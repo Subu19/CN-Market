@@ -1,0 +1,5 @@
+name: Market
+version: '1.0-SNAPSHOT'
+main: net.craftnepal.market.Market
+api-version: '1.20.4'
+depend: [ ProtocolLib ]

@@ -70,7 +70,7 @@ public class Claim extends SubCommand {
                     }
 
                 }else{
-                    SendMessage.sendPlayerMessage(player,"No plot found at your location.");
+                    SendMessage.sendPlayerMessage(player,"No plot found at your location..");
                     player.playSound(location,Sound.ITEM_SHIELD_BREAK,1,1);
 
                 }

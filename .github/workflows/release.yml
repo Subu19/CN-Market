@@ -3,7 +3,9 @@ name: Build and Release (Maven)
 on:
   push:
     branches:
-      - main
+      - "main"       # Build on all branches
+    tags:
+      - 'v*'       # Also handle tag pushes (for releases)
 
 jobs:
   build:
@@ -17,14 +19,16 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'  # Change to 8 or 11 if your plugin uses an older version
+          java-version: '17'
 
       - name: Build with Maven
         run: mvn clean package
 
+      # Only run this step when it's a tag push
       - name: Upload Jar to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v1
         with:
-          files: target/*.jar  # Maven output is typically in the target folder
+          files: target/*.jar
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

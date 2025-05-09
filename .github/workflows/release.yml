@@ -1,0 +1,30 @@
+name: Build and Release (Maven)
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on tag pushes like v1.0.0
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'  # Change to 8 or 11 if your plugin uses an older version
+
+      - name: Build with Maven
+        run: mvn clean package
+
+      - name: Upload Jar to GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: target/*.jar  # Maven output is typically in the target folder
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

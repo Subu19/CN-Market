@@ -3,6 +3,7 @@ package net.craftnepal.market.subcommands;
 import me.kodysimpson.simpapi.command.SubCommand;
 import net.craftnepal.market.Listeners.Movement;
 import net.craftnepal.market.files.LocationData;
+import net.craftnepal.market.utils.PlayerUtils;
 import net.craftnepal.market.utils.RegionUtils;
 import net.craftnepal.market.utils.SendMessage;
 import org.bukkit.Location;
@@ -36,7 +37,7 @@ public class Back extends SubCommand {
     public void perform(CommandSender commandSender, String[] strings) {
         if(commandSender instanceof Player){
             Player player = (Player) commandSender;
-            Location lastLocation = RegionUtils.getLastLocation(player);
+            Location lastLocation = PlayerUtils.getLastLocation(player);
             if(lastLocation != null){
                 player.teleport(lastLocation);
                 Movement.getPlayersInMarket().remove(player.getUniqueId());
@@ -45,7 +46,7 @@ public class Back extends SubCommand {
 
                 SendMessage.sendPlayerMessage(player,"You left the Market!");
                 //remove user from lastlocation database
-                RegionUtils.removeLastLocation(player);
+                PlayerUtils.clearLastLocation(player);
             }else{
                 SendMessage.sendPlayerMessage(player,"Last location not Found!");
             }

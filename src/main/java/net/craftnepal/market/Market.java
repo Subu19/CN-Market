@@ -3,10 +3,8 @@ package net.craftnepal.market;
 import com.comphenix.protocol.ProtocolLibrary;
 import com.comphenix.protocol.ProtocolManager;
 import me.kodysimpson.simpapi.command.CommandManager;
-import net.craftnepal.market.Listeners.MarketRegionProtection;
-import net.craftnepal.market.Listeners.Movement;
-import net.craftnepal.market.Listeners.RegionSelection;
-import net.craftnepal.market.Listeners.joinEvent;
+import me.kodysimpson.simpapi.menu.MenuManager;
+import net.craftnepal.market.Listeners.*;
 import net.craftnepal.market.commands.*;
 import net.craftnepal.market.files.LocationData;
 import net.craftnepal.market.files.RegionData;
@@ -40,7 +38,8 @@ public final class Market extends JavaPlugin implements Listener {
         saveDefaultConfig();
         config = getConfig();
         cfile = new File(getDataFolder(),"config.yml");
-
+        //initialize menu
+        MenuManager.setup(getServer(), this);
         //load custom config;
         RegionData.setup();
         RegionData.get().addDefault("test","spawn");
@@ -57,6 +56,7 @@ public final class Market extends JavaPlugin implements Listener {
         getServer().getPluginManager().registerEvents(new RegionSelection(),this);
         getServer().getPluginManager().registerEvents(new MarketRegionProtection(), this);
         getServer().getPluginManager().registerEvents(new Movement(this),this);
+        getServer().getPluginManager().registerEvents(new ShopInteraction(),this);
 
         //command register
 //        getCommand("market").setExecutor(new MarketCmd());
@@ -75,7 +75,8 @@ public final class Market extends JavaPlugin implements Listener {
                     Claim.class,
                     PlotTeleport.class,
                     Spawn.class,
-                    Back.class
+                    Back.class,
+                    Shops.class
             );
 //            CommandManager.createCoreCommand(this,"bd","Testing birthday command", "/bd", null,
 //                   Spiral.class

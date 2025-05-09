@@ -2,8 +2,8 @@ name: Build and Release (Maven)
 
 on:
   push:
-    tags:
-      - 'v*'  # Triggers on tag pushes like v1.0.0
+    branches:
+      - main
 
 jobs:
   build:

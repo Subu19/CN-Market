@@ -37,18 +37,23 @@ public class Back extends SubCommand {
     public void perform(CommandSender commandSender, String[] strings) {
         if(commandSender instanceof Player){
             Player player = (Player) commandSender;
-            Location lastLocation = PlayerUtils.getLastLocation(player);
-            if(lastLocation != null){
-                player.teleport(lastLocation);
-                Movement.getPlayersInMarket().remove(player.getUniqueId());
-                //toggle fly
-                Movement.checkAndToggle(player,false);
+            //Check if the player is inside market
+            if(Movement.isPlayerInMarket(player.getUniqueId())){
+                Location lastLocation = PlayerUtils.getLastLocation(player);
+                if(lastLocation != null){
+                    player.teleport(lastLocation);
+                    Movement.getPlayersInMarket().remove(player.getUniqueId());
+                    //toggle fly
+                    Movement.checkAndToggle(player,false);
 
-                SendMessage.sendPlayerMessage(player,"You left the Market!");
-                //remove user from lastlocation database
-                PlayerUtils.clearLastLocation(player);
+                    SendMessage.sendPlayerMessage(player,"You left the Market!");
+                    //remove user from lastlocation database
+                    PlayerUtils.clearLastLocation(player);
+                }else{
+                    SendMessage.sendPlayerMessage(player,"Last location not Found!");
+                }
             }else{
-                SendMessage.sendPlayerMessage(player,"Last location not Found!");
+                SendMessage.sendPlayerMessage(player,"You are not in the market!");
             }
         }
     }

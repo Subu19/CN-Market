@@ -31,6 +31,10 @@ public class Movement implements Listener {
         return new HashMap<>(playersInMarket);
     }
 
+    public static Boolean isPlayerInMarket(UUID uuid){
+        return playersInMarket.get(uuid);
+    }
+
     @EventHandler
     public void onMarketMovement(PlayerMoveEvent e) {
         // Only process if player actually moved blocks

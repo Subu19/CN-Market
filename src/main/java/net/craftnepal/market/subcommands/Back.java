@@ -6,6 +6,7 @@ import net.craftnepal.market.files.LocationData;
 import net.craftnepal.market.utils.PlayerUtils;
 import net.craftnepal.market.utils.RegionUtils;
 import net.craftnepal.market.utils.SendMessage;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -39,6 +40,7 @@ public class Back extends SubCommand {
             Player player = (Player) commandSender;
             //Check if the player is inside market
             if(Movement.isPlayerInMarket(player.getUniqueId())){
+                Bukkit.getLogger().info("player is in market");
                 Location lastLocation = PlayerUtils.getLastLocation(player);
                 if(lastLocation != null){
                     player.teleport(lastLocation);

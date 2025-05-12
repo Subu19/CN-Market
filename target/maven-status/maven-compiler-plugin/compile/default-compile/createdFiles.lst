@@ -5,6 +5,7 @@ net\craftnepal\market\utils\PlotUtils.class
 net\craftnepal\market\commands\God.class
 net\craftnepal\market\subcommands\Reload.class
 net\craftnepal\market\subcommands\Spiral.class
+net\craftnepal\market\utils\TeleportUtils.class
 net\craftnepal\market\utils\PrintParticles.class
 net\craftnepal\market\files\RegionData.class
 net\craftnepal\market\subcommands\ToggleBorder.class

@@ -5,10 +5,7 @@ import net.craftnepal.market.Listeners.Movement;
 import net.craftnepal.market.Market;
 import net.craftnepal.market.files.LocationData;
 import net.craftnepal.market.files.RegionData;
-import net.craftnepal.market.utils.MarketUtils;
-import net.craftnepal.market.utils.PlayerUtils;
-import net.craftnepal.market.utils.RegionUtils;
-import net.craftnepal.market.utils.SendMessage;
+import net.craftnepal.market.utils.*;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.command.CommandSender;
@@ -48,16 +45,11 @@ public class Spawn extends SubCommand {
             if(Movement.getPlayersInMarket().containsKey(player.getUniqueId())){
                 SendMessage.sendPlayerMessage(player,"You are already in market!");
             }else{
-                SendMessage.sendPlayerMessage(player,"Teleporting to market");
-                Bukkit.getScheduler().scheduleSyncDelayedTask(Market.getPlugin(),()->{
-                    //get and save last location first
+                SendMessage.sendPlayerMessage(player,"Teleporting to market in 5 seconds");
+                TeleportUtils.scheduleTeleport(player, spawn, () -> {
                     PlayerUtils.saveLastLocation(player);
-                    //put player into makret players
-                    Movement.getPlayersInMarket().put(player.getUniqueId(),true);
-                    //teleport player!
-                    player.teleport(spawn);
-                    SendMessage.sendPlayerMessage(player,"&aWelcome to market!");
-
+                    Movement.getPlayersInMarket().put(player.getUniqueId(), true);
+                    SendMessage.sendPlayerMessage(player, "&aWelcome to market!");
                 },50L);
             }
         }

@@ -4,6 +4,7 @@ import net.craftnepal.market.Market;
 import net.craftnepal.market.files.RegionData;
 import net.craftnepal.market.utils.RegionUtils;
 import net.craftnepal.market.utils.SendMessage;
+import net.craftnepal.market.utils.TeleportUtils;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -31,16 +32,21 @@ public class Movement implements Listener {
         return new HashMap<>(playersInMarket);
     }
 
-    public static Boolean isPlayerInMarket(UUID uuid){
-        return playersInMarket.get(uuid);
+    public static boolean isPlayerInMarket(UUID uuid) {
+        Boolean inMarket = playersInMarket.get(uuid);
+        return inMarket != null && inMarket;
     }
 
     @EventHandler
     public void onMarketMovement(PlayerMoveEvent e) {
+        //Cancel any teleports if any pending for that player!
+        TeleportUtils.handleMovement(e);
+
         // Only process if player actually moved blocks
         if (e.getFrom().getBlock().equals(e.getTo().getBlock())) {
             return;
         }
+
 
         Player player = e.getPlayer();
         Location min = RegionData.get().getLocation("market.posMin");

@@ -83,7 +83,7 @@ public class PlotUtils {
         return new Location(
                 min.getWorld(),
                 (min.getX() + max.getX()) / 2,
-                (min.getY() + max.getY()) / 2 + 1, // +1 to be above ground
+                (min.getY()) + 1, // +1 to be above ground
                 (min.getZ() + max.getZ()) / 2
         );
     }

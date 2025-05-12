@@ -2,6 +2,7 @@ package net.craftnepal.market.Listeners;
 
 import net.craftnepal.market.Market;
 import net.craftnepal.market.files.RegionData;
+import net.craftnepal.market.utils.MarketUtils;
 import net.craftnepal.market.utils.RegionUtils;
 import net.craftnepal.market.utils.SendMessage;
 import net.craftnepal.market.utils.TeleportUtils;
@@ -61,9 +62,9 @@ public class Movement implements Listener {
             return;
         }
 
-        boolean isInsideMarket = RegionUtils.isLocationInsideRegion(player.getLocation(), min, max);
-        UUID uuid = player.getUniqueId();
+        boolean isInsideMarket = MarketUtils.isInMarketArea(player.getLocation());
 
+        UUID uuid = player.getUniqueId();
         if (isInsideMarket) {
             handleEnterMarket(player, uuid);
         } else {

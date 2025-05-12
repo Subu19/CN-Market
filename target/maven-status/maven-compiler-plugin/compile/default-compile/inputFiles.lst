@@ -8,6 +8,7 @@ C:\Users\Subu\IdeaProjects\Market\src\main\java\net\craftnepal\market\Listeners\
 C:\Users\Subu\IdeaProjects\Market\src\main\java\net\craftnepal\market\subcommands\ListPlots.java
 C:\Users\Subu\IdeaProjects\Market\src\main\java\net\craftnepal\market\commands\MarketSelectionMode.java
 C:\Users\Subu\IdeaProjects\Market\src\main\java\net\craftnepal\market\subcommands\DeletePlot.java
+C:\Users\Subu\IdeaProjects\Market\src\main\java\net\craftnepal\market\utils\TeleportUtils.java
 C:\Users\Subu\IdeaProjects\Market\src\main\java\net\craftnepal\market\menus\ShopListMenu.java
 C:\Users\Subu\IdeaProjects\Market\src\main\java\net\craftnepal\market\subcommands\Back.java
 C:\Users\Subu\IdeaProjects\Market\src\main\java\net\craftnepal\market\utils\SendMessage.java
@@ -17,6 +18,7 @@ C:\Users\Subu\IdeaProjects\Market\src\main\java\net\craftnepal\market\files\Loca
 C:\Users\Subu\IdeaProjects\Market\src\main\java\net\craftnepal\market\utils\PrintParticles.java
 C:\Users\Subu\IdeaProjects\Market\src\main\java\net\craftnepal\market\subcommands\ToggleBorder.java
 C:\Users\Subu\IdeaProjects\Market\src\main\java\net\craftnepal\market\commands\SetMarketSpawn.java
+C:\Users\Subu\IdeaProjects\Market\src\main\java\net\craftnepal\market\files\PriceData.java
 C:\Users\Subu\IdeaProjects\Market\src\main\java\net\craftnepal\market\Listeners\RegionSelection.java
 C:\Users\Subu\IdeaProjects\Market\src\main\java\net\craftnepal\market\subcommands\Bypass.java
 C:\Users\Subu\IdeaProjects\Market\src\main\java\net\craftnepal\market\subcommands\SetSpawn.java

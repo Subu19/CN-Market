@@ -7,6 +7,7 @@ import me.kodysimpson.simpapi.menu.MenuManager;
 import net.craftnepal.market.Listeners.*;
 import net.craftnepal.market.commands.*;
 import net.craftnepal.market.files.LocationData;
+import net.craftnepal.market.files.PriceData;
 import net.craftnepal.market.files.RegionData;
 import net.craftnepal.market.subcommands.*;
 import org.bukkit.Bukkit;
@@ -28,6 +29,7 @@ public final class Market extends JavaPlugin implements Listener {
     private static Market plugin;
     private static FileConfiguration config;
     private  static File cfile;
+
     @Override
     public void onEnable() {
         //turn on manager
@@ -40,6 +42,7 @@ public final class Market extends JavaPlugin implements Listener {
         cfile = new File(getDataFolder(),"config.yml");
         //initialize menu
         MenuManager.setup(getServer(), this);
+
         //load custom config;
         RegionData.setup();
         RegionData.get().addDefault("test","spawn");
@@ -50,6 +53,8 @@ public final class Market extends JavaPlugin implements Listener {
         LocationData.get().addDefault("players","");
         LocationData.get().options().copyDefaults(true);
         LocationData.save();
+
+        PriceData.setup();
 
         //event listeners
         getServer().getPluginManager().registerEvents(new joinEvent(this),this);
@@ -76,7 +81,9 @@ public final class Market extends JavaPlugin implements Listener {
                     PlotTeleport.class,
                     Spawn.class,
                     Back.class,
-                    Shops.class
+                    Shops.class,
+                    SetPlotSpawn.class,
+                    PlotSpawn.class
             );
 //            CommandManager.createCoreCommand(this,"bd","Testing birthday command", "/bd", null,
 //                   Spiral.class

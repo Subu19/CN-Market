@@ -95,4 +95,45 @@ public class PlotUtils {
         String owner = getPlotOwner(plotId);
         return owner != null && owner.equals(player.getUniqueId().toString());
     }
+
+    public static Location getPlotSpawn(String plotId) {
+        return RegionData.get().getLocation("market.plots." + plotId + ".spawn");
+    }    public static void setPlotSpawn(String plotId, Location location) {
+        RegionData.get().set("market.plots." + plotId + ".spawn", location);
+        RegionData.save();
+    }
+
+    public static void teleportToPlotSpawn(Player player, String plotId) {
+        Location spawn = getPlotSpawn(plotId);
+        if (spawn != null) {
+            player.teleport(spawn);
+            SendMessage.sendPlayerMessage(player, "&aTeleported to plot spawn point!");
+        } else {
+            SendMessage.sendPlayerMessage(player, "&cThis plot doesn't have a spawn point set!");
+        }
+    }
+
+    /**
+     * Teleport a player to their own plot's spawn point
+     * @param player The player to teleport
+     * @return true if teleported successfully, false if player doesn't own a plot or plot has no spawn
+     */
+    public static boolean teleportToOwnPlotSpawn(Player player) {
+        String plotId = getPlotIdByPlayer(player);
+        if (plotId == null) {
+            SendMessage.sendPlayerMessage(player, "&cYou don't own a plot!");
+            return false;
+        }
+        
+        Location spawn = getPlotSpawn(plotId);
+        if (spawn == null) {
+            SendMessage.sendPlayerMessage(player, "&cYour plot doesn't have a spawn point set! Use /market setplotspawn to set one.");
+            return false;
+        }
+        SendMessage.sendPlayerMessage(player,"&eTeleporting in 5 seconds.. don't move!");
+        TeleportUtils.scheduleTeleport(player,spawn,()->{
+            SendMessage.sendPlayerMessage(player, "&aTeleported to your plot's spawn point!");
+        });
+        return true;
+    }
 }

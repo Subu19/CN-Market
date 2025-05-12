@@ -6,6 +6,7 @@ import net.craftnepal.market.Market;
 import net.craftnepal.market.files.RegionData;
 import net.craftnepal.market.utils.RegionUtils;
 import net.craftnepal.market.utils.SendMessage;
+import net.craftnepal.market.utils.TeleportUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
 import org.bukkit.Location;
@@ -52,21 +53,30 @@ public class PlotTeleport extends SubCommand {
                     assert owner != null;
                     OfflinePlayer plotOwner = Bukkit.getOfflinePlayer(UUID.fromString(owner));
                     String plotOwnerName = plotOwner.getName();
-                    assert plotOwnerName != null;
-                    if(plotOwnerName.equalsIgnoreCase(pp)){
+                    assert plotOwnerName != null;                    if(plotOwnerName.equalsIgnoreCase(pp)){
                         Location min = RegionData.get().getLocation("market.plots."+plot+".posMin");
                         Location max = RegionData.get().getLocation("market.plots."+plot+".posMax");
-                        Location tpLocation = new Location(
-                                player.getWorld(),
-                                (min.getX()+max.getX())/2,
-                                min.getY()+2,
-                                min.getZ()
-                        );
-                        SendMessage.sendPlayerMessage(player,"Teleporting in 2 seconds..");
-                        Bukkit.getScheduler().scheduleSyncDelayedTask(Market.getPlugin(),()->{
-                            player.teleport(tpLocation);
+                        
+                        // First check for plot spawn
+                        Location plotSpawn = RegionData.get().getLocation("market.plots."+plot+".spawn");
+                        Location tpLocation;
+                        
+                        if (plotSpawn != null) {
+                            tpLocation = plotSpawn;
+                        } else {
+                            // Fall back to center if no spawn is set
+                            tpLocation = new Location(
+                                    player.getWorld(),
+                                    (min.getX()+max.getX())/2,
+                                    min.getY()+2,
+                                    min.getZ()
+                            );
+                        }
+                        
+                        SendMessage.sendPlayerMessage(player,"&eTeleporting in 5 seconds.. don't move!");
+                        TeleportUtils.scheduleTeleport(player, tpLocation, ()->{
                             RegionUtils.visibleRegionBorders(player,min,max,Market.getPlugin(), Color.PURPLE,30);
-                        },50L);
+                        });
                         return;
                     }
                 }

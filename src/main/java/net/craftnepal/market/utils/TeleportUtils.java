@@ -12,7 +12,7 @@ import java.util.UUID;
 public class TeleportUtils {
 
     private static final Map<UUID, Integer> teleportTasks = new HashMap<>();
-    private static final long DELAY_TICKS = 50L; // 2.5 seconds
+    private static final long DELAY_TICKS = 100L; // 5 seconds
 
     /**
      * Schedule a delayed teleport for a player.

@@ -10,6 +10,8 @@ import net.craftnepal.market.files.LocationData;
 import net.craftnepal.market.files.PriceData;
 import net.craftnepal.market.files.RegionData;
 import net.craftnepal.market.subcommands.*;
+import net.craftnepal.market.utils.DisplayUtils;
+import net.craftnepal.market.utils.MarketUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -28,78 +30,89 @@ public final class Market extends JavaPlugin implements Listener {
     private static ProtocolManager protocolManager;
     private static Market plugin;
     private static FileConfiguration config;
-    private  static File cfile;
+    private static File cfile;
+    private DisplayUtils displayUtils;
 
     @Override
     public void onEnable() {
-        //turn on manager
-         protocolManager = ProtocolLibrary.getProtocolManager();
-         plugin = this;
-        //load config
+        // turn on manager
+        protocolManager = ProtocolLibrary.getProtocolManager();
+        plugin = this;
+
+        // load config
         getConfig().options().copyDefaults();
         saveDefaultConfig();
         config = getConfig();
-        cfile = new File(getDataFolder(),"config.yml");
-        //initialize menu
+        cfile = new File(getDataFolder(), "config.yml");
+
+        // initialize menu
         MenuManager.setup(getServer(), this);
 
-        //load custom config;
+        // load custom config
         RegionData.setup();
-        RegionData.get().addDefault("test","spawn");
+        RegionData.get().addDefault("test", "spawn");
         RegionData.get().options().copyDefaults(true);
         RegionData.save();
 
         LocationData.setup();
-        LocationData.get().addDefault("players","");
+        LocationData.get().addDefault("players", "");
         LocationData.get().options().copyDefaults(true);
         LocationData.save();
 
         PriceData.setup();
 
-        //event listeners
-        getServer().getPluginManager().registerEvents(new joinEvent(this),this);
-        getServer().getPluginManager().registerEvents(new RegionSelection(),this);
-        getServer().getPluginManager().registerEvents(new MarketRegionProtection(), this);
-        getServer().getPluginManager().registerEvents(new Movement(this),this);
-        getServer().getPluginManager().registerEvents(new ShopInteraction(),this);
+        // initialize display system
+        displayUtils = DisplayUtils.getInstance();
+        getServer().getScheduler().runTask(this, () -> {
+            if (MarketUtils.getMarketSpawn() != null) {
+                displayUtils.spawnMarketDisplays();
+            }
+        });
 
-        //command register
-//        getCommand("market").setExecutor(new MarketCmd());
+        // event listeners
+        getServer().getPluginManager().registerEvents(new joinEvent(this), this);
+        getServer().getPluginManager().registerEvents(new RegionSelection(), this);
+        getServer().getPluginManager().registerEvents(new MarketRegionProtection(), this);
+        getServer().getPluginManager().registerEvents(new Movement(this), this);
+        getServer().getPluginManager().registerEvents(new ShopInteraction(), this);
+        getServer().getPluginManager().registerEvents(new MarketDisplayListener(this), this);
+
+        // command register
         try {
-            CommandManager.createCoreCommand(this,"amarket","Admin commands for market configuration","/amarket",null,
-                    SelectionMode.class ,
+            CommandManager.createCoreCommand(this, "amarket", "Admin commands for market configuration", "/amarket",
+                    null,
+                    SelectionMode.class,
                     ToggleBorder.class,
                     SetSpawn.class,
                     ListPlots.class,
                     DeletePlot.class,
                     Bypass.class,
-                    Reload.class
-            );
+                    Reload.class);
 
-            CommandManager.createCoreCommand(this,"market","Market Commands for Players", "/market", null,
+            CommandManager.createCoreCommand(this, "market", "Market Commands for Players", "/market", null,
                     Claim.class,
                     PlotTeleport.class,
                     Spawn.class,
                     Back.class,
                     Shops.class,
                     SetPlotSpawn.class,
-                    PlotSpawn.class
-            );
-//            CommandManager.createCoreCommand(this,"bd","Testing birthday command", "/bd", null,
-//                   Spiral.class
-//            );
+                    PlotSpawn.class);
         } catch (NoSuchFieldException | IllegalAccessException e) {
             throw new RuntimeException(e);
         }
         Bukkit.getLogger().info("Market was loaded successfully!");
     }
+
     @Override
     public void onDisable() {
-        // Plugin shutdown logic
+        // Clean up displays when plugin disables
+        if (displayUtils != null) {
+            displayUtils.clearAllDisplays();
+        }
         Bukkit.getLogger().info("Market is shutting down!");
     }
 
-    //get plugins and configs
+    // get plugins and configs
     public static Market getPlugin() {
         return plugin;
     }
@@ -107,7 +120,8 @@ public final class Market extends JavaPlugin implements Listener {
     public static FileConfiguration getMainConfig() {
         return config;
     }
-    public static void reloadMainConfig(){
+
+    public static void reloadMainConfig() {
         config = YamlConfiguration.loadConfiguration(cfile);
     }
 

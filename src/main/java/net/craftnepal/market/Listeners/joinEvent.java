@@ -1,6 +1,8 @@
 package net.craftnepal.market.Listeners;
 
 import net.craftnepal.market.Market;
+import net.craftnepal.market.utils.DisplayUtils;
+import net.craftnepal.market.utils.MarketUtils;
 import org.bukkit.ChatColor;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
@@ -10,8 +12,7 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.Plugin;
 
 public class joinEvent implements Listener {
-    FileConfiguration config;
-    @EventHandler
+    FileConfiguration config;    @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event){
         Player p = event.getPlayer();
         String joinmessage = config.getString("join-message");

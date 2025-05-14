@@ -94,11 +94,27 @@ public class PlotUtils {
 
         String owner = getPlotOwner(plotId);
         return owner != null && owner.equals(player.getUniqueId().toString());
+    }    public static Location getPlotSpawn(String plotId) {
+        return RegionData.get().getLocation("market.plots." + plotId + ".spawn");
     }
 
-    public static Location getPlotSpawn(String plotId) {
-        return RegionData.get().getLocation("market.plots." + plotId + ".spawn");
-    }    public static void setPlotSpawn(String plotId, Location location) {
+    /**
+     * Set the owner of a plot and update displays accordingly
+     * @param plotId The ID of the plot
+     * @param ownerUUID The UUID of the new owner, or null to unclaim
+     */
+    public static void setPlotOwner(String plotId, String ownerUUID) {
+
+        // Update the owner in the config
+        if (ownerUUID != null) {
+            RegionData.get().set("market.plots." + plotId + ".owner", ownerUUID);
+        } else {
+            // If unclaiming, remove all plot data
+            RegionData.get().set("market.plots." + plotId + ".owner", null);
+        }
+        RegionData.save();
+
+    }public static void setPlotSpawn(String plotId, Location location) {
         RegionData.get().set("market.plots." + plotId + ".spawn", location);
         RegionData.save();
     }

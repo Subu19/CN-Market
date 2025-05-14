@@ -1,20 +1,15 @@
 package net.craftnepal.market.Listeners;
 
+import net.craftnepal.market.Entities.ChestShop;
 import net.craftnepal.market.Market;
 import net.craftnepal.market.files.PriceData;
 import net.craftnepal.market.files.RegionData;
-import net.craftnepal.market.utils.MarketUtils;
-import net.craftnepal.market.utils.PlotUtils;
-import net.craftnepal.market.utils.RegionUtils;
-import net.craftnepal.market.utils.SendMessage;
+import net.craftnepal.market.utils.*;
 import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.ComponentBuilder;
 import net.md_5.bungee.api.chat.HoverEvent;
 import net.md_5.bungee.api.chat.TextComponent;
-import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.Location;
-import org.bukkit.Material;
+import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
@@ -34,18 +29,30 @@ import java.util.function.Consumer;
 
 public class ShopInteraction implements Listener {
     private final Map<UUID, Consumer<String>> awaitingInput = new HashMap<>();
+    private final DisplayUtils displayUtils;
+
+    public ShopInteraction() {
+        this.displayUtils = DisplayUtils.getInstance();
+    }
 
     @EventHandler
     public void onChestInteraction(PlayerInteractEvent event) {
         Player player = event.getPlayer();
         UUID uuid = player.getUniqueId();
 
-        if (event.getAction() != Action.LEFT_CLICK_BLOCK || event.getClickedBlock() == null) return;
+        //Check if the player is not in survival mode.
+        if(player.getGameMode() != GameMode.SURVIVAL) return;
+
+        //Check for block and click
+        if (event.getAction() != Action.LEFT_CLICK_BLOCK || event.getClickedBlock() == null)
+            return;
 
         Block clickedBlock = event.getClickedBlock();
         Material blockType = clickedBlock.getType();
 
-        if (blockType != Material.CHEST && blockType != Material.TRAPPED_CHEST) return;
+        if (blockType != Material.BARREL){
+            return;
+        }
 
         Location chestLocation = clickedBlock.getLocation();
 
@@ -81,17 +88,17 @@ public class ShopInteraction implements Listener {
         // Check if this chest is already a shop
         ConfigurationSection shops = RegionData.get().getConfigurationSection("market.plots." + playerPlot + ".shops");
         if (shops != null) {
-            for (String shopId : shops.getKeys(false)) {
-                Location shopLoc = RegionData.get().getLocation("market.plots." + playerPlot + ".shops." + shopId + ".location");
+            for (String shopId : shops.getKeys(true)) {
+                Location shopLoc = RegionData.get()
+                        .getLocation("market.plots." + playerPlot + ".shops." + shopId + ".location");
                 if (shopLoc != null && shopLoc.equals(chestLocation)) {
                     SendMessage.sendPlayerMessage(player, "§cThis chest is already a shop!");
-                    event.setCancelled(true);
                     return;
                 }
             }
-        }        // Retrieve the item in hand
+        } // Retrieve the item in hand
         Material itemType = item.getType();
-        String itemName = itemType.name().replace("_", " ").toLowerCase();        // Fetch the fair price from PriceData
+        String itemName = itemType.name().replace("_", " ").toLowerCase(); // Fetch the fair price from PriceData
         double fairPrice = PriceData.getPrice(itemType);
         if (fairPrice <= 0) {
             SendMessage.sendPlayerMessage(player, "§cThis item cannot be sold in shops as it has no base price set.");
@@ -116,32 +123,37 @@ public class ShopInteraction implements Listener {
 
         // Create price adjustment buttons
         TextComponent decrease10 = new TextComponent("§6[<< 10%]");
-        decrease10.setClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, String.format("%.2f", fairPrice * 0.90)));
-        decrease10.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, 
-            new ComponentBuilder("§7Set price to: §6" + String.format("%.2f", fairPrice * 0.90)).create()));
+        decrease10.setClickEvent(
+                new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, String.format("%.2f", fairPrice * 0.90)));
+        decrease10.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                new ComponentBuilder("§7Set price to: §6" + String.format("%.2f", fairPrice * 0.90)).create()));
 
         TextComponent decrease5 = new TextComponent("§e[< 5%]");
-        decrease5.setClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, String.format("%.2f", fairPrice * 0.95)));
+        decrease5.setClickEvent(
+                new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, String.format("%.2f", fairPrice * 0.95)));
         decrease5.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-            new ComponentBuilder("§7Set price to: §e" + String.format("%.2f", fairPrice * 0.95)).create()));
+                new ComponentBuilder("§7Set price to: §e" + String.format("%.2f", fairPrice * 0.95)).create()));
 
         TextComponent basePrice = new TextComponent("§2[" + String.format("%.2f", fairPrice) + "]");
         basePrice.setClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, String.format("%.2f", fairPrice)));
         basePrice.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-            new ComponentBuilder("§7Click to use base price").create()));
+                new ComponentBuilder("§7Click to use base price").create()));
 
         TextComponent increase5 = new TextComponent("§e[5% >]");
-        increase5.setClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, String.format("%.2f", fairPrice * 1.05)));
+        increase5.setClickEvent(
+                new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, String.format("%.2f", fairPrice * 1.05)));
         increase5.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-            new ComponentBuilder("§7Set price to: §e" + String.format("%.2f", fairPrice * 1.05)).create()));
+                new ComponentBuilder("§7Set price to: §e" + String.format("%.2f", fairPrice * 1.05)).create()));
 
         TextComponent increase10 = new TextComponent("§6[10% >>]");
-        increase10.setClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, String.format("%.2f", fairPrice * 1.10)));
+        increase10.setClickEvent(
+                new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, String.format("%.2f", fairPrice * 1.10)));
         increase10.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-            new ComponentBuilder("§7Set price to: §6" + String.format("%.2f", fairPrice * 1.10)).create()));
+                new ComponentBuilder("§7Set price to: §6" + String.format("%.2f", fairPrice * 1.10)).create()));
 
         // Create the bottom row with all buttons
-        TextComponent buttonsRow = new TextComponent(Objects.requireNonNull(Market.getMainConfig().getString("prefix")).replaceAll("&","§"));
+        TextComponent buttonsRow = new TextComponent(
+                Objects.requireNonNull(Market.getMainConfig().getString("prefix")).replaceAll("&", "§"));
         buttonsRow.addExtra(decrease10);
         buttonsRow.addExtra(spacer);
         buttonsRow.addExtra(decrease5);
@@ -164,33 +176,55 @@ public class ShopInteraction implements Listener {
                 SendMessage.sendPlayerMessage(player, "§cShop creation cancelled.");
                 return;
             }
-              try {
+            try {
+                // Parse the input price
                 double price = Double.parseDouble(input);
+
+                // Validate the price
                 if (price < minPrice) {
-                    player.sendMessage(ChatColor.RED + "Price cannot be less than " + String.format("%.2f", minPrice) + " (15% below base price).");
+                    player.sendMessage(ChatColor.RED + "Price cannot be less than " + String.format("%.2f", minPrice)
+                            + " (15% below base price).");
                     return;
                 }
                 if (price > maxPrice) {
-                    player.sendMessage(ChatColor.RED + "Price cannot be more than " + String.format("%.2f", maxPrice) + " (50% above base price).");
+                    player.sendMessage(ChatColor.RED + "Price cannot be more than " + String.format("%.2f", maxPrice)
+                            + " (50% above base price).");
                     return;
                 }
 
                 // Generate a new shop ID
                 String shopId = UUID.randomUUID().toString();
 
-                // Save shop data to YAML
-                RegionData.get().set("market.plots." + playerPlot + ".shops." + shopId + ".location", chestLocation);
-                RegionData.get().set("market.plots." + playerPlot + ".shops." + shopId + ".item", item.getType().toString());
-                RegionData.get().set("market.plots." + playerPlot + ".shops." + shopId + ".owner", uuid.toString());
-                RegionData.get().set("market.plots." + playerPlot + ".shops." + shopId + ".price", price);
+                // Create a new ChestShop instance
+                ChestShop chestShop = new ChestShop(
+                        shopId,
+                        chestLocation,
+                        item.getType(),
+                        uuid,
+                        price
+                );
 
-                // Save the file
+                // Define the base path in the YAML configuration
+                String basePath = "market.plots." + playerPlot + ".shops." + shopId;
+
+                // Serialize and save the ChestShop data to the YAML configuration
+                RegionData.get().set(basePath + ".location",chestShop.getLocation());
+                RegionData.get().set(basePath + ".item", chestShop.getItem().toString());
+                RegionData.get().set(basePath + ".owner", chestShop.getOwner().toString());
+                RegionData.get().set(basePath + ".price", chestShop.getPrice());
+
+                // Save the configuration to persist the data
                 RegionData.save();
 
+                // Notify the player
                 player.sendMessage(ChatColor.GREEN + "Shop created successfully with price: " + ChatColor.GOLD + price);
+
+                //Spawn display after creation
+                displayUtils.spawnDisplayPair(chestShop);
             } catch (NumberFormatException e) {
                 player.sendMessage(ChatColor.RED + "Invalid price entered. Please enter a valid number.");
-            }        });
+            }
+        });
 
         // Add timeout to remove awaitingInput after 30 seconds
         Bukkit.getScheduler().runTaskLater(Bukkit.getPluginManager().getPlugin("Market"), () -> {
@@ -199,7 +233,6 @@ public class ShopInteraction implements Listener {
             }
         }, 20L * 30); // 30 seconds * 20 ticks per second
 
-        event.setCancelled(true);
     }
 
     @EventHandler
@@ -221,7 +254,8 @@ public class ShopInteraction implements Listener {
         Block block = event.getBlock();
         Material blockType = block.getType();
 
-        if (blockType != Material.CHEST && blockType != Material.TRAPPED_CHEST) return;
+        if (blockType != Material.BARREL)
+            return;
 
         Location chestLocation = block.getLocation();
 
@@ -234,23 +268,27 @@ public class ShopInteraction implements Listener {
         ConfigurationSection plots = RegionData.get().getConfigurationSection("market.plots");
         if (plots != null) {
             for (String plot : plots.getKeys(false)) {
-                ConfigurationSection shops = RegionData.get().getConfigurationSection("market.plots." + plot + ".shops");
+                ConfigurationSection shops = RegionData.get()
+                        .getConfigurationSection("market.plots." + plot + ".shops");
                 if (shops != null) {
                     for (String shopId : shops.getKeys(false)) {
-                        Location shopLoc = RegionData.get().getLocation("market.plots." + plot + ".shops." + shopId + ".location");
+                        Location shopLoc = RegionData.get()
+                                .getLocation("market.plots." + plot + ".shops." + shopId + ".location");
                         if (shopLoc != null && shopLoc.equals(chestLocation)) {
                             // Check if the breaker is the owner or has permission
                             Player player = event.getPlayer();
-                            String owner = RegionData.get().getString("market.plots." + plot + ".shops." + shopId + ".owner");
+                            String owner = RegionData.get()
+                                    .getString("market.plots." + plot + ".shops." + shopId + ".owner");
 
                             if (owner != null && owner.equals(player.getUniqueId().toString())) {
                                 // Owner breaking their own shop - remove it
                                 RegionData.get().set("market.plots." + plot + ".shops." + shopId, null);
                                 RegionData.save();
-                                SendMessage.sendPlayerMessage(player,"§aShop removed successfully.");
+                                SendMessage.sendPlayerMessage(player, "§aShop removed successfully.");
+                                displayUtils.removeDisplayPair(plot,shopId);
                             } else {
                                 // Someone else trying to break the shop
-                                SendMessage.sendPlayerMessage(player,"§cYou cannot break someone else's shop!");
+                                SendMessage.sendPlayerMessage(player, "§cYou cannot break someone else's shop!");
                                 event.setCancelled(true);
                             }
                             return;

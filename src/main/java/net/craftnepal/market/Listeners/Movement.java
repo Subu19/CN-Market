@@ -2,10 +2,7 @@ package net.craftnepal.market.Listeners;
 
 import net.craftnepal.market.Market;
 import net.craftnepal.market.files.RegionData;
-import net.craftnepal.market.utils.MarketUtils;
-import net.craftnepal.market.utils.RegionUtils;
-import net.craftnepal.market.utils.SendMessage;
-import net.craftnepal.market.utils.TeleportUtils;
+import net.craftnepal.market.utils.*;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -70,9 +67,7 @@ public class Movement implements Listener {
         } else {
             handleExitMarket(player, uuid);
         }
-    }
-
-    private void handleEnterMarket(Player player, UUID uuid) {
+    }    private void handleEnterMarket(Player player, UUID uuid) {
         // Cancel any pending flight disable
         cancelPendingFlightDisable(uuid);
 
@@ -90,9 +85,7 @@ public class Movement implements Listener {
                 return;
             }
 
-            SendMessage.sendPlayerMessage(player, "&eFlight will be disabled in " + FLIGHT_DISABLE_WARNING_TIME + " seconds!");
-
-            BukkitRunnable disableTask = new BukkitRunnable() {
+            SendMessage.sendPlayerMessage(player, "&eFlight will be disabled in " + FLIGHT_DISABLE_WARNING_TIME + " seconds!");            BukkitRunnable disableTask = new BukkitRunnable() {
                 @Override
                 public void run() {
                     if (player.isOnline()) {

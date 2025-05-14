@@ -2,6 +2,9 @@ package net.craftnepal.market.menus;
 
 import me.kodysimpson.simpapi.menu.Menu;
 import me.kodysimpson.simpapi.menu.PlayerMenuUtility;
+import net.craftnepal.market.Entities.ChestShop;
+import net.craftnepal.market.Market;
+import net.craftnepal.market.files.RegionData;
 import net.craftnepal.market.utils.*;
 import org.bukkit.*;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -120,12 +123,27 @@ public class ShopItemListMenu extends Menu {
                 !clickedItem.getType().equals(Material.BOOK)) {
             // Handle item click
             Material clickedMaterial = clickedItem.getType();
-            Location shopLocation = PlotUtils.getPlotCenter(String.valueOf(plotId));
+
+            //Fetch location to teleport. Either Plot spawn or Plot center
+            Location shopLocation;
+            Location shopSpawn = PlotUtils.getPlotSpawn(String.valueOf(plotId));
+            if(shopSpawn != null){
+                shopLocation = shopSpawn;
+            }else{
+                shopLocation = PlotUtils.getPlotCenter(String.valueOf(plotId));
+            }
 
             if (shopLocation != null) {
-                playerMenuUtility.getOwner().teleport(shopLocation);
-                playerMenuUtility.getOwner().sendMessage(ChatColor.GREEN + "Teleported to shop selling: " +
-                        ChatColor.YELLOW + clickedMaterial.name());
+                SendMessage.sendPlayerMessage(playerMenuUtility.getOwner(),"Teleporting to the shop in 5 seconds! Don't move..");
+                playerMenuUtility.getOwner().closeInventory();
+                TeleportUtils.scheduleTeleport(playerMenuUtility.getOwner(),shopLocation,()->{
+                    SendMessage.sendPlayerMessage(playerMenuUtility.getOwner(), "Teleported to shop selling: " +
+                            ChatColor.YELLOW + clickedMaterial.name());
+                    List<ChestShop> allShops =  ShopUtils.getPlotShopsByItemName( String.valueOf(plotId),clickedItem.getType().toString());
+                    for (ChestShop shop:allShops){
+                        RegionUtils.showVerticalParticleLine(shop.getLocation().clone().add(0,2,0),null, Market.getPlugin());
+                    }
+                });
             } else {
                 playerMenuUtility.getOwner().sendMessage(ChatColor.RED + "No shop found selling this item.");
             }

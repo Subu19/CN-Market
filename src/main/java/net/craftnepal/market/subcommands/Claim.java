@@ -2,6 +2,7 @@ package net.craftnepal.market.subcommands;
 
 import me.kodysimpson.simpapi.command.SubCommand;
 import net.craftnepal.market.files.RegionData;
+import net.craftnepal.market.utils.PlotUtils;
 import net.craftnepal.market.utils.RegionUtils;
 import net.craftnepal.market.utils.SendMessage;
 import org.bukkit.Bukkit;
@@ -57,10 +58,8 @@ public class Claim extends SubCommand {
                 }
 
                 if(selectedPlot != null){
-                    String owner = RegionData.get().getString("market.plots."+selectedPlot+".owner");
-                    if(owner == null || owner.isEmpty()){
-                        RegionData.get().set("market.plots."+selectedPlot+".owner", player.getUniqueId().toString());
-                        RegionData.save();
+                    String owner = RegionData.get().getString("market.plots."+selectedPlot+".owner");                    if(owner == null || owner.isEmpty()){
+                        PlotUtils.setPlotOwner(selectedPlot, player.getUniqueId().toString());
                         SendMessage.sendPlayerMessage(player,"&aYou successfully claimed plot: "+ selectedPlot);
                         player.playSound(location, Sound.ENTITY_EXPERIENCE_ORB_PICKUP,1,1);
                     }else if(owner.equals(player.getUniqueId().toString())){

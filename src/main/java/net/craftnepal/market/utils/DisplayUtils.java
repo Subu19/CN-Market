@@ -2,9 +2,12 @@ package net.craftnepal.market.utils;
 
 import net.craftnepal.market.Entities.ChestShop;
 import net.craftnepal.market.Entities.DisplayPair;
+import net.craftnepal.market.Entities.EnchantedBookChestShop;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.TextDisplay;
@@ -23,7 +26,6 @@ import java.util.Map;
 public class DisplayUtils {
     private static DisplayUtils instance;
     private final Map<String, Map<String, DisplayPair>> marketDisplays = new HashMap<>();
-
 
     private DisplayUtils() {
     }
@@ -76,7 +78,7 @@ public class DisplayUtils {
     }
 
     public DisplayPair spawnDisplayPair(ChestShop shop) {
-        Bukkit.getLogger().info("created display for "+shop.getId());
+        Bukkit.getLogger().info("created display for " + shop.getId());
         if (!RegionUtils.isChunkLoaded(shop.getLocation())) {
             return null;
         }
@@ -103,19 +105,31 @@ public class DisplayUtils {
                     new Vector3f(0.5f, 0.5f, 0.5f),
                     new AxisAngle4f(0, 0, 0, 0));
             display.setPersistent(false);
+            display.setBillboard(TextDisplay.Billboard.CENTER);
             display.setTransformation(transformation);
         });
 
         String displayName;
-        if (meta != null && meta.hasDisplayName()) {
+        if (shop.getItem() == Material.ENCHANTED_BOOK && shop instanceof EnchantedBookChestShop) {
+            EnchantedBookChestShop enchantedShop = (EnchantedBookChestShop) shop;
+            Map.Entry<Enchantment, Integer> enchant = enchantedShop.getEnchantment();
+            if (enchant != null) {
+                String enchantName = enchant.getKey().getKey().getKey();
+                displayName = String.format("§d%s %d",
+                        enchantName.replaceAll("_"," ").toUpperCase(),
+                        enchant.getValue());
+            } else {
+                displayName = "Enchanted Book";
+            }
+        } else if (meta != null && meta.hasDisplayName()) {
             displayName = meta.getDisplayName();
         } else {
             displayName = shop.getItem().toString().replace('_', ' ');
         }
         TextDisplay textDisplay = shopLoc.getWorld().spawn(textLoc, TextDisplay.class, display -> {
-            display.setText(String.format("§a%s\n§6Price: §f$%.2f",displayName, shop.getPrice()));
+            display.setText(String.format("§a%s\n§6Price: §f$%.2f", displayName, shop.getPrice()));
             display.setAlignment(TextDisplay.TextAlignment.CENTER);
-//            display.setBillboard(TextDisplay.Billboard.CENTER);
+            // display.setBillboard(TextDisplay.Billboard.CENTER);
             Transformation transformation = display.getTransformation();
             transformation.getScale().set(0.5D);
             display.setTransformation(transformation);
@@ -182,8 +196,6 @@ public class DisplayUtils {
             }
         }
     }
-
-
 
     public Map<String, Map<String, DisplayPair>> getMarketDisplays() {
         return marketDisplays;

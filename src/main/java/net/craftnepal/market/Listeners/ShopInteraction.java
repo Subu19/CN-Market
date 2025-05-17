@@ -1,6 +1,7 @@
 package net.craftnepal.market.Listeners;
 
 import net.craftnepal.market.Entities.ChestShop;
+import net.craftnepal.market.Entities.EnchantedBookChestShop;
 import net.craftnepal.market.Market;
 import net.craftnepal.market.files.PriceData;
 import net.craftnepal.market.files.RegionData;
@@ -12,6 +13,7 @@ import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -20,6 +22,7 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.EnchantmentStorageMeta;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -40,17 +43,18 @@ public class ShopInteraction implements Listener {
         Player player = event.getPlayer();
         UUID uuid = player.getUniqueId();
 
-        //Check if the player is not in survival mode.
-        if(player.getGameMode() != GameMode.SURVIVAL) return;
+        // Check if the player is not in survival mode.
+        if (player.getGameMode() != GameMode.SURVIVAL)
+            return;
 
-        //Check for block and click
+        // Check for block and click
         if (event.getAction() != Action.LEFT_CLICK_BLOCK || event.getClickedBlock() == null)
             return;
 
         Block clickedBlock = event.getClickedBlock();
         Material blockType = clickedBlock.getType();
 
-        if (blockType != Material.BARREL){
+        if (blockType != Material.BARREL) {
             return;
         }
 
@@ -96,9 +100,26 @@ public class ShopInteraction implements Listener {
                     return;
                 }
             }
-        } // Retrieve the item in hand
+        }
+
+        // Retrieve the item in hand
         Material itemType = item.getType();
-        String itemName = itemType.name().replace("_", " ").toLowerCase(); // Fetch the fair price from PriceData
+        String itemName = itemType.name().replace("_", " ").toLowerCase();
+
+        final Map.Entry<Enchantment, Integer> enchantment;
+        if (itemType == Material.ENCHANTED_BOOK) {
+            EnchantmentStorageMeta meta = (EnchantmentStorageMeta) item.getItemMeta();
+            if (meta != null && meta.getStoredEnchants().size() > 1) {
+                SendMessage.sendPlayerMessage(player, "§cYou cannot sell books with multiple enchantments.");
+                return;
+            }
+            assert meta != null;
+            enchantment = meta.getStoredEnchants().entrySet().iterator().next();
+        } else {
+            enchantment = null;
+        }
+
+        // Get the price of the item
         double fairPrice = PriceData.getPrice(itemType);
         if (fairPrice <= 0) {
             SendMessage.sendPlayerMessage(player, "§cThis item cannot be sold in shops as it has no base price set.");
@@ -195,32 +216,66 @@ public class ShopInteraction implements Listener {
                 // Generate a new shop ID
                 String shopId = UUID.randomUUID().toString();
 
-                // Create a new ChestShop instance
-                ChestShop chestShop = new ChestShop(
-                        shopId,
-                        chestLocation,
-                        item.getType(),
-                        uuid,
-                        price
-                );
+                if (enchantment != null) {
 
-                // Define the base path in the YAML configuration
-                String basePath = "market.plots." + playerPlot + ".shops." + shopId;
+                    // Create a new EnchantedBookChestShop instance
+                    EnchantedBookChestShop enchantedBookChestShop = new EnchantedBookChestShop(
+                            shopId,
+                            chestLocation,
+                            item.getType(),
+                            uuid,
+                            price,
+                            enchantment);
+                    // Define the base path in the YAML configuration
+                    String basePath = "market.plots." + playerPlot + ".shops." + shopId;
 
-                // Serialize and save the ChestShop data to the YAML configuration
-                RegionData.get().set(basePath + ".location",chestShop.getLocation());
-                RegionData.get().set(basePath + ".item", chestShop.getItem().toString());
-                RegionData.get().set(basePath + ".owner", chestShop.getOwner().toString());
-                RegionData.get().set(basePath + ".price", chestShop.getPrice());
+                    // Serialize and save the ChestShop data to the YAML configuration
+                    RegionData.get().set(basePath + ".location", enchantedBookChestShop.getLocation());
+                    RegionData.get().set(basePath + ".item", enchantedBookChestShop.getItem().toString());
+                    RegionData.get().set(basePath + ".owner", enchantedBookChestShop.getOwner().toString());
+                    RegionData.get().set(basePath + ".price", enchantedBookChestShop.getPrice());
+                    RegionData.get().set(basePath + ".enchantment.key", enchantment.getKey().getKey().getKey());
+                    RegionData.get().set(basePath + ".enchantment.level", enchantment.getValue());
 
-                // Save the configuration to persist the data
-                RegionData.save();
+                    // Save the configuration to persist the data
+                    RegionData.save();
 
-                // Notify the player
-                player.sendMessage(ChatColor.GREEN + "Shop created successfully with price: " + ChatColor.GOLD + price);
+                    // Notify the player
+                    player.sendMessage(
+                            ChatColor.GREEN + "Shop created successfully with price: " + ChatColor.GOLD + price);
 
-                //Spawn display after creation
-                displayUtils.spawnDisplayPair(chestShop);
+                    // Spawn display after creation
+                    displayUtils.spawnDisplayPair(enchantedBookChestShop);
+                } else {
+                    // Create a new ChestShop instance
+                    ChestShop chestShop = new ChestShop(
+                            shopId,
+                            chestLocation,
+                            item.getType(),
+                            uuid,
+                            price);
+
+                    // Define the base path in the YAML configuration
+                    String basePath = "market.plots." + playerPlot + ".shops." + shopId;
+
+                    // Serialize and save the ChestShop data to the YAML configuration
+                    RegionData.get().set(basePath + ".location", chestShop.getLocation());
+                    RegionData.get().set(basePath + ".item", chestShop.getItem().toString());
+                    RegionData.get().set(basePath + ".owner", chestShop.getOwner().toString());
+                    RegionData.get().set(basePath + ".price", chestShop.getPrice());
+
+                    // Save the configuration to persist the data
+                    RegionData.save();
+
+                    // Notify the player
+                    player.sendMessage(
+                            ChatColor.GREEN + "Shop created successfully with price: " + ChatColor.GOLD + price);
+
+                    // Spawn display after creation
+                    displayUtils.spawnDisplayPair(chestShop);
+
+                }
+
             } catch (NumberFormatException e) {
                 player.sendMessage(ChatColor.RED + "Invalid price entered. Please enter a valid number.");
             }
@@ -285,7 +340,7 @@ public class ShopInteraction implements Listener {
                                 RegionData.get().set("market.plots." + plot + ".shops." + shopId, null);
                                 RegionData.save();
                                 SendMessage.sendPlayerMessage(player, "§aShop removed successfully.");
-                                displayUtils.removeDisplayPair(plot,shopId);
+                                displayUtils.removeDisplayPair(plot, shopId);
                             } else {
                                 // Someone else trying to break the shop
                                 SendMessage.sendPlayerMessage(player, "§cYou cannot break someone else's shop!");

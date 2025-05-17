@@ -9,12 +9,16 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.configuration.ConfigurationSection;
 import net.craftnepal.market.files.RegionData;
 import net.craftnepal.market.Entities.ChestShop;
+import net.craftnepal.market.Entities.EnchantedBookChestShop;
+import org.bukkit.enchantments.Enchantment;
+import org.bukkit.NamespacedKey;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.AbstractMap;
 
 public class ShopUtils {
 
@@ -51,6 +55,37 @@ public class ShopUtils {
         return itemCounts;
     }
 
+    private static ChestShop createShopFromConfig(String shopId, String path) {
+        Location location = RegionData.get().getLocation(path + ".location");
+        String materialName = RegionData.get().getString(path + ".item");
+        Material material = Material.matchMaterial(materialName);
+        String ownerString = RegionData.get().getString(path + ".owner");
+        UUID owner = UUID.fromString(ownerString);
+        double price = RegionData.get().getDouble(path + ".price");
+
+        if (material != null && location != null) {
+            if (material == Material.ENCHANTED_BOOK) {
+                String enchantKey = RegionData.get().getString(path + ".enchantment.key");
+                int level = RegionData.get().getInt(path + ".enchantment.level");
+                if (enchantKey != null) {
+                    enchantKey = enchantKey.toLowerCase();
+                    Enchantment enchantment = Enchantment.getByKey(NamespacedKey.minecraft(enchantKey));
+                    if (enchantment != null) {
+                        return new EnchantedBookChestShop(
+                                shopId,
+                                location,
+                                material,
+                                owner,
+                                price,
+                                new AbstractMap.SimpleEntry<>(enchantment, level));
+                    }
+                }
+            }
+            return new ChestShop(shopId, location, material, owner, price);
+        }
+        return null;
+    }
+
     public static Map<String, ChestShop> getAllShops() {
         Map<String, ChestShop> shops = new HashMap<>();
         ConfigurationSection plots = RegionData.get().getConfigurationSection("market.plots");
@@ -61,15 +96,8 @@ public class ShopUtils {
                 if (plotShops != null) {
                     for (String shopId : plotShops.getKeys(false)) {
                         String path = "market.plots." + plotId + ".shops." + shopId;
-                        Location location = RegionData.get().getLocation(path + ".location");
-                        String materialName = RegionData.get().getString(path + ".item");
-                        Material material = Material.matchMaterial(materialName);
-                        String ownerString = RegionData.get().getString(path + ".owner");
-                        UUID owner = UUID.fromString(ownerString);
-                        double price = RegionData.get().getDouble(path + ".price");
-
-                        if (material != null && location != null) {
-                            ChestShop shop = new ChestShop(shopId, location, material, owner, price);
+                        ChestShop shop = createShopFromConfig(shopId, path);
+                        if (shop != null) {
                             shops.put(shopId, shop);
                         }
                     }
@@ -93,14 +121,8 @@ public class ShopUtils {
                         (materialName.equalsIgnoreCase(itemName) ||
                                 materialName.replace("_", " ").equalsIgnoreCase(itemName))) {
 
-                    Location location = RegionData.get().getLocation(path + ".location");
-                    Material material = Material.matchMaterial(materialName);
-                    String ownerString = RegionData.get().getString(path + ".owner");
-                    UUID owner = UUID.fromString(ownerString);
-                    double price = RegionData.get().getDouble(path + ".price");
-
-                    if (material != null && location != null) {
-                        ChestShop shop = new ChestShop(shopId, location, material, owner, price);
+                    ChestShop shop = createShopFromConfig(shopId, path);
+                    if (shop != null) {
                         matchingShops.add(shop);
                     }
                 }

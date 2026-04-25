@@ -2,6 +2,8 @@ package net.craftnepal.market.Listeners;
 
 import net.craftnepal.market.files.RegionData;
 import net.craftnepal.market.subcommands.Bypass;
+import net.craftnepal.market.utils.MarketUtils;
+import net.craftnepal.market.utils.PlotUtils;
 import net.craftnepal.market.utils.RegionUtils;
 import net.craftnepal.market.utils.SendMessage;
 import org.bukkit.Location;
@@ -33,22 +35,18 @@ public class MarketRegionProtection implements Listener {
             return true;
         }
 
-        ConfigurationSection plots = RegionData.get().getConfigurationSection("market.plots");
-        if (plots != null) {
-            for (String plot : plots.getKeys(false)) {
-                Location minPos = RegionData.get().getLocation("market.plots." + plot + ".posMin");
-                Location maxPos = RegionData.get().getLocation("market.plots." + plot + ".posMax");
-
-                if (RegionUtils.isLocationInsideRegion(location, minPos, maxPos)) {
-                    String owner = RegionData.get().getString("market.plots." + plot + ".owner");
-                    return owner != null && owner.equals(player.getUniqueId().toString());
-                }
-            }
+        if (!MarketUtils.isInMarketArea(location)) {
+            return true;
         }
 
-        Location marketMin = RegionData.get().getLocation("market.posMin");
-        Location marketMax = RegionData.get().getLocation("market.posMax");
+        // Check if inside any plot
+        String plot = PlotUtils.getPlotIdByLocation(location);
+        if (plot != null) {
+            String owner = PlotUtils.getPlotOwner(plot);
+            return owner != null && owner.equals(player.getUniqueId().toString());
+        }
 
-        return !RegionUtils.isLocationInsideRegion(location, marketMin, marketMax);
+        // In market world but not in any plot
+        return false;
     }
 }

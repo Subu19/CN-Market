@@ -1,5 +1,6 @@
 package net.craftnepal.market.Listeners;
 
+import net.craftnepal.market.utils.MarketUtils;
 import net.craftnepal.market.files.RegionData;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -25,7 +26,6 @@ public class RegionSelection implements Listener {
     private static final Material SELECTION_TOOL = Material.STICK;
 
     public enum SelectionMode {
-        MARKET,
         MARKET_PLOT
     }
 
@@ -68,6 +68,13 @@ public class RegionSelection implements Listener {
 
     private void handleSelection(Player player, Location clickedLocation) {
         UUID uuid = player.getUniqueId();
+        
+        // Ensure manual selection only happens in the market world
+        if (!MarketUtils.isInMarketArea(clickedLocation)) {
+            player.sendMessage("§cManual selection can only be done in the market world!");
+            cleanupSelection(uuid);
+            return;
+        }
 
         if (!playerSelections.containsKey(uuid)) {
             // First selection point
@@ -81,45 +88,24 @@ public class RegionSelection implements Listener {
         Location point2 = clickedLocation;
 
         RegionBounds bounds = new RegionBounds(point1, point2);
-
-        String mode = selectionModePlayers.get(uuid);
-
-        try {
-            if (SelectionMode.MARKET.name().equals(mode)) {
-                saveMarketRegion(bounds, player);
-            } else if (SelectionMode.MARKET_PLOT.name().equals(mode)) {
-                saveMarketPlot(bounds, player);
-            }
-        } finally {
-            cleanupSelection(uuid);
-        }
+        saveMarketPlot(bounds, player);
+        cleanupSelection(uuid);
     }
 
-    private void saveMarketRegion(RegionBounds bounds, Player player) {
-        RegionData.get().set("market.posMin", bounds.getMin());
-        RegionData.get().set("market.posMax", bounds.getMax());
-        RegionData.save();
-        player.sendMessage("Region created and is protected from grief!");
-    }
 
     private void saveMarketPlot(RegionBounds bounds, Player player) {
         ConfigurationSection plotsSection = RegionData.get().getConfigurationSection("market.plots");
-        int newPlotId = 0;
+        
+        // Generate a unique ID for the manual plot
+        String newPlotId = "manual_" + System.currentTimeMillis();
 
         if (plotsSection != null) {
-            // Find the highest existing plot ID and check for overlaps
+            // Check for overlaps
             for (String plotId : plotsSection.getKeys(false)) {
-                try {
-                    int currentId = Integer.parseInt(plotId);
-                    newPlotId = Math.max(newPlotId, currentId + 1);
-
-                    RegionBounds existingPlot = getPlotBounds(plotId);
-                    if (bounds.intersects(existingPlot)) {
-                        player.sendMessage("Error: The selected area overlaps with existing plot " + plotId);
-                        return;
-                    }
-                } catch (NumberFormatException e) {
-                    Bukkit.getLogger().warning("Invalid plot ID found in config: " + plotId);
+                RegionBounds existingPlot = getPlotBounds(plotId);
+                if (bounds.intersects(existingPlot)) {
+                    player.sendMessage("Error: The selected area overlaps with existing plot " + plotId);
+                    return;
                 }
             }
         }
@@ -129,7 +115,7 @@ public class RegionSelection implements Listener {
         RegionData.get().set("market.plots." + newPlotId + ".posMax", bounds.getMax());
         RegionData.save();
 
-        player.sendMessage("Created new plot: " + newPlotId);
+        player.sendMessage("Created new manual plot: " + newPlotId);
     }
 
     private RegionBounds getPlotBounds(String plotId) {

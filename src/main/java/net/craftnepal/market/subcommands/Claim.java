@@ -37,50 +37,38 @@ public class Claim extends SubCommand {
 
     @Override
     public void perform(CommandSender commandSender, String[] strings) {
-        if(commandSender instanceof  Player){
+        if(commandSender instanceof Player){
             Player player = (Player) commandSender;
             Location location = player.getLocation();
-            ConfigurationSection plots = RegionData.get().getConfigurationSection("market.plots");
-            if(plots != null){
-                String selectedPlot = null;
+            
+            // Get the plot ID at the player's location (checks both manual and automatic plots)
+            String selectedPlot = PlotUtils.getPlotIdByLocation(location);
 
-                //get selected plot
-                for(String plot: plots.getKeys(false)){
-                    Location min = RegionData.get().getLocation("market.plots."+plot+".posMin");
-                    Location max = RegionData.get().getLocation("market.plots."+plot+".posMax");
-                    if(min != null && max != null){
-                        if(RegionUtils.isLocationInsideRegion(location,min,max)){
-                            selectedPlot = plot;
-                        }
-                    }else{
-                        SendMessage.sendPlayerMessage(player,"Something went wrong!");
-                    }
+            if (selectedPlot != null) {
+                // If it's an automatic plot, register it if not already registered
+                if (selectedPlot.startsWith("plot_")) {
+                    PlotUtils.registerAutomaticPlot(selectedPlot);
                 }
 
-                if(selectedPlot != null){
-                    String owner = RegionData.get().getString("market.plots."+selectedPlot+".owner");                    if(owner == null || owner.isEmpty()){
-                        PlotUtils.setPlotOwner(selectedPlot, player.getUniqueId().toString());
-                        SendMessage.sendPlayerMessage(player,"&aYou successfully claimed plot: "+ selectedPlot);
-                        player.playSound(location, Sound.ENTITY_EXPERIENCE_ORB_PICKUP,1,1);
-                    }else if(owner.equals(player.getUniqueId().toString())){
-                        SendMessage.sendPlayerMessage(player,"&aYou already own this plot : "+ selectedPlot);
-                    }else{
-                        SendMessage.sendPlayerMessage(player,"&aIt is claimed by someone else");
-                    }
-
-                }else{
-                    SendMessage.sendPlayerMessage(player,"No plot found at your location..");
-                    player.playSound(location,Sound.ITEM_SHIELD_BREAK,1,1);
-
+                String owner = PlotUtils.getPlotOwner(selectedPlot);
+                if (owner == null || owner.isEmpty()) {
+                    PlotUtils.setPlotOwner(selectedPlot, player.getUniqueId().toString());
+                    SendMessage.sendPlayerMessage(player, "&aYou successfully claimed plot: " + selectedPlot);
+                    player.playSound(location, Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1, 1);
+                } else if (owner.equals(player.getUniqueId().toString())) {
+                    SendMessage.sendPlayerMessage(player, "&aYou already own this plot: " + selectedPlot);
+                } else {
+                    SendMessage.sendPlayerMessage(player, "&cThis plot is already claimed by someone else.");
                 }
-
-            }else{
-                SendMessage.sendPlayerMessage(player,"No plots found.");
+            } else {
+                SendMessage.sendPlayerMessage(player, "&cNo plot found at your location. (Are you standing on a pathway?)");
+                player.playSound(location, Sound.ITEM_SHIELD_BREAK, 1, 1);
             }
-        }else{
+        } else {
             Bukkit.getLogger().info("You are not a player");
         }
     }
+
 
     @Override
     public List<String> getSubcommandArguments(Player player, String[] strings) {

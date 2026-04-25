@@ -42,52 +42,72 @@ public class PlotTeleport extends SubCommand {
 
     @Override
     public void perform(CommandSender commandSender, String[] strings) {
-        if(commandSender instanceof  Player){
+        if(commandSender instanceof Player){
             Player player = (Player) commandSender;
-            String pp = strings[1];
+            if (strings.length < 2) {
+                SendMessage.sendPlayerMessage(player, "&cUsage: /market visit <playername/plotID>");
+                return;
+            }
+            String target = strings[1];
             ConfigurationSection plots = RegionData.get().getConfigurationSection("market.plots");
+            
             if(plots != null){
+                // First check if target is a plot ID
+                if (plots.contains(target)) {
+                    teleportToPlot(player, target);
+                    return;
+                }
+
+                // Otherwise search by player name
                 for(String plot: plots.getKeys(false)){
-                    String owner = RegionData.get().getString("market.plots."+plot+".owner");
-                    //if owner exists
-                    assert owner != null;
-                    OfflinePlayer plotOwner = Bukkit.getOfflinePlayer(UUID.fromString(owner));
+                    String ownerUUID = RegionData.get().getString("market.plots."+plot+".owner");
+                    if (ownerUUID == null || ownerUUID.isEmpty()) continue;
+
+                    OfflinePlayer plotOwner = Bukkit.getOfflinePlayer(UUID.fromString(ownerUUID));
                     String plotOwnerName = plotOwner.getName();
-                    assert plotOwnerName != null;                    if(plotOwnerName.equalsIgnoreCase(pp)){
-                        Location min = RegionData.get().getLocation("market.plots."+plot+".posMin");
-                        Location max = RegionData.get().getLocation("market.plots."+plot+".posMax");
-                        
-                        // First check for plot spawn
-                        Location plotSpawn = RegionData.get().getLocation("market.plots."+plot+".spawn");
-                        Location tpLocation;
-                        
-                        if (plotSpawn != null) {
-                            tpLocation = plotSpawn;
-                        } else {
-                            // Fall back to center if no spawn is set
-                            tpLocation = new Location(
-                                    player.getWorld(),
-                                    (min.getX()+max.getX())/2,
-                                    min.getY()+2,
-                                    min.getZ()
-                            );
-                        }
-                        
-                        SendMessage.sendPlayerMessage(player,"&eTeleporting in 5 seconds.. don't move!");
-                        TeleportUtils.scheduleTeleport(player, tpLocation, ()->{
-                            RegionUtils.visibleRegionBorders(player,min,max,Market.getPlugin(), Color.PURPLE,30);
-                        });
+                    
+                    if(plotOwnerName != null && plotOwnerName.equalsIgnoreCase(target)){
+                        teleportToPlot(player, plot);
                         return;
                     }
                 }
-                SendMessage.sendPlayerMessage(player,"That player doesn't own any shop yet.");
+                SendMessage.sendPlayerMessage(player, "&cCould not find a plot owned by '" + target + "' or with ID '" + target + "'.");
             }else{
-                SendMessage.sendPlayerMessage(player,"No plot found!");
+                SendMessage.sendPlayerMessage(player,"&cNo plots have been registered yet.");
             }
         }else{
             Bukkit.getLogger().info("You are not a player!");
         }
     }
+
+    private void teleportToPlot(Player player, String plotId) {
+        Location min = RegionData.get().getLocation("market.plots." + plotId + ".posMin");
+        Location max = RegionData.get().getLocation("market.plots." + plotId + ".posMax");
+        if (min == null || max == null) {
+            SendMessage.sendPlayerMessage(player, "&cError: Plot boundaries not found for " + plotId);
+            return;
+        }
+
+        Location plotSpawn = RegionData.get().getLocation("market.plots." + plotId + ".spawn");
+        Location tpLocation;
+
+        if (plotSpawn != null) {
+            tpLocation = plotSpawn;
+        } else {
+            tpLocation = new Location(
+                    min.getWorld(),
+                    (min.getX() + max.getX()) / 2,
+                    min.getY() + 2,
+                    (min.getZ() + max.getZ()) / 2
+            );
+        }
+
+        SendMessage.sendPlayerMessage(player, "&eTeleporting to plot " + plotId + " in 5 seconds.. don't move!");
+        TeleportUtils.scheduleTeleport(player, tpLocation, () -> {
+            RegionUtils.visibleRegionBorders(player, min, max, Market.getPlugin(), Color.PURPLE, 30);
+        });
+    }
+
 
     @Override
     public List<String> getSubcommandArguments(Player player, String[] strings) {

@@ -37,12 +37,8 @@ public class SelectionMode extends SubCommand {
         if(commandSender instanceof Player){
             Player player = (Player) commandSender;
             UUID uuid = player.getUniqueId();
-            if(strings[1].equals("market") || strings[1].equals("plot")){
-
-                RegionSelection.SelectionMode mode = null;
-                if(strings[1].equals("market"))
-                    mode = RegionSelection.SelectionMode.MARKET;
-                else mode = RegionSelection.SelectionMode.MARKET_PLOT;
+            if(strings[1].equals("plot")){
+                RegionSelection.SelectionMode mode = RegionSelection.SelectionMode.MARKET_PLOT;
 
                 if(RegionSelection.isInSelectionMode(uuid)){
                     RegionSelection.removeSelectionModePlayer(uuid);
@@ -52,7 +48,7 @@ public class SelectionMode extends SubCommand {
                     player.sendMessage("Selection mode enabled! Please use Stick to select region");
                 }
             }else{
-                player.sendMessage("Please pass which region you want to make (market/plot)");
+                player.sendMessage("Please pass which region you want to make (plot)");
             }
 
         }else{
@@ -63,7 +59,6 @@ public class SelectionMode extends SubCommand {
     @Override
     public List<String> getSubcommandArguments(Player player, String[] strings) {
         List<String> autocomplete = new ArrayList<>();
-        autocomplete.add("market");
         autocomplete.add("plot");
         return autocomplete ;
     }

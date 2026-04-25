@@ -12,6 +12,6 @@ services:
     volumes:
       # Mount the built plugin JAR to the plugins folder
       # Note: You need to run 'mvn package' first to generate the JAR in target/
-      - ./target:/data/plugins:ro
+      - ./target/Market-1.0.1-SNAPSHOT.jar:/data/plugins/Market.jar:ro
       - ./mc-data:/data
     restart: unless-stopped

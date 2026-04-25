@@ -65,21 +65,22 @@ public class ShopInteraction implements Listener {
             return; // Do nothing if not in market area
         }
 
-        // Check if chest is inside the player's plot
+        // Check if chest is inside a plot
         String plot = PlotUtils.getPlotIdByLocation(chestLocation);
-        String playerPlot;
-
-        if (PlotUtils.getPlotOwner(plot).equals(uuid.toString())) {
-            playerPlot = plot;
-        } else {
-            playerPlot = null;
-        }
-
-        if (playerPlot == null) {
-            SendMessage.sendPlayerMessage(player, "§cYou must click a chest inside your own plot.");
+        if (plot == null) {
+            SendMessage.sendPlayerMessage(player, "§cThis barrel is not inside a market plot.");
             event.setCancelled(true);
             return;
         }
+
+        String owner = PlotUtils.getPlotOwner(plot);
+        if (owner == null || !owner.equals(uuid.toString())) {
+            SendMessage.sendPlayerMessage(player, "§cYou can only create shops in your own plot.");
+            event.setCancelled(true);
+            return;
+        }
+
+        String playerPlot = plot;
 
         // Check the item in hand
         ItemStack item = player.getInventory().getItemInMainHand();
@@ -319,38 +320,31 @@ public class ShopInteraction implements Listener {
             return; // Do nothing if not in market area
         }
 
-        // Check all plots for this chest
-        ConfigurationSection plots = RegionData.get().getConfigurationSection("market.plots");
-        if (plots != null) {
-            for (String plot : plots.getKeys(false)) {
-                ConfigurationSection shops = RegionData.get()
-                        .getConfigurationSection("market.plots." + plot + ".shops");
-                if (shops != null) {
-                    for (String shopId : shops.getKeys(false)) {
-                        Location shopLoc = RegionData.get()
-                                .getLocation("market.plots." + plot + ".shops." + shopId + ".location");
-                        if (shopLoc != null && shopLoc.equals(chestLocation)) {
-                            // Check if the breaker is the owner or has permission
-                            Player player = event.getPlayer();
-                            String owner = RegionData.get()
-                                    .getString("market.plots." + plot + ".shops." + shopId + ".owner");
+        // Get plot at chest location
+        String plot = PlotUtils.getPlotIdByLocation(chestLocation);
+        if (plot == null) return;
 
-                            if (owner != null && owner.equals(player.getUniqueId().toString())) {
-                                // Owner breaking their own shop - remove it
-                                RegionData.get().set("market.plots." + plot + ".shops." + shopId, null);
-                                RegionData.save();
-                                SendMessage.sendPlayerMessage(player, "§aShop removed successfully.");
-                                displayUtils.removeDisplayPair(plot, shopId);
-                            } else {
-                                // Someone else trying to break the shop
-                                SendMessage.sendPlayerMessage(player, "§cYou cannot break someone else's shop!");
-                                event.setCancelled(true);
-                            }
-                            return;
-                        }
-                    }
+        ConfigurationSection shops = RegionData.get().getConfigurationSection("market.plots." + plot + ".shops");
+        if (shops == null) return;
+
+        for (String shopId : shops.getKeys(false)) {
+            Location shopLoc = RegionData.get().getLocation("market.plots." + plot + ".shops." + shopId + ".location");
+            if (shopLoc != null && shopLoc.equals(chestLocation)) {
+                Player player = event.getPlayer();
+                String owner = RegionData.get().getString("market.plots." + plot + ".shops." + shopId + ".owner");
+
+                if (owner != null && owner.equals(player.getUniqueId().toString())) {
+                    RegionData.get().set("market.plots." + plot + ".shops." + shopId, null);
+                    RegionData.save();
+                    SendMessage.sendPlayerMessage(player, "§aShop removed successfully.");
+                    displayUtils.removeDisplayPair(plot, shopId);
+                } else {
+                    SendMessage.sendPlayerMessage(player, "§cYou cannot break someone else's shop!");
+                    event.setCancelled(true);
                 }
+                return;
             }
         }
     }
+
 }

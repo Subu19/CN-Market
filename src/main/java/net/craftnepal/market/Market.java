@@ -1,7 +1,5 @@
 package net.craftnepal.market;
 
-import com.comphenix.protocol.ProtocolLibrary;
-import com.comphenix.protocol.ProtocolManager;
 import me.kodysimpson.simpapi.command.CommandManager;
 import me.kodysimpson.simpapi.menu.MenuManager;
 import net.craftnepal.market.Listeners.*;
@@ -12,7 +10,10 @@ import net.craftnepal.market.files.RegionData;
 import net.craftnepal.market.subcommands.*;
 import net.craftnepal.market.utils.DisplayUtils;
 import net.craftnepal.market.utils.MarketUtils;
+import net.craftnepal.market.world.MarketGenerator;
 import org.bukkit.Bukkit;
+import org.bukkit.World;
+import org.bukkit.WorldCreator;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
@@ -27,7 +28,6 @@ import org.jetbrains.annotations.NotNull;
 import java.io.File;
 
 public final class Market extends JavaPlugin implements Listener {
-    private static ProtocolManager protocolManager;
     private static Market plugin;
     private static FileConfiguration config;
     private static File cfile;
@@ -36,7 +36,6 @@ public final class Market extends JavaPlugin implements Listener {
     @Override
     public void onEnable() {
         // turn on manager
-        protocolManager = ProtocolLibrary.getProtocolManager();
         plugin = this;
 
         // load config
@@ -100,7 +99,29 @@ public final class Market extends JavaPlugin implements Listener {
         } catch (NoSuchFieldException | IllegalAccessException e) {
             throw new RuntimeException(e);
         }
+        // Initialize Market World
+        initializeMarketWorld();
+
         Bukkit.getLogger().info("Market was loaded successfully!");
+    }
+
+    private void initializeMarketWorld() {
+        String worldName = config.getString("market-world.name", "market");
+        World marketWorld = Bukkit.getWorld(worldName);
+        if (marketWorld == null) {
+            Bukkit.getLogger().info("Creating market world: " + worldName);
+            WorldCreator creator = new WorldCreator(worldName);
+            creator.generator(new MarketGenerator());
+            marketWorld = creator.createWorld();
+        }
+        if (marketWorld != null) {
+            // Set spawn at 0, 65, 0 (center of pathway junction)
+            marketWorld.setSpawnLocation(0, 65, 0);
+        }
+    }
+
+    public World getMarketWorld() {
+        return Bukkit.getWorld(config.getString("market-world.name", "market"));
     }
 
     @Override
@@ -125,7 +146,4 @@ public final class Market extends JavaPlugin implements Listener {
         config = YamlConfiguration.loadConfiguration(cfile);
     }
 
-    public static ProtocolManager getProtocolManager() {
-        return protocolManager;
-    }
 }

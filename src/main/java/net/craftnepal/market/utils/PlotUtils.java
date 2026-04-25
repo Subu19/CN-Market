@@ -3,7 +3,10 @@ package net.craftnepal.market.utils;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.configuration.ConfigurationSection;
+import net.craftnepal.market.Market;
 import net.craftnepal.market.files.RegionData;
+import org.bukkit.World;
+import org.bukkit.configuration.file.FileConfiguration;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -40,18 +43,84 @@ public class PlotUtils {
 
     public static String getPlotIdByLocation(Location location) {
         ConfigurationSection plots = RegionData.get().getConfigurationSection("market.plots");
-        if (plots == null) return null;
+        
+        // First check manually registered plots
+        if (plots != null) {
+            for (String plotId : plots.getKeys(false)) {
+                Location min = RegionData.get().getLocation("market.plots." + plotId + ".posMin");
+                Location max = RegionData.get().getLocation("market.plots." + plotId + ".posMax");
 
-        for (String plotId : plots.getKeys(false)) {
-            Location min = RegionData.get().getLocation("market.plots." + plotId + ".posMin");
-            Location max = RegionData.get().getLocation("market.plots." + plotId + ".posMax");
-
-            if (min != null && max != null &&
-                    RegionUtils.isLocationInsideRegion(location, min, max)) {
-                return plotId;
+                if (min != null && max != null &&
+                        RegionUtils.isLocationInsideRegion(location, min, max)) {
+                    return plotId;
+                }
             }
         }
-        return null;
+
+        // If not found, check if it's an automatic plot in the market world
+        return getAutomaticPlotIdAt(location);
+    }
+
+    public static String getAutomaticPlotIdAt(Location location) {
+        World marketWorld = Market.getPlugin().getMarketWorld();
+        if (marketWorld == null || !location.getWorld().equals(marketWorld)) {
+            return null;
+        }
+
+        FileConfiguration config = Market.getMainConfig();
+        int plotSize = config.getInt("market-world.plot-size", 16);
+        int pathwayWidth = config.getInt("market-world.pathway-width", 3);
+        int totalSize = plotSize + pathwayWidth;
+
+        int worldX = location.getBlockX();
+        int worldZ = location.getBlockZ();
+
+        int adjustedX = worldX + (pathwayWidth / 2);
+        int adjustedZ = worldZ + (pathwayWidth / 2);
+
+        int modX = Math.abs(adjustedX) % totalSize;
+        int modZ = Math.abs(adjustedZ) % totalSize;
+
+        if (adjustedX < 0 && modX != 0) modX = totalSize - modX;
+        if (adjustedZ < 0 && modZ != 0) modZ = totalSize - modZ;
+
+        if (modX < pathwayWidth || modZ < pathwayWidth) {
+            return null; // Standing on a pathway
+        }
+
+        // Calculate plot ID based on grid coordinates
+        int plotX = (int) Math.floor((double) adjustedX / totalSize);
+        int plotZ = (int) Math.floor((double) adjustedZ / totalSize);
+        
+        return "plot_" + plotX + "_" + plotZ;
+    }
+
+    public static void registerAutomaticPlot(String plotId) {
+        if (RegionData.get().contains("market.plots." + plotId)) {
+            return; // Already registered
+        }
+
+        String[] parts = plotId.split("_");
+        if (parts.length != 3) return;
+
+        int plotX = Integer.parseInt(parts[1]);
+        int plotZ = Integer.parseInt(parts[2]);
+
+        FileConfiguration config = Market.getMainConfig();
+        int plotSize = config.getInt("market-world.plot-size", 16);
+        int pathwayWidth = config.getInt("market-world.pathway-width", 3);
+        int totalSize = plotSize + pathwayWidth;
+
+        int startX = (plotX * totalSize) - (pathwayWidth / 2) + pathwayWidth;
+        int startZ = (plotZ * totalSize) - (pathwayWidth / 2) + pathwayWidth;
+
+        World world = Market.getPlugin().getMarketWorld();
+        Location min = new Location(world, startX, 64, startZ);
+        Location max = new Location(world, startX + plotSize - 1, 255, startZ + plotSize - 1);
+
+        RegionData.get().set("market.plots." + plotId + ".posMin", min);
+        RegionData.get().set("market.plots." + plotId + ".posMax", max);
+        RegionData.save();
     }
 
     public static String getPlotOwner(String plotId) {

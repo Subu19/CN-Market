@@ -47,12 +47,6 @@ public class Movement implements Listener {
 
 
         Player player = e.getPlayer();
-        Location min = RegionData.get().getLocation("market.posMin");
-        Location max = RegionData.get().getLocation("market.posMax");
-
-        if (min == null || max == null) {
-            return;
-        }
 
         boolean allowFlight = Market.getMainConfig().getBoolean("allow-flight", false);
         if (!allowFlight) {

@@ -1,3 +1,11 @@
 prefix: "&2&l[&a&lMarket&2&l] &a"
 join-message: "&eHello there! %player%"
 allow-flight: false
+
+market-world:
+  name: "market"
+  plot-size: 16
+  pathway-width: 3
+  floor-material: "GRASS_BLOCK"
+  pathway-material: "STONE_BRICKS"
+  border-material: "SMOOTH_STONE_SLAB"

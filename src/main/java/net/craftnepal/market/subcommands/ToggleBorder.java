@@ -3,6 +3,7 @@ package net.craftnepal.market.subcommands;
 import me.kodysimpson.simpapi.command.SubCommand;
 import net.craftnepal.market.Market;
 import net.craftnepal.market.files.RegionData;
+import net.craftnepal.market.utils.PlotUtils;
 import net.craftnepal.market.utils.RegionUtils;
 import org.bukkit.Color;
 import org.bukkit.Location;
@@ -39,38 +40,28 @@ public class ToggleBorder extends SubCommand {
         if(commandSender instanceof Player){
             Player player = (Player) commandSender;
 
-            if(Objects.equals(strings[1], "market")){
-
-                Location min = RegionData.get().getLocation("market.posMin");
-                Location max = RegionData.get().getLocation("market.posMax");
-                if(max !=null && min !=null){
-                    RegionUtils.visibleRegionBorders(player,min,max, Market.getPlugin(), Color.RED);
-                }else{
-                    player.sendMessage("Couldn't find market regions! Make sure you have created it.");
+            if(Objects.equals(strings[1], "plot" )){
+                String plotId = null;
+                if(strings.length == 3){
+                    plotId = strings[2];
+                } else {
+                    plotId = PlotUtils.getPlotIdByLocation(player.getLocation());
                 }
 
-            }else if(Objects.equals(strings[1], "plot" )){
-                if(strings.length == 3){
-
-                    Location min = RegionData.get().getLocation("market.plots."+Integer.parseInt(strings[2])+".posMin");
-                    Location max = RegionData.get().getLocation("market.plots."+Integer.parseInt(strings[2])+".posMax");
+                if (plotId != null) {
+                    Location min = RegionData.get().getLocation("market.plots." + plotId + ".posMin");
+                    Location max = RegionData.get().getLocation("market.plots." + plotId + ".posMax");
                     if(max !=null && min !=null){
                         RegionUtils.visibleRegionBorders(player,min,max,Market.getPlugin(), Color.LIME,100);
+                        player.sendMessage("Toggled border for plot: " + plotId);
                     }else{
-                        player.sendMessage("Couldn't find the plot.");
+                        player.sendMessage("Couldn't find data for plot: " + plotId);
                     }
-
-                }else{
-
-                    player.sendMessage("Please put plot number. Usage /amarket toggleborder plot <plot.No>");
-
+                } else {
+                    player.sendMessage("No plot found at your location. Please specify a plot ID.");
                 }
-
-
             }else{
-
-                player.sendMessage("No region in argument!");
-
+                player.sendMessage("Invalid usage. /amarket toggleborder plot [plotId]");
             }
 
         }
@@ -79,7 +70,6 @@ public class ToggleBorder extends SubCommand {
     @Override
     public List<String> getSubcommandArguments(Player player, String[] strings) {
         List<String> autoComplete =  new ArrayList<>();
-        autoComplete.add("market");
         autoComplete.add("plot");
         return autoComplete;
     }

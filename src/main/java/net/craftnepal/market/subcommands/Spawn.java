@@ -8,6 +8,7 @@ import net.craftnepal.market.files.RegionData;
 import net.craftnepal.market.utils.*;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
@@ -38,11 +39,16 @@ public class Spawn extends SubCommand {
     public void perform(CommandSender commandSender, String[] strings) {
         if(commandSender instanceof Player){
             Player player = (Player) commandSender;
-            Location spawn = RegionData.get().getLocation("market.spawn");
-
-            if(spawn == null )
+            World marketWorld = Market.getPlugin().getMarketWorld();
+            
+            if (marketWorld == null) {
+                SendMessage.sendPlayerMessage(player, "&cMarket world is not loaded!");
                 return;
-            if(Movement.getPlayersInMarket().containsKey(player.getUniqueId())){
+            }
+
+            Location spawn = marketWorld.getSpawnLocation();
+
+            if(Movement.getPlayersInMarket().containsKey(player.getUniqueId()) && player.getWorld().equals(marketWorld)){
                 SendMessage.sendPlayerMessage(player,"You are already in market!");
             }else{
                 SendMessage.sendPlayerMessage(player,"Teleporting to market in 5 seconds");
@@ -54,6 +60,7 @@ public class Spawn extends SubCommand {
             }
         }
     }
+
 
     @Override
     public List<String> getSubcommandArguments(Player player, String[] strings) {

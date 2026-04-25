@@ -17,9 +17,8 @@ public class MarketSelectionMode implements CommandExecutor {
             Player player = (Player) commandSender;
             UUID uuid = player.getUniqueId();
       if(strings.length>0){
-          if(strings[0].equals("market") || strings[0].equals("plot")){
-
-              RegionSelection.SelectionMode mode = strings[0].equals("market") ? RegionSelection.SelectionMode.MARKET:RegionSelection.SelectionMode.MARKET_PLOT ;
+          if(strings[0].equals("plot")){
+              RegionSelection.SelectionMode mode = RegionSelection.SelectionMode.MARKET_PLOT;
 
               if(RegionSelection.isInSelectionMode(uuid)){
                   RegionSelection.removeSelectionModePlayer(uuid);
@@ -29,10 +28,10 @@ public class MarketSelectionMode implements CommandExecutor {
                   player.sendMessage("Selection mode enabled! Please use Stick to select region");
               }
           }else{
-              player.sendMessage("Please pass which region you want to make (market/plot)");
+              player.sendMessage("Please pass which region you want to make (plot)");
           }
       }else{
-          player.sendMessage("Please specify what region you are creating! (market/plot)");
+          player.sendMessage("Please specify what region you are creating! (plot)");
       }
 
         }

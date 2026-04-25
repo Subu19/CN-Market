@@ -19,7 +19,7 @@ public class MarketCmd implements CommandExecutor {
             if(location !=null){
                 p.teleport(location);
                 p.playSound(location, Sound.ENTITY_ENDERMAN_TELEPORT,1,1);
-                p.spawnParticle(Particle.TOTEM,location,50);
+                p.spawnParticle(Particle.TOTEM_OF_UNDYING,location,50);
             }else{
                 p.sendMessage("Market spawn not set!");
             }

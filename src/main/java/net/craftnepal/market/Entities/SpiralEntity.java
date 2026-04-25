@@ -1,6 +1,6 @@
 package net.craftnepal.market.Entities;
 
-import com.sun.org.apache.xpath.internal.operations.Bool;
+
 import net.craftnepal.market.utils.PrintParticles;
 import net.craftnepal.market.utils.SendMessage;
 import org.bukkit.Color;
@@ -41,11 +41,11 @@ public class SpiralEntity {
                 Location upParticleLocation = new Location(p.getWorld(),center.getX()+upx,center.getY()+upy,center.getZ());
                 Location downParticleLocation = new Location(p.getWorld(),center.getX()+downx,center.getY()+downy,center.getZ());
 
-                p.getWorld().spawnParticle(Particle.REDSTONE,particleLocation,3,0,0,0,0,new Particle.DustOptions(
+                p.getWorld().spawnParticle(Particle.DUST,particleLocation,3,0,0,0,0,new Particle.DustOptions(
                         Color.RED, 15),true);
-                p.getWorld().spawnParticle(Particle.REDSTONE,upParticleLocation,3,0,0,0,0,new Particle.DustOptions(
+                p.getWorld().spawnParticle(Particle.DUST,upParticleLocation,3,0,0,0,0,new Particle.DustOptions(
                         Color.LIME, 15),true);
-                p.getWorld().spawnParticle(Particle.REDSTONE,downParticleLocation,3,0,0,0,0,new Particle.DustOptions(
+                p.getWorld().spawnParticle(Particle.DUST,downParticleLocation,3,0,0,0,0,new Particle.DustOptions(
                         Color.BLUE, 15),true);
                 if(angle > 50){
                     stage1count = true;
@@ -73,11 +73,11 @@ public class SpiralEntity {
             Location upParticleLocation = new Location(p.getWorld(),center.getX()+ acceleration,center.getY()+upy,center.getZ()+upx);
             Location downParticleLocation = new Location(p.getWorld(),center.getX()+ acceleration,center.getY()+downy,center.getZ()+downx);
 
-            p.getWorld().spawnParticle(Particle.REDSTONE,particleLocation,3,0,0,0,0,new Particle.DustOptions(
+            p.getWorld().spawnParticle(Particle.DUST,particleLocation,3,0,0,0,0,new Particle.DustOptions(
                     Color.RED, 15),true);
-            p.getWorld().spawnParticle(Particle.REDSTONE,upParticleLocation,3,0,0,0,0,new Particle.DustOptions(
+            p.getWorld().spawnParticle(Particle.DUST,upParticleLocation,3,0,0,0,0,new Particle.DustOptions(
                     Color.LIME, 15),true);
-            p.getWorld().spawnParticle(Particle.REDSTONE,downParticleLocation,3,0,0,0,0,new Particle.DustOptions(
+            p.getWorld().spawnParticle(Particle.DUST,downParticleLocation,3,0,0,0,0,new Particle.DustOptions(
                     Color.BLUE, 15),true);
 
 

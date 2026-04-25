@@ -1,1 +1,53 @@
-target
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# VS Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.history/
+
+# Docker & Minecraft Server Data
+mc-data/
+*.log
+usercache.json
+whitelist.json
+banned-ips.json
+banned-players.json
+ops.json
+server.properties
+help.yml
+permissions.yml
+commands.yml
+bukkit.yml
+spigot.yml
+paper.yml
+world/
+world_nether/
+world_the_end/
+plugins/
+cache/
+logs/
+libraries/
+versions/
+
+# OS Specific
+.DS_Store
+Thumbs.db

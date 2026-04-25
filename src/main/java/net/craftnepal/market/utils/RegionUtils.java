@@ -112,7 +112,7 @@ public class RegionUtils {
                 location.getX() + 0.5,
                 location.getY() + 0.5,
                 location.getZ() + 0.5);
-        player.spawnParticle(Particle.REDSTONE, centerLocation, 3, new Particle.DustOptions(
+        player.spawnParticle(Particle.DUST, centerLocation, 3, new Particle.DustOptions(
                 color, 1));
     }
 
@@ -157,7 +157,7 @@ public class RegionUtils {
 
                 // Helix particles with color
                 particleLoc.getWorld().spawnParticle(
-                        Particle.REDSTONE,
+                        Particle.DUST,
                         helixLoc,
                         1,
                         new Particle.DustOptions(Color.fromRGB(30, 144, 255), 0.7f));

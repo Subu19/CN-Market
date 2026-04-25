@@ -1,6 +1,5 @@
 package net.craftnepal.market.utils;
 
-import jdk.vm.ci.code.site.Mark;
 import net.craftnepal.market.Market;
 import org.bukkit.*;
 import org.bukkit.entity.Firework;
@@ -81,19 +80,19 @@ public class PrintParticles {
         letters.add(Bukkit.getScheduler().scheduleSyncRepeatingTask(Market.getPlugin(),()->{
             // Generate a letter H of bold 2, width of 6, and height of 8
             for (int i = 0; i<8; i++){
-                world.spawnParticle(Particle.REDSTONE,new Location(letterOrigin.getWorld(),letterOrigin.getX(),letterOrigin.getY()+i,letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
+                world.spawnParticle(Particle.DUST,new Location(letterOrigin.getWorld(),letterOrigin.getX(),letterOrigin.getY()+i,letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
                         pColor, 15),true);
-                world.spawnParticle(Particle.REDSTONE,new Location(letterOrigin.getWorld(),letterOrigin.getX()+1,letterOrigin.getY()+i,letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
+                world.spawnParticle(Particle.DUST,new Location(letterOrigin.getWorld(),letterOrigin.getX()+1,letterOrigin.getY()+i,letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
                         pColor, 15),true);
-                world.spawnParticle(Particle.REDSTONE,new Location(letterOrigin.getWorld(),letterOrigin.getX()+4,letterOrigin.getY()+i,letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
+                world.spawnParticle(Particle.DUST,new Location(letterOrigin.getWorld(),letterOrigin.getX()+4,letterOrigin.getY()+i,letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
                         pColor, 15),true);
-                world.spawnParticle(Particle.REDSTONE,new Location(letterOrigin.getWorld(),letterOrigin.getX()+5,letterOrigin.getY()+i,letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
+                world.spawnParticle(Particle.DUST,new Location(letterOrigin.getWorld(),letterOrigin.getX()+5,letterOrigin.getY()+i,letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
                         pColor, 15),true);
             }
             for (int i = 0; i<6; i++){
-                world.spawnParticle(Particle.REDSTONE,new Location(letterOrigin.getWorld(),letterOrigin.getX()+i,letterOrigin.getY()+3,letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
+                world.spawnParticle(Particle.DUST,new Location(letterOrigin.getWorld(),letterOrigin.getX()+i,letterOrigin.getY()+3,letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
                         pColor, 15),true);
-                world.spawnParticle(Particle.REDSTONE,new Location(letterOrigin.getWorld(),letterOrigin.getX()+i,letterOrigin.getY()+4, letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
+                world.spawnParticle(Particle.DUST,new Location(letterOrigin.getWorld(),letterOrigin.getX()+i,letterOrigin.getY()+4, letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
                         pColor, 15),true);
             }
 
@@ -107,20 +106,20 @@ public class PrintParticles {
             // Generate a letter H of bold 2, width of 6, and height of 8
             for (int i = 0; i<8; i++){
                 if(i>1 && i<6){
-                    world.spawnParticle(Particle.REDSTONE,new Location(letterOrigin.getWorld(),letterOrigin.getX()+2,letterOrigin.getY()+i,letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
+                    world.spawnParticle(Particle.DUST,new Location(letterOrigin.getWorld(),letterOrigin.getX()+2,letterOrigin.getY()+i,letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
                             pColor, 15),true);
-                    world.spawnParticle(Particle.REDSTONE,new Location(letterOrigin.getWorld(),letterOrigin.getX()+3,letterOrigin.getY()+i,letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
+                    world.spawnParticle(Particle.DUST,new Location(letterOrigin.getWorld(),letterOrigin.getX()+3,letterOrigin.getY()+i,letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
                             pColor, 15),true);
                 }
             }
             for (int i = 0; i<6; i++){
-                world.spawnParticle(Particle.REDSTONE,new Location(letterOrigin.getWorld(),letterOrigin.getX()+i,letterOrigin.getY(),letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
+                world.spawnParticle(Particle.DUST,new Location(letterOrigin.getWorld(),letterOrigin.getX()+i,letterOrigin.getY(),letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
                         pColor, 15),true);
-                world.spawnParticle(Particle.REDSTONE,new Location(letterOrigin.getWorld(),letterOrigin.getX()+i,letterOrigin.getY()+1,letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
+                world.spawnParticle(Particle.DUST,new Location(letterOrigin.getWorld(),letterOrigin.getX()+i,letterOrigin.getY()+1,letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
                         pColor, 15),true);
-                world.spawnParticle(Particle.REDSTONE,new Location(letterOrigin.getWorld(),letterOrigin.getX()+i,letterOrigin.getY()+6, letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
+                world.spawnParticle(Particle.DUST,new Location(letterOrigin.getWorld(),letterOrigin.getX()+i,letterOrigin.getY()+6, letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
                         pColor, 15),true);
-                world.spawnParticle(Particle.REDSTONE,new Location(letterOrigin.getWorld(),letterOrigin.getX()+i,letterOrigin.getY()+7, letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
+                world.spawnParticle(Particle.DUST,new Location(letterOrigin.getWorld(),letterOrigin.getX()+i,letterOrigin.getY()+7, letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
                         pColor, 15),true);
             }
 
@@ -135,17 +134,17 @@ public class PrintParticles {
             // Generate a letter H of bold 2, width of 6, and height of 8
             for (int i = 0; i<8; i++){
                 if(i<6){
-                    world.spawnParticle(Particle.REDSTONE,new Location(letterOrigin.getWorld(),letterOrigin.getX()+2,letterOrigin.getY()+i,letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
+                    world.spawnParticle(Particle.DUST,new Location(letterOrigin.getWorld(),letterOrigin.getX()+2,letterOrigin.getY()+i,letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
                             pColor, 15),true);
-                    world.spawnParticle(Particle.REDSTONE,new Location(letterOrigin.getWorld(),letterOrigin.getX()+3,letterOrigin.getY()+i,letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
+                    world.spawnParticle(Particle.DUST,new Location(letterOrigin.getWorld(),letterOrigin.getX()+3,letterOrigin.getY()+i,letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
                             pColor, 15),true);
                 }
             }
             for (int i = 0; i<6; i++){
 
-                world.spawnParticle(Particle.REDSTONE,new Location(letterOrigin.getWorld(),letterOrigin.getX()+i,letterOrigin.getY()+6, letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
+                world.spawnParticle(Particle.DUST,new Location(letterOrigin.getWorld(),letterOrigin.getX()+i,letterOrigin.getY()+6, letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
                         pColor, 15),true);
-                world.spawnParticle(Particle.REDSTONE,new Location(letterOrigin.getWorld(),letterOrigin.getX()+i,letterOrigin.getY()+7, letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
+                world.spawnParticle(Particle.DUST,new Location(letterOrigin.getWorld(),letterOrigin.getX()+i,letterOrigin.getY()+7, letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
                         pColor, 15),true);
             }
 
@@ -175,7 +174,7 @@ public class PrintParticles {
             for (int x = 0; x<6;x++){
                 for (int y = 0; y<8;y++){
                     if(!nonePP.contains(new Location(letterOrigin.getWorld(),letterOrigin.getX()+x,letterOrigin.getY()-y,letterOrigin.getZ()))){
-                        world.spawnParticle(Particle.REDSTONE,new Location(letterOrigin.getWorld(),letterOrigin.getX()+x,letterOrigin.getY()-y, letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
+                        world.spawnParticle(Particle.DUST,new Location(letterOrigin.getWorld(),letterOrigin.getX()+x,letterOrigin.getY()-y, letterOrigin.getZ()),3,0,0,0,0,new Particle.DustOptions(
                                 pColor, 15),true);
                     }
                 }
@@ -210,7 +209,7 @@ public class PrintParticles {
             for (int x = 0; x < 6; x++) {
                 for (int y = 0; y < 8; y++) {
                     if (!nonePP.contains(new Location(letterOrigin.getWorld(), letterOrigin.getX() + x, letterOrigin.getY() - y, letterOrigin.getZ()))) {
-                        world.spawnParticle(Particle.REDSTONE, new Location(letterOrigin.getWorld(), letterOrigin.getX() + x, letterOrigin.getY() - y, letterOrigin.getZ()), 3, 0,0,0,0,new Particle.DustOptions(
+                        world.spawnParticle(Particle.DUST, new Location(letterOrigin.getWorld(), letterOrigin.getX() + x, letterOrigin.getY() - y, letterOrigin.getZ()), 3, 0,0,0,0,new Particle.DustOptions(
                                 pColor, 15),true);
                     }
                 }
@@ -253,7 +252,7 @@ public class PrintParticles {
             for (int x = 0; x < 6; x++) {
                 for (int y = 0; y < 8; y++) {
                     if (!nonePP.contains(new Location(letterOrigin.getWorld(), letterOrigin.getX() + x, letterOrigin.getY() - y, letterOrigin.getZ()))) {
-                        world.spawnParticle(Particle.REDSTONE, new Location(letterOrigin.getWorld(), letterOrigin.getX() + x, letterOrigin.getY() - y, letterOrigin.getZ()), 3,0,0,0,0, new Particle.DustOptions(
+                        world.spawnParticle(Particle.DUST, new Location(letterOrigin.getWorld(), letterOrigin.getX() + x, letterOrigin.getY() - y, letterOrigin.getZ()), 3,0,0,0,0, new Particle.DustOptions(
                                 pColor, 15),true);
                     }
                 }
@@ -285,7 +284,7 @@ public class PrintParticles {
             for (int x = 0; x < 6; x++) {
                 for (int y = 0; y < 8; y++) {
                     if (!nonePP.contains(new Location(letterOrigin.getWorld(), letterOrigin.getX() + x, letterOrigin.getY() - y, letterOrigin.getZ()))) {
-                        world.spawnParticle(Particle.REDSTONE, new Location(letterOrigin.getWorld(), letterOrigin.getX() + x, letterOrigin.getY() - y, letterOrigin.getZ()), 3,0,0,0,0, new Particle.DustOptions(
+                        world.spawnParticle(Particle.DUST, new Location(letterOrigin.getWorld(), letterOrigin.getX() + x, letterOrigin.getY() - y, letterOrigin.getZ()), 3,0,0,0,0, new Particle.DustOptions(
                                 pColor, 15),true);
                     }
                 }
@@ -316,7 +315,7 @@ public class PrintParticles {
             for (int x = 0; x < 6; x++) {
                 for (int y = 0; y < 8; y++) {
                     if (!nonePP.contains(new Location(letterOrigin.getWorld(), letterOrigin.getX() + x, letterOrigin.getY() - y, letterOrigin.getZ()))) {
-                        world.spawnParticle(Particle.REDSTONE, new Location(letterOrigin.getWorld(), letterOrigin.getX() + x, letterOrigin.getY() - y, letterOrigin.getZ()), 3,0,0,0,0, new Particle.DustOptions(
+                        world.spawnParticle(Particle.DUST, new Location(letterOrigin.getWorld(), letterOrigin.getX() + x, letterOrigin.getY() - y, letterOrigin.getZ()), 3,0,0,0,0, new Particle.DustOptions(
                                 pColor, 15),true);
                     }
                 }
@@ -349,7 +348,7 @@ public class PrintParticles {
             for (int x = 0; x < 6; x++) {
                 for (int y = 0; y < 8; y++) {
                     if (!nonePP.contains(new Location(letterOrigin.getWorld(), letterOrigin.getX() + x, letterOrigin.getY() - y, letterOrigin.getZ()))) {
-                        world.spawnParticle(Particle.REDSTONE, new Location(letterOrigin.getWorld(), letterOrigin.getX() + x, letterOrigin.getY() - y, letterOrigin.getZ()), 3,0,0,0,0, new Particle.DustOptions(
+                        world.spawnParticle(Particle.DUST, new Location(letterOrigin.getWorld(), letterOrigin.getX() + x, letterOrigin.getY() - y, letterOrigin.getZ()), 3,0,0,0,0, new Particle.DustOptions(
                                 pColor, 15),true);
                     }
                 }
@@ -382,7 +381,7 @@ public class PrintParticles {
             for (int x = 0; x < 6; x++) {
                 for (int y = 0; y < 8; y++) {
                     if (!nonePP.contains(new Location(letterOrigin.getWorld(), letterOrigin.getX() + x, letterOrigin.getY() - y, letterOrigin.getZ()))) {
-                        world.spawnParticle(Particle.REDSTONE, new Location(letterOrigin.getWorld(), letterOrigin.getX() + x, letterOrigin.getY() - y, letterOrigin.getZ()), 3,0,0,0,0, new Particle.DustOptions(
+                        world.spawnParticle(Particle.DUST, new Location(letterOrigin.getWorld(), letterOrigin.getX() + x, letterOrigin.getY() - y, letterOrigin.getZ()), 3,0,0,0,0, new Particle.DustOptions(
                                 pColor, 15),true);
                     }
                 }
@@ -453,10 +452,10 @@ public class PrintParticles {
                             || ((-n/2-i) * (-n/2-i) + (-n/2-j) * (-n/2-j) <= n*n/2)) {
 
                         if(namePositions.contains(new Location(heartOrigin.getWorld(), heartOrigin.getX() + j, heartOrigin.getY() - i, heartOrigin.getZ()))){
-                            world.spawnParticle(Particle.REDSTONE, new Location(heartOrigin.getWorld(), heartOrigin.getX() + j, heartOrigin.getY() - i, heartOrigin.getZ()), 3,0,0,0,0, new Particle.DustOptions(
+                            world.spawnParticle(Particle.DUST, new Location(heartOrigin.getWorld(), heartOrigin.getX() + j, heartOrigin.getY() - i, heartOrigin.getZ()), 3,0,0,0,0, new Particle.DustOptions(
                                     Color.PURPLE, 15),true);
                         }else{
-                            world.spawnParticle(Particle.REDSTONE, new Location(heartOrigin.getWorld(), heartOrigin.getX() + j, heartOrigin.getY() - i, heartOrigin.getZ()), 3,0,0,0,0, new Particle.DustOptions(
+                            world.spawnParticle(Particle.DUST, new Location(heartOrigin.getWorld(), heartOrigin.getX() + j, heartOrigin.getY() - i, heartOrigin.getZ()), 3,0,0,0,0, new Particle.DustOptions(
                                     Color.YELLOW, 15),true);
                         }
 

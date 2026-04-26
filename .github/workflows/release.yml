@@ -1,33 +1,79 @@
-name: Build and Release
+name: CI/CD Pipeline
 
 on:
   push:
-    branches:
-      - 'main'
-    tags:
-      - 'v*'
+    branches: [ "main" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "main" ]
 
 permissions:
   contents: write
 
 jobs:
   build:
+    name: Build and Package
     runs-on: ubuntu-latest
-
+    
     steps:
-      - uses: actions/checkout@v3
-
-      - uses: actions/setup-java@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
         with:
-          distribution: 'temurin'
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
           java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
 
-      - run: mvn clean package
+      - name: Build with Maven
+        run: mvn clean package -DskipTests
 
-      - name: Release Jar
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Get Version
+        id: get_version
+        run: |
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Prepare Artifacts
+        run: |
+          mkdir -p artifacts
+          cp target/Market-*.jar artifacts/
+          # Create a clean name for the build artifact
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            mv artifacts/Market-*.jar artifacts/Market-${{ steps.get_version.outputs.version }}.jar
+          else
+            mv artifacts/Market-*.jar artifacts/Market-Dev-b${{ github.run_number }}.jar
+          fi
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Market-Build
+          path: artifacts/*.jar
+
+  release:
+    name: Create Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Market-Build
+          path: release-files
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          files: target/*.jar
+          files: release-files/*.jar
+          generate_release_notes: true
+          draft: false
+          prerelease: false
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

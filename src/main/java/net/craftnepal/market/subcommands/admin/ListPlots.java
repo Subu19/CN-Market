@@ -1,4 +1,4 @@
-package net.craftnepal.market.subcommands;
+package net.craftnepal.market.subcommands.admin;
 
 import me.kodysimpson.simpapi.colors.ColorTranslator;
 import me.kodysimpson.simpapi.command.SubCommand;

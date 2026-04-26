@@ -106,7 +106,7 @@ public class ShopListMenu extends Menu {
         }
         else if (displayName.startsWith("Plot ")) {
             String plotId = displayName.replace("Plot ", "");
-            new ShopItemListMenu(playerMenuUtility, Integer.parseInt(plotId)).open();
+            new ShopItemListMenu(playerMenuUtility, plotId).open();
         }
     }
 

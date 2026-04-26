@@ -8,7 +8,7 @@ import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.enchantments.Enchantment;
-import org.bukkit.entity.Display;
+
 import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.TextDisplay;
 import org.bukkit.inventory.ItemStack;
@@ -16,7 +16,7 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.util.Transformation;
 import org.joml.AxisAngle4f;
 import org.joml.Vector3f;
-import org.w3c.dom.Text;
+
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -71,9 +71,37 @@ public class DisplayUtils {
             DisplayPair displayPair = marketDisplays.get(plotId).get(shop.getId());
             if (displayPair != null) {
                 ItemStack displayItem = new ItemStack(shop.getItem());
-                String displayText = String.format("§6Price: §f$%.2f", shop.getPrice());
+                
+                String displayName = getDisplayName(shop);
+                int stock = ShopUtils.getShopStock(shop);
+                String color = (stock > 0) ? "§a" : "§c";
+                String trendStr = net.craftnepal.market.managers.DynamicPriceManager.getTrendString(shop.getItem());
+                
+                String displayText = String.format("%s%s\n§6Price: §f$%.2f %s", color, displayName, shop.getPrice(), trendStr);
                 displayPair.update(displayItem, displayText);
             }
+        }
+    }
+
+    private String getDisplayName(ChestShop shop) {
+        ItemStack itemStack = new ItemStack(shop.getItem());
+        ItemMeta meta = itemStack.getItemMeta();
+        
+        if (shop.getItem() == Material.ENCHANTED_BOOK && shop instanceof EnchantedBookChestShop) {
+            EnchantedBookChestShop enchantedShop = (EnchantedBookChestShop) shop;
+            Map.Entry<Enchantment, Integer> enchant = enchantedShop.getEnchantment();
+            if (enchant != null) {
+                String enchantName = enchant.getKey().getKey().getKey();
+                return String.format("%s %d",
+                        enchantName.replaceAll("_", " ").toUpperCase(),
+                        enchant.getValue());
+            } else {
+                return "Enchanted Book";
+            }
+        } else if (meta != null && meta.hasDisplayName()) {
+            return meta.getDisplayName();
+        } else {
+            return shop.getItem().toString().replace('_', ' ');
         }
     }
 
@@ -109,25 +137,13 @@ public class DisplayUtils {
             display.setTransformation(transformation);
         });
 
-        String displayName;
-        if (shop.getItem() == Material.ENCHANTED_BOOK && shop instanceof EnchantedBookChestShop) {
-            EnchantedBookChestShop enchantedShop = (EnchantedBookChestShop) shop;
-            Map.Entry<Enchantment, Integer> enchant = enchantedShop.getEnchantment();
-            if (enchant != null) {
-                String enchantName = enchant.getKey().getKey().getKey();
-                displayName = String.format("§d%s %d",
-                        enchantName.replaceAll("_"," ").toUpperCase(),
-                        enchant.getValue());
-            } else {
-                displayName = "Enchanted Book";
-            }
-        } else if (meta != null && meta.hasDisplayName()) {
-            displayName = meta.getDisplayName();
-        } else {
-            displayName = shop.getItem().toString().replace('_', ' ');
-        }
+        String displayName = getDisplayName(shop);
+        int stock = ShopUtils.getShopStock(shop);
+        String color = (stock > 0) ? "§a" : "§c";
+        String trendStr = net.craftnepal.market.managers.DynamicPriceManager.getTrendString(shop.getItem());
+
         TextDisplay textDisplay = shopLoc.getWorld().spawn(textLoc, TextDisplay.class, display -> {
-            display.setText(String.format("§a%s\n§6Price: §f$%.2f", displayName, shop.getPrice()));
+            display.setText(String.format("%s%s\n§6Price: §f$%.2f %s", color, displayName, shop.getPrice(), trendStr));
             display.setAlignment(TextDisplay.TextAlignment.CENTER);
             // display.setBillboard(TextDisplay.Billboard.CENTER);
             Transformation transformation = display.getTransformation();

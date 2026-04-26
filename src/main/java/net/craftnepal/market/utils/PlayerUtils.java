@@ -21,13 +21,16 @@ public class PlayerUtils {
     }
 
     public static void saveLastLocation(Player player) {
-        Location lastLocation = player.getLocation();
-        LocationData.get().set("players."+player.getUniqueId().toString(), lastLocation);
+        saveLastLocation(player, player.getLocation());
+    }
+
+    public static void saveLastLocation(Player player, Location location) {
+        net.craftnepal.market.utils.LocationUtils.saveLocation(LocationData.get(), "players."+player.getUniqueId().toString(), location);
         LocationData.save();
     }
 
     public static Location getLastLocation(Player player) {
-        return LocationData.get().getLocation("players."+player.getUniqueId().toString());
+        return net.craftnepal.market.utils.LocationUtils.loadLocation(LocationData.get(), "players."+player.getUniqueId().toString());
     }
 
     public static void clearLastLocation(Player player) {

@@ -1,7 +1,7 @@
 package net.craftnepal.market.Listeners;
 
 import net.craftnepal.market.files.RegionData;
-import net.craftnepal.market.subcommands.Bypass;
+import net.craftnepal.market.subcommands.admin.Bypass;
 import net.craftnepal.market.utils.MarketUtils;
 import net.craftnepal.market.utils.PlotUtils;
 import net.craftnepal.market.utils.RegionUtils;
@@ -25,9 +25,30 @@ public class MarketRegionProtection implements Listener {
 
         if (clickedBlock == null) return;
 
+        // Allow interaction if it's a shop
+        if (net.craftnepal.market.utils.ShopUtils.isShopLocation(clickedBlock.getLocation())) {
+            return;
+        }
+
         if (!isActionAllowed(player, clickedBlock.getLocation())) {
             e.setCancelled(true);
             SendMessage.sendPlayerMessage(player, "&cYou are not allowed to interact here.");
+        }
+    }
+
+    @EventHandler
+    public void onBlockBreak(BlockBreakEvent e) {
+        if (!isActionAllowed(e.getPlayer(), e.getBlock().getLocation())) {
+            e.setCancelled(true);
+            SendMessage.sendPlayerMessage(e.getPlayer(), "&cYou are not allowed to build here.");
+        }
+    }
+
+    @EventHandler
+    public void onBlockPlace(BlockPlaceEvent e) {
+        if (!isActionAllowed(e.getPlayer(), e.getBlock().getLocation())) {
+            e.setCancelled(true);
+            SendMessage.sendPlayerMessage(e.getPlayer(), "&cYou are not allowed to build here.");
         }
     }
     private boolean isActionAllowed(Player player, Location location) {
@@ -43,7 +64,11 @@ public class MarketRegionProtection implements Listener {
         String plot = PlotUtils.getPlotIdByLocation(location);
         if (plot != null) {
             String owner = PlotUtils.getPlotOwner(plot);
-            return owner != null && owner.equals(player.getUniqueId().toString());
+            if (owner != null && owner.equals(player.getUniqueId().toString())) {
+                return true;
+            }
+            java.util.List<String> members = net.craftnepal.market.files.RegionData.get().getStringList("market.plots." + plot + ".members");
+            return members.contains(player.getUniqueId().toString());
         }
 
         // In market world but not in any plot

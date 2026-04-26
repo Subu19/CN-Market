@@ -1,4 +1,4 @@
-package net.craftnepal.market.subcommands;
+package net.craftnepal.market.subcommands.player;
 
 import me.kodysimpson.simpapi.command.SubCommand;
 import net.craftnepal.market.Listeners.Movement;
@@ -39,9 +39,9 @@ public class Back extends SubCommand {
         if(commandSender instanceof Player){
             Player player = (Player) commandSender;
             //Check if the player is inside market
-            if(Movement.isPlayerInMarket(player.getUniqueId())){
+            if(net.craftnepal.market.utils.MarketUtils.isInMarketArea(player.getLocation())){
                 Bukkit.getLogger().info("player is in market");
-                Location lastLocation = PlayerUtils.getLastLocation(player);
+                Location lastLocation = net.craftnepal.market.utils.PlayerUtils.getLastLocation(player);
                 if(lastLocation != null){
                     player.teleport(lastLocation);
                     Movement.getPlayersInMarket().remove(player.getUniqueId());

@@ -15,6 +15,9 @@ public class LocationData {
         file = new File(Bukkit.getServer().getPluginManager().getPlugin("Market").getDataFolder(),"LocationData.yml");
         if(!file.exists()){
             try{
+                if (!file.getParentFile().exists()) {
+                    file.getParentFile().mkdirs();
+                }
                 file.createNewFile();
             }catch (IOException e){
                 System.out.println("Couldnt create location file.");
@@ -30,8 +33,8 @@ public class LocationData {
     public static void save(){
         try{
             config.save(file);
-        }catch (IOException e){
-            System.out.println("Couldnt save file!");
+        } catch (IOException e) {
+            Bukkit.getLogger().severe("Could not save LocationData.yml: " + e.getMessage());
         }
 
     }

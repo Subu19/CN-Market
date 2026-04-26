@@ -124,7 +124,7 @@ public class RegionUtils {
         return location.getChunk().equals(chunk);
     }
 
-    public static void showVerticalParticleLine(Location startLoc, Location endLoc, Plugin plugin) {
+    public static void showVerticalParticleLine(Player player, Location startLoc, Location endLoc, Plugin plugin) {
         // If no end location provided, create one 3 blocks above start
         if (endLoc == null) {
             endLoc = startLoc.clone().add(0, 3, 0);
@@ -153,14 +153,16 @@ public class RegionUtils {
                 Location helixLoc = particleLoc.clone().add(x, 0, z);
 
                 // Main beam particles
-                particleLoc.getWorld().spawnParticle(Particle.END_ROD, particleLoc, 1, 0, 0, 0, 0);
+                if (player.isOnline()) {
+                    player.spawnParticle(Particle.END_ROD, particleLoc, 1, 0, 0, 0, 0);
 
-                // Helix particles with color
-                particleLoc.getWorld().spawnParticle(
-                        Particle.DUST,
-                        helixLoc,
-                        1,
-                        new Particle.DustOptions(Color.fromRGB(30, 144, 255), 0.7f));
+                    // Helix particles with color
+                    player.spawnParticle(
+                            Particle.DUST,
+                            helixLoc,
+                            1,
+                            new Particle.DustOptions(Color.fromRGB(30, 144, 255), 0.7f));
+                }
             }
         }, 0L, 2L);
 

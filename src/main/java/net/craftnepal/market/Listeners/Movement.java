@@ -41,10 +41,11 @@ public class Movement implements Listener {
         TeleportUtils.handleMovement(e);
 
         // Only process if player actually moved blocks
-        if (e.getFrom().getBlock().equals(e.getTo().getBlock())) {
+        if (e.getFrom().getBlockX() == e.getTo().getBlockX() && 
+            e.getFrom().getBlockY() == e.getTo().getBlockY() && 
+            e.getFrom().getBlockZ() == e.getTo().getBlockZ()) {
             return;
         }
-
 
         Player player = e.getPlayer();
 

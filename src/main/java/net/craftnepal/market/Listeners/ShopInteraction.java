@@ -23,6 +23,7 @@ import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.EnchantmentStorageMeta;
+import org.bukkit.block.Barrel;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -82,25 +83,31 @@ public class ShopInteraction implements Listener {
 
         String playerPlot = plot;
 
+        // Check if this chest is already a shop
+        ConfigurationSection shops = RegionData.get().getConfigurationSection("market.plots." + playerPlot + ".shops");
+        if (shops != null) {
+            for (String shopId : shops.getKeys(false)) {
+                Location shopLoc = LocationUtils.loadLocation(RegionData.get(),
+                        "market.plots." + playerPlot + ".shops." + shopId + ".location");
+                if (shopLoc != null && shopLoc.equals(chestLocation)) {
+                    String shopOwner = RegionData.get().getString("market.plots." + playerPlot + ".shops." + shopId + ".owner");
+                    if (player.hasPermission("market.admin") || (shopOwner != null && shopOwner.equals(player.getUniqueId().toString()))) {
+                        showShopStats(player, playerPlot, shopId);
+                    } else {
+                        SendMessage.sendPlayerMessage(player, "§cThis chest is already a shop!");
+                    }
+                    event.setCancelled(true);
+                    return;
+                }
+            }
+        }
+
         // Check the item in hand
         ItemStack item = player.getInventory().getItemInMainHand();
         if (item == null || item.getType() == Material.AIR) {
             SendMessage.sendPlayerMessage(player, "§cYou must be holding an item to create a shop.");
             event.setCancelled(true);
             return;
-        }
-
-        // Check if this chest is already a shop
-        ConfigurationSection shops = RegionData.get().getConfigurationSection("market.plots." + playerPlot + ".shops");
-        if (shops != null) {
-            for (String shopId : shops.getKeys(true)) {
-                Location shopLoc = RegionData.get()
-                        .getLocation("market.plots." + playerPlot + ".shops." + shopId + ".location");
-                if (shopLoc != null && shopLoc.equals(chestLocation)) {
-                    SendMessage.sendPlayerMessage(player, "§cThis chest is already a shop!");
-                    return;
-                }
-            }
         }
 
         // Retrieve the item in hand
@@ -110,32 +117,33 @@ public class ShopInteraction implements Listener {
         final Map.Entry<Enchantment, Integer> enchantment;
         if (itemType == Material.ENCHANTED_BOOK) {
             EnchantmentStorageMeta meta = (EnchantmentStorageMeta) item.getItemMeta();
-            if (meta != null && meta.getStoredEnchants().size() > 1) {
-                SendMessage.sendPlayerMessage(player, "§cYou cannot sell books with multiple enchantments.");
+            if (meta == null || meta.getStoredEnchants().size() != 1) {
+                SendMessage.sendPlayerMessage(player, "§cYou can only sell books with exactly one enchantment.");
                 return;
             }
-            assert meta != null;
             enchantment = meta.getStoredEnchants().entrySet().iterator().next();
         } else {
             enchantment = null;
         }
 
-        // Get the price of the item
-        double fairPrice = PriceData.getPrice(itemType);
-        if (fairPrice <= 0) {
+        // Get the base price to check if item is sellable
+        Integer basePriceValue = PriceData.getPrice(itemType);
+        if (basePriceValue == null || basePriceValue <= 0) {
             SendMessage.sendPlayerMessage(player, "§cThis item cannot be sold in shops as it has no base price set.");
             event.setCancelled(true);
             return;
         }
+        double fairPrice = net.craftnepal.market.managers.DynamicPriceManager.getDynamicPrice(itemType);
 
         double minPrice = fairPrice * 0.85; // 15% below base price
         double maxPrice = fairPrice * 1.50; // 50% above base price
         String priceDisplay = String.format("§e%.2f", fairPrice);
 
         // Send detailed messages to the player
+        String trendStr = net.craftnepal.market.managers.DynamicPriceManager.getTrendString(itemType);
         SendMessage.sendPlayerMessage(player, "§7=============================");
         SendMessage.sendPlayerMessage(player, "§aYou're creating a shop for: §b" + itemName);
-        SendMessage.sendPlayerMessage(player, "§7Base price: " + priceDisplay);
+        SendMessage.sendPlayerMessage(player, "§7Market price: " + priceDisplay + " " + trendStr);
         SendMessage.sendPlayerMessage(player, String.format("§7Price range: §c%.2f §7to §a%.2f", minPrice, maxPrice));
         SendMessage.sendPlayerMessage(player, "§7----------------------------------------");
         SendMessage.sendPlayerMessage(player, "   ");
@@ -231,7 +239,7 @@ public class ShopInteraction implements Listener {
                     String basePath = "market.plots." + playerPlot + ".shops." + shopId;
 
                     // Serialize and save the ChestShop data to the YAML configuration
-                    RegionData.get().set(basePath + ".location", enchantedBookChestShop.getLocation());
+                    LocationUtils.saveLocation(RegionData.get(), basePath + ".location", enchantedBookChestShop.getLocation());
                     RegionData.get().set(basePath + ".item", enchantedBookChestShop.getItem().toString());
                     RegionData.get().set(basePath + ".owner", enchantedBookChestShop.getOwner().toString());
                     RegionData.get().set(basePath + ".price", enchantedBookChestShop.getPrice());
@@ -260,7 +268,7 @@ public class ShopInteraction implements Listener {
                     String basePath = "market.plots." + playerPlot + ".shops." + shopId;
 
                     // Serialize and save the ChestShop data to the YAML configuration
-                    RegionData.get().set(basePath + ".location", chestShop.getLocation());
+                    LocationUtils.saveLocation(RegionData.get(), basePath + ".location", chestShop.getLocation());
                     RegionData.get().set(basePath + ".item", chestShop.getItem().toString());
                     RegionData.get().set(basePath + ".owner", chestShop.getOwner().toString());
                     RegionData.get().set(basePath + ".price", chestShop.getPrice());
@@ -283,7 +291,7 @@ public class ShopInteraction implements Listener {
         });
 
         // Add timeout to remove awaitingInput after 30 seconds
-        Bukkit.getScheduler().runTaskLater(Bukkit.getPluginManager().getPlugin("Market"), () -> {
+        Bukkit.getScheduler().runTaskLater(Market.getPlugin(), () -> {
             if (awaitingInput.remove(uuid) != null) {
                 SendMessage.sendPlayerMessage(player, "§cShop creation timed out after 30 seconds.");
             }
@@ -299,10 +307,144 @@ public class ShopInteraction implements Listener {
         if (awaitingInput.containsKey(uuid)) {
             event.setCancelled(true);
             Consumer<String> consumer = awaitingInput.remove(uuid);
-            Bukkit.getScheduler().runTask(Bukkit.getPluginManager().getPlugin("Market"), () -> {
+            Bukkit.getScheduler().runTask(Market.getPlugin(), () -> {
                 consumer.accept(event.getMessage());
             });
         }
+    }
+
+    @EventHandler
+    public void onVisitorShopClick(PlayerInteractEvent event) {
+        Player player = event.getPlayer();
+
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK || event.getClickedBlock() == null)
+            return;
+
+        Block clickedBlock = event.getClickedBlock();
+        if (clickedBlock.getType() != Material.BARREL)
+            return;
+
+        Location chestLocation = clickedBlock.getLocation();
+
+        if (!MarketUtils.isInMarketArea(chestLocation)) {
+            return;
+        }
+
+        String plot = PlotUtils.getPlotIdByLocation(chestLocation);
+        if (plot == null) return;
+
+        ConfigurationSection shops = RegionData.get().getConfigurationSection("market.plots." + plot + ".shops");
+        if (shops == null) return;
+
+        for (String shopId : shops.getKeys(false)) {
+            Location shopLoc = LocationUtils.loadLocation(RegionData.get(), "market.plots." + plot + ".shops." + shopId + ".location");
+            if (shopLoc != null && shopLoc.equals(chestLocation)) {
+                String owner = RegionData.get().getString("market.plots." + plot + ".shops." + shopId + ".owner");
+                
+                if (owner != null && owner.equals(player.getUniqueId().toString())) {
+                    // It's the owner. Let them open the barrel.
+                    return;
+                }
+
+                // It's a visitor! Cancel opening the barrel.
+                event.setCancelled(true);
+
+                // Fetch shop data
+                String itemNameStr = RegionData.get().getString("market.plots." + plot + ".shops." + shopId + ".item");
+                Material itemType = Material.matchMaterial(itemNameStr);
+                if (itemType == null) return;
+                
+                double price = RegionData.get().getDouble("market.plots." + plot + ".shops." + shopId + ".price");
+                
+                // Count stock
+                org.bukkit.block.Barrel barrel = (org.bukkit.block.Barrel) clickedBlock.getState();
+                int stock = 0;
+                for (ItemStack item : barrel.getInventory().getContents()) {
+                    if (item != null && item.getType() == itemType) {
+                        stock += item.getAmount();
+                    }
+                }
+
+                // Build Interactive Chat Menu
+                String itemName = itemType.name().replace("_", " ").toLowerCase();
+                String trendStr = net.craftnepal.market.managers.DynamicPriceManager.getTrendString(itemType);
+                SendMessage.sendPlayerMessage(player, "§7=============================");
+                SendMessage.sendPlayerMessage(player, "§aShop Item: §b" + itemName);
+                SendMessage.sendPlayerMessage(player, "§7Price per item: §e" + EconomyUtils.format(price) + " " + trendStr);
+                SendMessage.sendPlayerMessage(player, "§7In Stock: §a" + stock);
+                SendMessage.sendPlayerMessage(player, "§7----------------------------------------");
+                
+                TextComponent spacer = new TextComponent("   ");
+                TextComponent buttonsRow = new TextComponent(
+                        Objects.requireNonNull(Market.getMainConfig().getString("prefix")).replaceAll("&", "§"));
+                
+                int[] buyAmounts = {1, 16, 64};
+                for (int amount : buyAmounts) {
+                    String color = (stock >= amount) ? "§a" : "§c";
+                    TextComponent buyBtn = new TextComponent(color + "[Buy " + amount + "]");
+                    buyBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/market _buy " + plot + " " + shopId + " " + amount));
+                    buyBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                            new ComponentBuilder("§7Buy " + amount + " for §e" + EconomyUtils.format(price * amount) + 
+                                    (stock < amount ? " §c(Not enough stock)" : "")).create()));
+                    buttonsRow.addExtra(buyBtn);
+                    buttonsRow.addExtra(spacer);
+                }
+
+                player.spigot().sendMessage(buttonsRow);
+                SendMessage.sendPlayerMessage(player, "§7=============================");
+
+                return;
+            }
+        }
+    }
+
+    private void showShopStats(Player player, String plotId, String shopId) {
+        ConfigurationSection shopSection = RegionData.get().getConfigurationSection("market.plots." + plotId + ".shops." + shopId);
+        if (shopSection == null) return;
+
+        String itemNameStr = shopSection.getString("item");
+        Material itemType = Material.matchMaterial(itemNameStr);
+        if (itemType == null) return;
+
+        double price = shopSection.getDouble("price");
+        String ownerUUID = shopSection.getString("owner");
+        Location loc = LocationUtils.loadLocation(RegionData.get(), "market.plots." + plotId + ".shops." + shopId + ".location");
+
+        int stock = 0;
+        if (loc != null && loc.getBlock().getType() == Material.BARREL) {
+            org.bukkit.block.Barrel barrel = (org.bukkit.block.Barrel) loc.getBlock().getState();
+            for (ItemStack item : barrel.getInventory().getContents()) {
+                if (item != null && item.getType() == itemType) {
+                    stock += item.getAmount();
+                }
+            }
+        }
+
+        String itemName = itemType.name().replace("_", " ").toLowerCase();
+        String trendStr = net.craftnepal.market.managers.DynamicPriceManager.getTrendString(itemType);
+        SendMessage.sendPlayerMessage(player, "§7=============================");
+        SendMessage.sendPlayerMessage(player, "§6§lSHOP STATS");
+        SendMessage.sendPlayerMessage(player, "§aItem: §b" + itemName);
+        SendMessage.sendPlayerMessage(player, "§7Price: §e" + EconomyUtils.format(price) + " " + trendStr);
+        SendMessage.sendPlayerMessage(player, "§7Stock: §a" + stock);
+        
+        if (player.hasPermission("market.admin")) {
+            String ownerName = ownerUUID != null ? Bukkit.getOfflinePlayer(UUID.fromString(ownerUUID)).getName() : "Unknown";
+            SendMessage.sendPlayerMessage(player, "§7Owner: §f" + ownerName);
+        }
+        
+        SendMessage.sendPlayerMessage(player, "§7----------------------------------------");
+
+        TextComponent removeBtn = new TextComponent("§c§l[REMOVE SHOP]");
+        removeBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/market plot removeshop " + plotId + " " + shopId));
+        removeBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                new ComponentBuilder("§7Click to remove this shop permanently").create()));
+
+        TextComponent row = new TextComponent(Objects.requireNonNull(Market.getMainConfig().getString("prefix")).replaceAll("&", "§"));
+        row.addExtra(removeBtn);
+
+        player.spigot().sendMessage(row);
+        SendMessage.sendPlayerMessage(player, "§7=============================");
     }
 
     @EventHandler
@@ -328,12 +470,12 @@ public class ShopInteraction implements Listener {
         if (shops == null) return;
 
         for (String shopId : shops.getKeys(false)) {
-            Location shopLoc = RegionData.get().getLocation("market.plots." + plot + ".shops." + shopId + ".location");
+            Location shopLoc = LocationUtils.loadLocation(RegionData.get(), "market.plots." + plot + ".shops." + shopId + ".location");
             if (shopLoc != null && shopLoc.equals(chestLocation)) {
                 Player player = event.getPlayer();
                 String owner = RegionData.get().getString("market.plots." + plot + ".shops." + shopId + ".owner");
 
-                if (owner != null && owner.equals(player.getUniqueId().toString())) {
+                if (player.hasPermission("market.admin") || (owner != null && owner.equals(player.getUniqueId().toString()))) {
                     RegionData.get().set("market.plots." + plot + ".shops." + shopId, null);
                     RegionData.save();
                     SendMessage.sendPlayerMessage(player, "§aShop removed successfully.");

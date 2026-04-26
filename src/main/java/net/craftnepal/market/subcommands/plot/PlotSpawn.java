@@ -1,18 +1,16 @@
-package net.craftnepal.market.subcommands;
+package net.craftnepal.market.subcommands.plot;
 
 import me.kodysimpson.simpapi.command.SubCommand;
 import net.craftnepal.market.utils.PlotUtils;
-import net.craftnepal.market.utils.SendMessage;
-import org.bukkit.Location;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import java.util.List;
 
-public class SetPlotSpawn extends SubCommand {
+public class PlotSpawn extends SubCommand {
     @Override
     public String getName() {
-        return "setplotspawn";
+        return "plotspawn";
     }
 
     @Override
@@ -22,12 +20,12 @@ public class SetPlotSpawn extends SubCommand {
 
     @Override
     public String getDescription() {
-        return "Sets spawn point for your plot";
+        return "Teleport to your plot's spawn point";
     }
 
     @Override
     public String getSyntax() {
-        return "/amarket setplotspawn";
+        return "/market plotspawn";
     }
 
     @Override
@@ -38,17 +36,7 @@ public class SetPlotSpawn extends SubCommand {
         }
 
         Player player = (Player) commandSender;
-        Location location = player.getLocation();
-
-        // Check if player is in their own plot
-        if (!PlotUtils.isPlayerInOwnPlot(player)) {
-            SendMessage.sendPlayerMessage(player, "&cYou must be in your own plot to set its spawn point!");
-            return;
-        }
-
-        String plotId = PlotUtils.getPlotIdByLocation(location);
-        PlotUtils.setPlotSpawn(plotId, location);
-        SendMessage.sendPlayerMessage(player, "&aPlot spawn point set successfully!");
+        PlotUtils.teleportToOwnPlotSpawn(player);
     }
 
     @Override

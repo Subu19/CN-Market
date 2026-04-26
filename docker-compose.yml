@@ -9,6 +9,8 @@ services:
       TYPE: "PAPER"
       VERSION: "26.1.2"
       MEMORY: "2G"
+      UID: 1000
+      GID: 1000
     volumes:
       # Mount the built plugin JAR to the plugins folder
       # Note: You need to run 'mvn package' first to generate the JAR in target/

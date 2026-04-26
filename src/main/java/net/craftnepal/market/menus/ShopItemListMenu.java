@@ -15,15 +15,15 @@ import java.util.*;
 
 public class ShopItemListMenu extends Menu {
 
-    private final int plotId;
+    private final String plotId;
     private int currentPage = 0;
     private final Map<Material, Integer> itemCounts;
     private static final int ITEMS_PER_PAGE = 45;
 
-    public ShopItemListMenu(PlayerMenuUtility playerMenuUtility, int plotId) {
+    public ShopItemListMenu(PlayerMenuUtility playerMenuUtility, String plotId) {
         super(playerMenuUtility);
         this.plotId = plotId;
-        this.itemCounts = ShopUtils.getAllShopItemsAndCountsByPlotID(String.valueOf(plotId));
+        this.itemCounts = ShopUtils.getAllShopItemsAndCountsByPlotID(plotId);
     }
 
     @Override
@@ -126,11 +126,11 @@ public class ShopItemListMenu extends Menu {
 
             //Fetch location to teleport. Either Plot spawn or Plot center
             Location shopLocation;
-            Location shopSpawn = PlotUtils.getPlotSpawn(String.valueOf(plotId));
+            Location shopSpawn = PlotUtils.getPlotSpawn(plotId);
             if(shopSpawn != null){
                 shopLocation = shopSpawn;
             }else{
-                shopLocation = PlotUtils.getPlotCenter(String.valueOf(plotId));
+                shopLocation = PlotUtils.getPlotCenter(plotId);
             }
 
             if (shopLocation != null) {
@@ -139,9 +139,9 @@ public class ShopItemListMenu extends Menu {
                 TeleportUtils.scheduleTeleport(playerMenuUtility.getOwner(),shopLocation,()->{
                     SendMessage.sendPlayerMessage(playerMenuUtility.getOwner(), "Teleported to shop selling: " +
                             ChatColor.YELLOW + clickedMaterial.name());
-                    List<ChestShop> allShops =  ShopUtils.getPlotShopsByItemName( String.valueOf(plotId),clickedItem.getType().toString());
+                    List<ChestShop> allShops =  ShopUtils.getPlotShopsByItemName(plotId,clickedItem.getType().toString());
                     for (ChestShop shop:allShops){
-                        RegionUtils.showVerticalParticleLine(shop.getLocation().clone().add(0,2,0),null, Market.getPlugin());
+                        RegionUtils.showVerticalParticleLine(playerMenuUtility.getOwner(), shop.getLocation().clone().add(0, 2, 0), null, Market.getPlugin());
                     }
                 });
             } else {

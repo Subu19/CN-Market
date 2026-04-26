@@ -1,10 +1,10 @@
-package net.craftnepal.market.subcommands;
+package net.craftnepal.market.subcommands.player;
 
 import me.kodysimpson.simpapi.command.SubCommand;
 import me.kodysimpson.simpapi.exceptions.MenuManagerException;
 import me.kodysimpson.simpapi.exceptions.MenuManagerNotSetupException;
 import me.kodysimpson.simpapi.menu.MenuManager;
-import net.craftnepal.market.menus.ShopListMenu;
+import net.craftnepal.market.menus.ShopMainMenu;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import java.util.List;
@@ -41,7 +41,7 @@ public class Shops extends SubCommand {
         Player player = (Player) sender;
 
         try {
-            MenuManager.openMenu(ShopListMenu.class, player);
+            MenuManager.openMenu(ShopMainMenu.class, player);
         } catch (MenuManagerException | MenuManagerNotSetupException e) {
             throw new RuntimeException(e);
         }

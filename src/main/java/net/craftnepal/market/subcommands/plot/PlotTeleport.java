@@ -1,4 +1,4 @@
-package net.craftnepal.market.subcommands;
+package net.craftnepal.market.subcommands.plot;
 
 
 import me.kodysimpson.simpapi.command.SubCommand;
@@ -102,8 +102,12 @@ public class PlotTeleport extends SubCommand {
             );
         }
 
+        Location origin = player.getLocation();
         SendMessage.sendPlayerMessage(player, "&eTeleporting to plot " + plotId + " in 5 seconds.. don't move!");
         TeleportUtils.scheduleTeleport(player, tpLocation, () -> {
+            if (!net.craftnepal.market.utils.MarketUtils.isInMarketArea(origin)) {
+                net.craftnepal.market.utils.PlayerUtils.saveLastLocation(player, origin);
+            }
             RegionUtils.visibleRegionBorders(player, min, max, Market.getPlugin(), Color.PURPLE, 30);
         });
     }

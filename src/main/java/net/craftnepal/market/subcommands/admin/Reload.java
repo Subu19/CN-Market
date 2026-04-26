@@ -1,17 +1,20 @@
-package net.craftnepal.market.subcommands;
+package net.craftnepal.market.subcommands.admin;
 
 import me.kodysimpson.simpapi.command.SubCommand;
+import net.craftnepal.market.Market;
 import net.craftnepal.market.files.RegionData;
-import org.bukkit.Location;
+import net.craftnepal.market.utils.SendMessage;
+import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import java.util.List;
 
-public class SetSpawn extends SubCommand {
+public class Reload extends SubCommand {
+
     @Override
     public String getName() {
-        return "setspawn";
+        return "reload";
     }
 
     @Override
@@ -21,22 +24,22 @@ public class SetSpawn extends SubCommand {
 
     @Override
     public String getDescription() {
-        return "Sets spawn of market.";
+        return "Reload market plugin.";
     }
 
     @Override
     public String getSyntax() {
-        return "/amarket setspawn";
+        return "/amarket reload";
     }
 
     @Override
     public void perform(CommandSender commandSender, String[] strings) {
+        RegionData.reload();
+        Market.reloadMainConfig();
         if(commandSender instanceof Player){
-            Player p = (Player) commandSender;
-            Location location = p.getLocation();
-            RegionData.get().set("market.spawn", location);
-            RegionData.save();
-            p.sendMessage("Spawn set!");
+            SendMessage.sendPlayerMessage((Player) commandSender,"Reloaded Market configuration!");
+        }else{
+            Bukkit.getLogger().info("Reloaded Market configuration!");
         }
     }
 

@@ -1,4 +1,4 @@
-package net.craftnepal.market.subcommands;
+package net.craftnepal.market.subcommands.admin;
 
 import me.kodysimpson.simpapi.command.SubCommand;
 import net.craftnepal.market.Market;

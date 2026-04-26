@@ -47,8 +47,8 @@ public class PlotUtils {
         // First check manually registered plots
         if (plots != null) {
             for (String plotId : plots.getKeys(false)) {
-                Location min = RegionData.get().getLocation("market.plots." + plotId + ".posMin");
-                Location max = RegionData.get().getLocation("market.plots." + plotId + ".posMax");
+                Location min = LocationUtils.loadLocation(plots, plotId + ".posMin");
+                Location max = LocationUtils.loadLocation(plots, plotId + ".posMax");
 
                 if (min != null && max != null &&
                         RegionUtils.isLocationInsideRegion(location, min, max)) {
@@ -96,8 +96,8 @@ public class PlotUtils {
     }
 
     public static void registerAutomaticPlot(String plotId) {
-        if (RegionData.get().contains("market.plots." + plotId)) {
-            return; // Already registered
+        if (RegionData.get().contains("market.plots." + plotId + ".posMin")) {
+            return; // Already registered with boundaries
         }
 
         String[] parts = plotId.split("_");
@@ -118,8 +118,13 @@ public class PlotUtils {
         Location min = new Location(world, startX, 64, startZ);
         Location max = new Location(world, startX + plotSize - 1, 255, startZ + plotSize - 1);
 
-        RegionData.get().set("market.plots." + plotId + ".posMin", min);
-        RegionData.get().set("market.plots." + plotId + ".posMax", max);
+        ConfigurationSection plotSection = RegionData.get().getConfigurationSection("market.plots." + plotId);
+        if (plotSection == null) {
+            plotSection = RegionData.get().createSection("market.plots." + plotId);
+        }
+
+        LocationUtils.saveLocation(RegionData.get(), "market.plots." + plotId + ".posMin", min);
+        LocationUtils.saveLocation(RegionData.get(), "market.plots." + plotId + ".posMax", max);
         RegionData.save();
     }
 
@@ -145,8 +150,11 @@ public class PlotUtils {
     }
 
     public static Location getPlotCenter(String plotId) {
-        Location min = RegionData.get().getLocation("market.plots." + plotId + ".posMin");
-        Location max = RegionData.get().getLocation("market.plots." + plotId + ".posMax");
+        if (!RegionData.get().contains("market.plots." + plotId + ".posMin") && plotId.startsWith("plot_")) {
+            registerAutomaticPlot(plotId);
+        }
+        Location min = LocationUtils.loadLocation(RegionData.get(), "market.plots." + plotId + ".posMin");
+        Location max = LocationUtils.loadLocation(RegionData.get(), "market.plots." + plotId + ".posMax");
         if (min == null || max == null) return null;
 
         return new Location(
@@ -164,7 +172,10 @@ public class PlotUtils {
         String owner = getPlotOwner(plotId);
         return owner != null && owner.equals(player.getUniqueId().toString());
     }    public static Location getPlotSpawn(String plotId) {
-        return RegionData.get().getLocation("market.plots." + plotId + ".spawn");
+        if (!RegionData.get().contains("market.plots." + plotId + ".posMin") && plotId.startsWith("plot_")) {
+            registerAutomaticPlot(plotId);
+        }
+        return LocationUtils.loadLocation(RegionData.get(), "market.plots." + plotId + ".spawn");
     }
 
     /**
@@ -184,7 +195,7 @@ public class PlotUtils {
         RegionData.save();
 
     }public static void setPlotSpawn(String plotId, Location location) {
-        RegionData.get().set("market.plots." + plotId + ".spawn", location);
+        LocationUtils.saveLocation(RegionData.get(), "market.plots." + plotId + ".spawn", location);
         RegionData.save();
     }
 
@@ -215,8 +226,12 @@ public class PlotUtils {
             SendMessage.sendPlayerMessage(player, "&cYour plot doesn't have a spawn point set! Use /market setplotspawn to set one.");
             return false;
         }
+        Location origin = player.getLocation();
         SendMessage.sendPlayerMessage(player,"&eTeleporting in 5 seconds.. don't move!");
         TeleportUtils.scheduleTeleport(player,spawn,()->{
+            if (!MarketUtils.isInMarketArea(origin)) {
+                PlayerUtils.saveLastLocation(player, origin);
+            }
             SendMessage.sendPlayerMessage(player, "&aTeleported to your plot's spawn point!");
         });
         return true;

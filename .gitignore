@@ -39,9 +39,9 @@ commands.yml
 bukkit.yml
 spigot.yml
 paper.yml
-world/
-world_nether/
-world_the_end/
+/world/
+/world_nether/
+/world_the_end/
 plugins/
 cache/
 logs/

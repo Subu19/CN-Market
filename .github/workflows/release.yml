@@ -41,12 +41,13 @@ jobs:
       - name: Prepare Artifacts
         run: |
           mkdir -p artifacts
-          cp target/Market-*.jar artifacts/
-          # Create a clean name for the build artifact
+          # Remove the 'original-' jar if it exists to avoid conflicts
+          rm -f target/original-*.jar
+          
           if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            mv artifacts/Market-*.jar artifacts/Market-${{ steps.get_version.outputs.version }}.jar
+            cp target/Market-*.jar artifacts/Market-${{ steps.get_version.outputs.version }}.jar
           else
-            mv artifacts/Market-*.jar artifacts/Market-Dev-b${{ github.run_number }}.jar
+            cp target/Market-*.jar artifacts/Market-Dev-b${{ github.run_number }}.jar
           fi
 
       - name: Upload Build Artifact

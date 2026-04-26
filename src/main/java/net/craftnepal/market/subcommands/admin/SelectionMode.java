@@ -34,25 +34,31 @@ public class SelectionMode extends SubCommand {
 
     @Override
     public void perform(CommandSender commandSender, String[] strings) {
-        if(commandSender instanceof Player){
-            Player player = (Player) commandSender;
-            UUID uuid = player.getUniqueId();
-            if(strings[1].equals("plot")){
-                RegionSelection.SelectionMode mode = RegionSelection.SelectionMode.MARKET_PLOT;
-
-                if(RegionSelection.isInSelectionMode(uuid)){
-                    RegionSelection.removeSelectionModePlayer(uuid);
-                    player.sendMessage("Selection mode disabled!");
-                }else{
-                    RegionSelection.addSelectionModePlayer(uuid,mode);
-                    player.sendMessage("Selection mode enabled! Please use Stick to select region");
-                }
-            }else{
-                player.sendMessage("Please pass which region you want to make (plot)");
+        if (!(commandSender instanceof Player)) {
+            Bukkit.getLogger().info("This command can only be run by a player!");
+            return;
+        }
+        Player player = (Player) commandSender;
+        if (!player.hasPermission("market.admin")) {
+            SendMessage.sendPlayerMessage(player, "§cYou don't have permission to use this command.");
+            return;
+        }
+        if (strings.length < 2) {
+            player.sendMessage("§cUsage: /market admin selectionmode <plot>");
+            return;
+        }
+        UUID uuid = player.getUniqueId();
+        if (strings[1].equals("plot")) {
+            RegionSelection.SelectionMode mode = RegionSelection.SelectionMode.MARKET_PLOT;
+            if (RegionSelection.isInSelectionMode(uuid)) {
+                RegionSelection.removeSelectionModePlayer(uuid);
+                player.sendMessage("§aSelection mode disabled!");
+            } else {
+                RegionSelection.addSelectionModePlayer(uuid, mode);
+                player.sendMessage("§aSelection mode enabled! Use a Stick to select a region.");
             }
-
-        }else{
-            Bukkit.getLogger().info("This command can only be run by player!");
+        } else {
+            player.sendMessage("§cUnknown mode. Use: plot");
         }
     }
 

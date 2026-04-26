@@ -40,6 +40,7 @@ public final class Market extends JavaPlugin {
         // initialize data files
         RegionData.setup();
         PriceData.setup();
+        net.craftnepal.market.files.LocationData.setup();
         net.craftnepal.market.managers.DynamicPriceManager.setup();
 
         // initialize economy
@@ -72,8 +73,10 @@ public final class Market extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new ShopInteraction(), this);
         getServer().getPluginManager().registerEvents(new MarketDisplayListener(this), this);
         getServer().getPluginManager().registerEvents(new ShopStockListener(), this);
+        getServer().getPluginManager().registerEvents(new MarketWorldListener(), this);
         getServer().getPluginManager().registerEvents(new net.craftnepal.market.Listeners.InternalCommandListener(), this);
         getServer().getPluginManager().registerEvents(new net.craftnepal.market.Listeners.SearchListener(), this);
+        getServer().getPluginManager().registerEvents(new net.craftnepal.market.Listeners.CommandTabFilter(), this);
 
         // command register
         try {
@@ -89,6 +92,8 @@ public final class Market extends JavaPlugin {
                                 }
                                 p.teleport(location);
                                 p.playSound(location, org.bukkit.Sound.ENTITY_ENDERMAN_TELEPORT, 1, 1);
+                                // Enable flight on arrival if configured
+                                net.craftnepal.market.Listeners.Movement.checkAndToggle(p, true);
                             } else {
                                 p.sendMessage("§cMarket world not loaded!");
                             }

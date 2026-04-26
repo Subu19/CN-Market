@@ -39,8 +39,12 @@ public class ListPlots extends SubCommand {
 
     @Override
     public void perform(CommandSender commandSender, String[] strings) {
-        if(commandSender instanceof Player){
+        if (commandSender instanceof Player) {
             Player player = (Player) commandSender;
+            if (!player.hasPermission("market.admin")) {
+                SendMessage.sendPlayerMessage(player, "§cYou don't have permission to use this command.");
+                return;
+            }
             ConfigurationSection plots = RegionData.get().getConfigurationSection("market.plots");
             if(plots != null){
                 SendMessage.sendPlayerMessage(player, "Plots are listed below:");

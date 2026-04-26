@@ -35,17 +35,21 @@ public class Bypass extends SubCommand {
 
     @Override
     public void perform(CommandSender commandSender, String[] strings) {
-        if(commandSender instanceof Player){
+        if (commandSender instanceof Player) {
             Player player = (Player) commandSender;
-            if(bypassPlayers.containsKey(player.getUniqueId())){
-                bypassPlayers.remove(player.getUniqueId());
-                SendMessage.sendPlayerMessage(player,"You are no longer bypassing region restrictions.");
-            }else{
-                bypassPlayers.put(player.getUniqueId(),true);
-                SendMessage.sendPlayerMessage(player,"You are now bypassing region restrictions.");
+            if (!player.hasPermission("market.admin")) {
+                SendMessage.sendPlayerMessage(player, "§cYou don't have permission to use this command.");
+                return;
             }
-        }else{
-            Bukkit.getLogger().info("You arent a player");
+            if (bypassPlayers.containsKey(player.getUniqueId())) {
+                bypassPlayers.remove(player.getUniqueId());
+                SendMessage.sendPlayerMessage(player, "§aYou are no longer bypassing region restrictions.");
+            } else {
+                bypassPlayers.put(player.getUniqueId(), true);
+                SendMessage.sendPlayerMessage(player, "§aYou are now bypassing region restrictions.");
+            }
+        } else {
+            Bukkit.getLogger().info("You aren't a player");
         }
     }
 

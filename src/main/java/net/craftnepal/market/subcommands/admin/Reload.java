@@ -34,12 +34,20 @@ public class Reload extends SubCommand {
 
     @Override
     public void perform(CommandSender commandSender, String[] strings) {
-        RegionData.reload();
+        if (commandSender instanceof Player && !commandSender.hasPermission("market.admin")) {
+            SendMessage.sendPlayerMessage((Player) commandSender,
+                    "§cYou don't have permission to use this command.");
+            return;
+        }
         Market.reloadMainConfig();
-        if(commandSender instanceof Player){
-            SendMessage.sendPlayerMessage((Player) commandSender,"Reloaded Market configuration!");
-        }else{
-            Bukkit.getLogger().info("Reloaded Market configuration!");
+        RegionData.reload();
+        net.craftnepal.market.files.LocationData.reload();
+        net.craftnepal.market.files.PriceData.setup(); // Re-reads price.yml
+        if (commandSender instanceof Player) {
+            SendMessage.sendPlayerMessage((Player) commandSender,
+                    "§aMarket configuration reloaded!");
+        } else {
+            Bukkit.getLogger().info("Market configuration reloaded!");
         }
     }
 

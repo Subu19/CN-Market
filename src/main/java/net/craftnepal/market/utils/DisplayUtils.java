@@ -24,23 +24,88 @@ import java.util.List;
 import java.util.Map;
 
 public class DisplayUtils {
-    private static DisplayUtils instance;
+    private static volatile DisplayUtils instance;
+
+    // plotId -> shopId -> DisplayPair
     private final Map<String, Map<String, DisplayPair>> marketDisplays = new HashMap<>();
 
-    private DisplayUtils() {
-    }
+    private DisplayUtils() {}
 
     public static DisplayUtils getInstance() {
         if (instance == null) {
-            instance = new DisplayUtils();
+            synchronized (DisplayUtils.class) {
+                if (instance == null)
+                    instance = new DisplayUtils();
+            }
         }
         return instance;
     }
 
+    // ── Spawn / Remove ────────────────────────────────────────────────
+
+    public DisplayPair spawnDisplayPair(ChestShop shop) {
+        if (!RegionUtils.isChunkLoaded(shop.getLocation()))
+            return null;
+
+        Location shopLoc = shop.getLocation();
+        String plotId = PlotUtils.getPlotIdByLocation(shopLoc);
+        if (plotId == null)
+            return null;
+
+        // Guard: remove stale display before spawning a new one
+        removeDisplayPair(plotId, shop.getId());
+
+        Location itemLoc = shopLoc.clone().add(0.5, 1.3, 0.5);
+        Location textLoc = itemLoc.clone().add(0, 0.3, 0);
+
+        ItemStack itemStack = buildDisplayItem(shop);
+        String text = buildDisplayText(shop);
+
+        Transformation itemTransform =
+                new Transformation(new Vector3f(0, 0, 0), new AxisAngle4f(0, 0, 0, 0),
+                        new Vector3f(0.5f, 0.5f, 0.5f), new AxisAngle4f(0, 0, 0, 0));
+
+        ItemDisplay itemDisplay = shopLoc.getWorld().spawn(itemLoc, ItemDisplay.class, d -> {
+            d.setItemStack(itemStack);
+            d.setTransformation(itemTransform);
+            d.setBillboard(TextDisplay.Billboard.CENTER);
+            d.setPersistent(false);
+        });
+
+        TextDisplay textDisplay = shopLoc.getWorld().spawn(textLoc, TextDisplay.class, d -> {
+            d.setText(text);
+            d.setAlignment(TextDisplay.TextAlignment.CENTER);
+            d.setBillboard(TextDisplay.Billboard.CENTER);
+            Transformation t = d.getTransformation();
+            t.getScale().set(0.5f);
+            d.setTransformation(t);
+            d.setPersistent(false);
+        });
+
+        DisplayPair pair = new DisplayPair(itemDisplay, textDisplay, shopLoc);
+        marketDisplays.computeIfAbsent(plotId, k -> new HashMap<>()).put(shop.getId(), pair);
+        Bukkit.getLogger().info("Created display for " + shop.getId());
+        return pair;
+    }
+
+    public void removeDisplayPair(String plotId, String shopId) {
+        Map<String, DisplayPair> plotDisplays = marketDisplays.get(plotId);
+        if (plotDisplays == null)
+            return;
+
+        DisplayPair pair = plotDisplays.remove(shopId);
+        if (pair != null)
+            pair.remove();
+
+        if (plotDisplays.isEmpty())
+            marketDisplays.remove(plotId);
+    }
+
+    // ── Bulk Operations ───────────────────────────────────────────────
+
     public void spawnMarketDisplays() {
         clearAllDisplays();
-        Map<String, ChestShop> shops = ShopUtils.getAllShops();
-        for (ChestShop shop : shops.values()) {
+        for (ChestShop shop : ShopUtils.getAllShops().values()) {
             if (RegionUtils.isChunkLoaded(shop.getLocation())) {
                 spawnDisplayPair(shop);
             }
@@ -48,17 +113,12 @@ public class DisplayUtils {
     }
 
     public void clearAllDisplays() {
-        for (Map<String, DisplayPair> plotDisplays : marketDisplays.values()) {
-            for (DisplayPair displayPair : plotDisplays.values()) {
-                displayPair.remove();
-            }
-        }
+        marketDisplays.values().forEach(plot -> plot.values().forEach(DisplayPair::remove));
         marketDisplays.clear();
     }
 
     public void updateAllDisplays() {
-        Map<String, ChestShop> shops = ShopUtils.getAllShops();
-        for (ChestShop shop : shops.values()) {
+        for (ChestShop shop : ShopUtils.getAllShops().values()) {
             if (RegionUtils.isChunkLoaded(shop.getLocation())) {
                 updateDisplay(shop);
             }
@@ -67,120 +127,27 @@ public class DisplayUtils {
 
     public void updateDisplay(ChestShop shop) {
         String plotId = PlotUtils.getPlotIdByLocation(shop.getLocation());
-        if (plotId != null && marketDisplays.containsKey(plotId)) {
-            DisplayPair displayPair = marketDisplays.get(plotId).get(shop.getId());
-            if (displayPair != null) {
-                ItemStack displayItem = new ItemStack(shop.getItem());
-                
-                String displayName = getDisplayName(shop);
-                int stock = ShopUtils.getShopStock(shop);
-                String color = (stock > 0) ? "§a" : "§c";
-                String trendStr = net.craftnepal.market.managers.DynamicPriceManager.getTrendString(shop.getItem());
-                
-                String displayText = String.format("%s%s\n§6Price: §f$%.2f %s", color, displayName, shop.getPrice(), trendStr);
-                displayPair.update(displayItem, displayText);
-            }
-        }
-    }
-
-    private String getDisplayName(ChestShop shop) {
-        ItemStack itemStack = new ItemStack(shop.getItem());
-        ItemMeta meta = itemStack.getItemMeta();
-        
-        if (shop.getItem() == Material.ENCHANTED_BOOK && shop instanceof EnchantedBookChestShop) {
-            EnchantedBookChestShop enchantedShop = (EnchantedBookChestShop) shop;
-            Map.Entry<Enchantment, Integer> enchant = enchantedShop.getEnchantment();
-            if (enchant != null) {
-                String enchantName = enchant.getKey().getKey().getKey();
-                return String.format("%s %d",
-                        enchantName.replaceAll("_", " ").toUpperCase(),
-                        enchant.getValue());
-            } else {
-                return "Enchanted Book";
-            }
-        } else if (meta != null && meta.hasDisplayName()) {
-            return meta.getDisplayName();
-        } else {
-            return shop.getItem().toString().replace('_', ' ');
-        }
-    }
-
-    public DisplayPair spawnDisplayPair(ChestShop shop) {
-        Bukkit.getLogger().info("created display for " + shop.getId());
-        if (!RegionUtils.isChunkLoaded(shop.getLocation())) {
-            return null;
-        }
-
-        Location shopLoc = shop.getLocation();
-        String plotId = PlotUtils.getPlotIdByLocation(shopLoc);
-
         if (plotId == null)
-            return null;
+            return;
 
-        // Create display locations
-        Location displayLoc = shopLoc.clone().add(0.5, 1.3, 0.5);
-        Location textLoc = displayLoc.clone().add(0, 0.3, 0);
+        Map<String, DisplayPair> plotDisplays = marketDisplays.get(plotId);
+        if (plotDisplays == null)
+            return;
 
-        ItemStack itemStack = new ItemStack(shop.getItem());
-        ItemMeta meta = itemStack.getItemMeta();
+        DisplayPair pair = plotDisplays.get(shop.getId());
+        if (pair == null)
+            return;
 
-        // Create displays
-        ItemDisplay itemDisplay = shopLoc.getWorld().spawn(displayLoc, ItemDisplay.class, display -> {
-            display.setItemStack(itemStack);
-            Transformation transformation = new Transformation(
-                    new Vector3f(0, 0, 0),
-                    new AxisAngle4f(0, 0, 0, 0),
-                    new Vector3f(0.5f, 0.5f, 0.5f),
-                    new AxisAngle4f(0, 0, 0, 0));
-            display.setPersistent(false);
-            display.setBillboard(TextDisplay.Billboard.CENTER);
-            display.setTransformation(transformation);
-        });
-
-        String displayName = getDisplayName(shop);
-        int stock = ShopUtils.getShopStock(shop);
-        String color = (stock > 0) ? "§a" : "§c";
-        String trendStr = net.craftnepal.market.managers.DynamicPriceManager.getTrendString(shop.getItem());
-
-        TextDisplay textDisplay = shopLoc.getWorld().spawn(textLoc, TextDisplay.class, display -> {
-            display.setText(String.format("%s%s\n§6Price: §f$%.2f %s", color, displayName, shop.getPrice(), trendStr));
-            display.setAlignment(TextDisplay.TextAlignment.CENTER);
-            // display.setBillboard(TextDisplay.Billboard.CENTER);
-            Transformation transformation = display.getTransformation();
-            transformation.getScale().set(0.5D);
-            display.setTransformation(transformation);
-            display.setBillboard(TextDisplay.Billboard.CENTER);
-            display.setPersistent(false);
-        });
-
-        DisplayPair displayPair = new DisplayPair(itemDisplay, textDisplay, shopLoc);
-
-        // Store the display pair
-        marketDisplays.computeIfAbsent(plotId, k -> new HashMap<>())
-                .put(shop.getId(), displayPair);
-
-        return displayPair;
+        pair.update(buildDisplayItem(shop), buildDisplayText(shop));
     }
 
-    public void removeDisplayPair(String plotId, String shopId) {
-        if (marketDisplays.containsKey(plotId)) {
-            DisplayPair displayPair = marketDisplays.get(plotId).get(shopId);
-            if (displayPair != null) {
-                displayPair.remove();
-                marketDisplays.get(plotId).remove(shopId);
-            }
-            if (marketDisplays.get(plotId).isEmpty()) {
-                marketDisplays.remove(plotId);
-            }
-        }
-    }
+    // ── Chunk Events ──────────────────────────────────────────────────
 
     public void handleChunkLoad(Chunk chunk) {
         if (!MarketUtils.isChunkInMarketRegion(chunk))
             return;
 
-        Map<String, ChestShop> shops = ShopUtils.getAllShops();
-        for (ChestShop shop : shops.values()) {
+        for (ChestShop shop : ShopUtils.getAllShops().values()) {
             if (RegionUtils.isLocationInChunk(shop.getLocation(), chunk)) {
                 spawnDisplayPair(shop);
             }
@@ -191,33 +158,61 @@ public class DisplayUtils {
         if (!MarketUtils.isChunkInMarketRegion(chunk))
             return;
 
-        List<DisplayPair> toRemove = new ArrayList<>();
-        for (Map<String, DisplayPair> plotDisplays : marketDisplays.values()) {
-            for (DisplayPair displayPair : plotDisplays.values()) {
-                if (RegionUtils.isLocationInChunk(displayPair.getLocation(), chunk)) {
-                    toRemove.add(displayPair);
+        // Collect (plotId, shopId) pairs to remove — avoids mutating while iterating
+        List<String[]> toRemove = new ArrayList<>();
+        for (Map.Entry<String, Map<String, DisplayPair>> plotEntry : marketDisplays.entrySet()) {
+            for (Map.Entry<String, DisplayPair> shopEntry : plotEntry.getValue().entrySet()) {
+                if (RegionUtils.isLocationInChunk(shopEntry.getValue().getLocation(), chunk)) {
+                    toRemove.add(new String[] {plotEntry.getKey(), shopEntry.getKey()});
                 }
             }
         }
 
-        for (DisplayPair displayPair : toRemove) {
-            String plotId = PlotUtils.getPlotIdByLocation(displayPair.getLocation());
-            if (plotId != null) {
-                for (Map.Entry<String, DisplayPair> entry : marketDisplays.get(plotId).entrySet()) {
-                    if (entry.getValue() == displayPair) {
-                        removeDisplayPair(plotId, entry.getKey());
-                        break;
-                    }
-                }
-            }
+        for (String[] ids : toRemove) {
+            removeDisplayPair(ids[0], ids[1]);
         }
     }
+
+    // ── Helpers ───────────────────────────────────────────────────────
+
+    /** Builds the display text without String.format for speed. */
+    private String buildDisplayText(ChestShop shop) {
+        int stock = ShopUtils.getShopStock(shop);
+        String color = stock > 0 ? "§a" : "§c";
+        String trend =
+                net.craftnepal.market.managers.DynamicPriceManager.getTrendString(shop.getItem());
+        // StringBuilder is faster than String.format in a hot update loop
+        return color + getDisplayName(shop) + "\n§6Price: §f$"
+                + String.format("%.2f", shop.getPrice()) + " " + trend;
+    }
+
+    private ItemStack buildDisplayItem(ChestShop shop) {
+        return new ItemStack(shop.getItem());
+    }
+
+    private String getDisplayName(ChestShop shop) {
+        if (shop.getItem() == Material.ENCHANTED_BOOK
+                && shop instanceof EnchantedBookChestShop) {
+            EnchantedBookChestShop enchantedShop = (EnchantedBookChestShop) shop;
+            Map.Entry<Enchantment, Integer> enchant = enchantedShop.getEnchantment();
+            if (enchant != null) {
+                return enchant.getKey().getKey().getKey().replace('_', ' ').toUpperCase() + " "
+                        + enchant.getValue();
+            }
+            return "Enchanted Book";
+        }
+        // Fresh ItemStack has no custom meta — just format the material name
+        return shop.getItem().toString().replace('_', ' ');
+    }
+
+    // ── Accessors ─────────────────────────────────────────────────────
 
     public Map<String, Map<String, DisplayPair>> getMarketDisplays() {
         return marketDisplays;
     }
 
     public DisplayPair getDisplayPair(String plotId, String shopId) {
-        return marketDisplays.containsKey(plotId) ? marketDisplays.get(plotId).get(shopId) : null;
+        Map<String, DisplayPair> plotDisplays = marketDisplays.get(plotId);
+        return plotDisplays != null ? plotDisplays.get(shopId) : null;
     }
 }

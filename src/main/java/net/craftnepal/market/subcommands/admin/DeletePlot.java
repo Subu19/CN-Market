@@ -33,20 +33,24 @@ public class DeletePlot extends SubCommand {
 
     @Override
     public void perform(CommandSender commandSender, String[] strings) {
-        if(commandSender instanceof Player){
+        if (commandSender instanceof Player) {
             Player player = (Player) commandSender;
-            String plot = strings[1];
-            if(plot.isEmpty() || plot ==null){
-                SendMessage.sendPlayerMessage(player,"Please provide plot number.");
-            }else{                if(RegionData.get().get("market.plots."+plot) != null){
-                    PlotUtils.setPlotOwner(plot, null);
-                    SendMessage.sendPlayerMessage(player,"Deleted plot no: &b"+plot);
-                }else{
-                    SendMessage.sendPlayerMessage(player,"Please provide valid plot number.");
-                }
-
+            if (!player.hasPermission("market.admin")) {
+                SendMessage.sendPlayerMessage(player, "§cYou don't have permission to use this command.");
+                return;
             }
-        }else{
+            if (strings.length < 2) {
+                SendMessage.sendPlayerMessage(player, "§cUsage: /market admin deleteplot <plotId>");
+                return;
+            }
+            String plot = strings[1];
+            if (RegionData.get().get("market.plots." + plot) != null) {
+                PlotUtils.setPlotOwner(plot, null);
+                SendMessage.sendPlayerMessage(player, "§aDeleted plot: §b" + plot);
+            } else {
+                SendMessage.sendPlayerMessage(player, "§cPlot not found: " + plot);
+            }
+        } else {
             Bukkit.getLogger().info("You are not a player");
         }
     }

@@ -78,7 +78,13 @@ public class AddMember extends SubCommand {
         RegionData.get().set("market.plots." + plotId + ".members", members);
         RegionData.save();
 
-        SendMessage.sendPlayerMessage(player, "§aSuccessfully added " + target.getName() + " to your plot.");
+        SendMessage.sendPlayerMessage(player, "§aSuccessfully added §b" + target.getName() + "§a as a trusted member of your plot.");
+
+        // Notify the target if online
+        Player onlineTarget = Bukkit.getPlayer(target.getUniqueId());
+        if (onlineTarget != null) {
+            SendMessage.sendPlayerMessage(onlineTarget, "§aYou have been trusted to manage §b" + player.getName() + "§a's market plot! You can now restock and manage shops there.");
+        }
     }
 
     @Override

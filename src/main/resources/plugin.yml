@@ -3,3 +3,81 @@ version: "${project.version}"
 main: net.craftnepal.market.Market
 api-version: "1.20.4"
 depend: [Vault]
+
+permissions:
+  # === ADMIN PERMISSIONS ===
+  market.admin:
+    description: Full admin access to all Market commands
+    default: op
+    children:
+      market.admin.bypass: true
+      market.admin.deleteplot: true
+      market.admin.listplots: true
+      market.admin.reload: true
+      market.admin.selectionmode: true
+      market.admin.setowner: true
+      market.admin.setspawn: true
+      market.admin.toggleborder: true
+      market.admin.setup: true
+      market.admin.forceupdate: true
+      market.use: true
+
+  market.admin.bypass:
+    description: Bypass market region protection
+    default: op
+  market.admin.deleteplot:
+    description: Delete any market plot
+    default: op
+  market.admin.listplots:
+    description: List all market plots
+    default: op
+  market.admin.reload:
+    description: Reload market configuration
+    default: op
+  market.admin.selectionmode:
+    description: Toggle region selection mode
+    default: op
+  market.admin.setowner:
+    description: Set the owner of a market plot
+    default: op
+  market.admin.setspawn:
+    description: Set the market world spawn
+    default: op
+  market.admin.toggleborder:
+    description: Toggle plot border visibility
+    default: op
+  market.admin.setup:
+    description: Run market world setup
+    default: op
+  market.admin.forceupdate:
+    description: Force a dynamic price update cycle
+    default: op
+
+  # === PLAYER PERMISSIONS ===
+  market.use:
+    description: Use the market — teleport, browse, buy
+    default: true
+  market.plot.claim:
+    description: Claim a market plot
+    default: true
+  market.plot.info:
+    description: View plot info
+    default: true
+  market.plot.teleport:
+    description: Teleport to own plot
+    default: true
+  market.plot.setspawn:
+    description: Set your plot spawn
+    default: true
+  market.plot.addmember:
+    description: Add a trusted member to your plot
+    default: true
+  market.plot.removemember:
+    description: Remove a member from your plot
+    default: true
+  market.back:
+    description: Return to previous location from market
+    default: true
+  market.shops:
+    description: Browse the market shops GUI
+    default: true

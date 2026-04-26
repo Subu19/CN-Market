@@ -41,37 +41,46 @@ public class Info extends SubCommand {
             return;
         }
 
+        // Friendly plot display name
         String ownerUUID = PlotUtils.getPlotOwner(plotId);
         String ownerName = "Unclaimed";
-        
+        String friendlyName;
         if (ownerUUID != null) {
             OfflinePlayer owner = Bukkit.getOfflinePlayer(UUID.fromString(ownerUUID));
-            if (owner.getName() != null) {
-                ownerName = owner.getName();
-            }
+            ownerName = owner.getName() != null ? owner.getName() : "Unknown";
+            friendlyName = ownerName + "'s Plot";
+        } else {
+            friendlyName = "Unclaimed Plot";
         }
 
+        // Count shops
+        org.bukkit.configuration.ConfigurationSection shopSection =
+                RegionData.get().getConfigurationSection("market.plots." + plotId + ".shops");
+        int shopCount = shopSection != null ? shopSection.getKeys(false).size() : 0;
+
+        SendMessage.sendPlayerMessage(player, "§7=============================");
+        SendMessage.sendPlayerMessage(player, "§a§l" + friendlyName);
+        SendMessage.sendPlayerMessage(player, "§7Owner: §e" + ownerName);
+        SendMessage.sendPlayerMessage(player, "§7Shops: §b" + shopCount);
+        // Build member names list
         List<String> members = RegionData.get().getStringList("market.plots." + plotId + ".members");
         StringBuilder memberNames = new StringBuilder();
-        
         if (!members.isEmpty()) {
             for (String uuidStr : members) {
-                OfflinePlayer member = Bukkit.getOfflinePlayer(UUID.fromString(uuidStr));
-                if (member.getName() != null) {
-                    memberNames.append(member.getName()).append(", ");
-                }
+                try {
+                    OfflinePlayer member = Bukkit.getOfflinePlayer(UUID.fromString(uuidStr));
+                    if (member.getName() != null) memberNames.append(member.getName()).append(", ");
+                } catch (IllegalArgumentException ignored) {}
             }
-            if (memberNames.length() > 0) {
-                memberNames.setLength(memberNames.length() - 2); // remove trailing comma
-            }
+            if (memberNames.length() > 2) memberNames.setLength(memberNames.length() - 2);
         } else {
             memberNames.append("None");
         }
 
-        SendMessage.sendPlayerMessage(player, "§7=============================");
-        SendMessage.sendPlayerMessage(player, "§aPlot Info: §b" + plotId);
-        SendMessage.sendPlayerMessage(player, "§7Owner: §e" + ownerName);
         SendMessage.sendPlayerMessage(player, "§7Members: §d" + memberNames.toString());
+        if (player.hasPermission("market.admin")) {
+            SendMessage.sendPlayerMessage(player, "§8[Admin] Internal ID: §7" + plotId);
+        }
         SendMessage.sendPlayerMessage(player, "§7=============================");
     }
 

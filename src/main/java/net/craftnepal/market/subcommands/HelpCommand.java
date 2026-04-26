@@ -26,15 +26,18 @@ public class HelpCommand extends SubCommand {
 
     @Override
     public void perform(CommandSender sender, String[] args) {
-        if (!(sender instanceof Player)) return;
+        if (!(sender instanceof Player))
+            return;
         Player player = (Player) sender;
 
         SendMessage.sendPlayerMessage(player, "§7--- §bMarket Commands §7---");
         SendMessage.sendPlayerMessage(player, "§e/market §7- Teleport to market spawn.");
-        SendMessage.sendPlayerMessage(player, "§e/market plot <subcommand> §7- Manage your market plots.");
-        SendMessage.sendPlayerMessage(player, "§e/market shops §7- View a list of all active shops.");
-        SendMessage.sendPlayerMessage(player, "§e/market back §7- Teleport back to your previous location.");
-        SendMessage.sendPlayerMessage(player, "§e/market admin <subcommand> §7- Admin commands.");
+        SendMessage.sendPlayerMessage(player,
+                "§e/market plot <subcommand> §7- Manage your market plots.");
+        SendMessage.sendPlayerMessage(player,
+                "§e/market shops §7- View a list of all active shops.");
+        SendMessage.sendPlayerMessage(player,
+                "§e/market back §7- Teleport back to your previous location.");
     }
 
     @Override

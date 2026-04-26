@@ -74,11 +74,16 @@ public class ShopInteraction implements Listener {
             return;
         }
 
+        // Members can also see their own shop stats (treated as co-owners)
         String owner = PlotUtils.getPlotOwner(plot);
         if (owner == null || !owner.equals(uuid.toString())) {
-            SendMessage.sendPlayerMessage(player, "§cYou can only create shops in your own plot.");
-            event.setCancelled(true);
-            return;
+            // check members
+            java.util.List<String> members = RegionData.get().getStringList("market.plots." + plot + ".members");
+            if (!player.hasPermission("market.admin") && !members.contains(uuid.toString())) {
+                SendMessage.sendPlayerMessage(player, "§cYou can only create shops in your own plot.");
+                event.setCancelled(true);
+                return;
+            }
         }
 
         String playerPlot = plot;
@@ -91,7 +96,8 @@ public class ShopInteraction implements Listener {
                         "market.plots." + playerPlot + ".shops." + shopId + ".location");
                 if (shopLoc != null && shopLoc.equals(chestLocation)) {
                     String shopOwner = RegionData.get().getString("market.plots." + playerPlot + ".shops." + shopId + ".owner");
-                    if (player.hasPermission("market.admin") || (shopOwner != null && shopOwner.equals(player.getUniqueId().toString()))) {
+                    java.util.List<String> members = RegionData.get().getStringList("market.plots." + playerPlot + ".members");
+                    if (player.hasPermission("market.admin") || (shopOwner != null && shopOwner.equals(player.getUniqueId().toString())) || members.contains(player.getUniqueId().toString())) {
                         showShopStats(player, playerPlot, shopId);
                     } else {
                         SendMessage.sendPlayerMessage(player, "§cThis chest is already a shop!");
@@ -341,8 +347,9 @@ public class ShopInteraction implements Listener {
             if (shopLoc != null && shopLoc.equals(chestLocation)) {
                 String owner = RegionData.get().getString("market.plots." + plot + ".shops." + shopId + ".owner");
                 
-                if (owner != null && owner.equals(player.getUniqueId().toString())) {
-                    // It's the owner. Let them open the barrel.
+                // Owner and members can open the barrel freely
+                java.util.List<String> members = RegionData.get().getStringList("market.plots." + plot + ".members");
+                if (owner != null && (owner.equals(player.getUniqueId().toString()) || members.contains(player.getUniqueId().toString()))) {
                     return;
                 }
 
@@ -436,7 +443,7 @@ public class ShopInteraction implements Listener {
         SendMessage.sendPlayerMessage(player, "§7----------------------------------------");
 
         TextComponent removeBtn = new TextComponent("§c§l[REMOVE SHOP]");
-        removeBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/market plot removeshop " + plotId + " " + shopId));
+        removeBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/market _removeshop " + plotId + " " + shopId));
         removeBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
                 new ComponentBuilder("§7Click to remove this shop permanently").create()));
 

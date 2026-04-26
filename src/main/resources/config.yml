@@ -1,6 +1,18 @@
+# Market chat prefix — supports & color codes
 prefix: "&2&l[&a&lMarket&2&l] &a"
 join-message: "&eHello there! %player%"
-allow-flight: false
+
+# Allow players to fly within the market world
+allow-flight: true
+
+# Market world protection settings
+protection:
+  # Prevent all player damage (fall, mobs, void, etc.)
+  prevent-damage: true
+  # Prevent hunger loss
+  prevent-hunger: true
+  # Prevent natural mob spawning
+  prevent-mob-spawn: true
 
 market-world:
   name: "market"

@@ -20,6 +20,11 @@ public class AdminCommand extends NestedCommand {
     }
 
     @Override
+    public String getRequiredPermission() {
+        return "market.admin";
+    }
+
+    @Override
     public String getName() {
         return "admin";
     }

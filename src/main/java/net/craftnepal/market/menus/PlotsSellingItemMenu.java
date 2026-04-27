@@ -176,8 +176,7 @@ public class PlotsSellingItemMenu extends Menu {
         lore.add(ChatColor.GRAY + "Owner: " + ChatColor.YELLOW + ownerName);
         lore.add(ChatColor.GRAY + "In Stock: " + ChatColor.GREEN + totalStock);
         if (cheapest != Double.MAX_VALUE) {
-            Material material = Material.valueOf(targetProductKey.split(":")[0]);
-            String trendStr = net.craftnepal.market.managers.DynamicPriceManager.getTrendString(material);
+            String trendStr = net.craftnepal.market.managers.DynamicPriceManager.getTrendString(targetProductKey);
             lore.add(ChatColor.GRAY + "Price: " + ChatColor.GOLD + EconomyUtils.format(cheapest) + " " + trendStr);
         }
         lore.add("");

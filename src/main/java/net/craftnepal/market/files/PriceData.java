@@ -13,7 +13,7 @@ import java.util.Map;
 public class PriceData {
     private static File file;
     private static FileConfiguration config;
-    private static final Map<Material, Integer> priceMap = new HashMap<>();
+    private static final Map<String, Integer> priceMap = new HashMap<>();
 
     public static void setup() {
         file = new File(Bukkit.getServer().getPluginManager().getPlugin("Market").getDataFolder(), "price.yml");
@@ -28,103 +28,39 @@ public class PriceData {
         priceMap.clear();
         boolean modified = false;
         for (String key : config.getKeys(false)) {
-            String originalKey = key.toUpperCase();
-            Material material = null;
+            String upperKey = key.toUpperCase();
+            int price = config.getInt(key);
+            priceMap.put(upperKey, price);
             
-            try {
-                material = Material.valueOf(originalKey);
-            } catch (IllegalArgumentException e) {
-                // Try to resolve legacy or common alias names
-                material = resolveLegacyMaterial(originalKey);
-            }
-
-            if (material != null) {
-                int price = config.getInt(key);
-                priceMap.put(material, price);
-                
-                // If the key was legacy, update it in the config
-                if (!material.name().equals(key)) {
-                    config.set(key, null);
-                    config.set(material.name(), price);
-                    modified = true;
-                }
-            } else {
-                Bukkit.getLogger().warning("Invalid material in prices.yml: " + key);
+            if (!key.equals(upperKey)) {
+                config.set(key, null);
+                config.set(upperKey, price);
+                modified = true;
             }
         }
+        
+        // Inject base prices for generic items if missing
+        if (!priceMap.containsKey("POTION")) { priceMap.put("POTION", 100); config.set("POTION", 100); modified = true; }
+        if (!priceMap.containsKey("SPLASH_POTION")) { priceMap.put("SPLASH_POTION", 120); config.set("SPLASH_POTION", 120); modified = true; }
+        if (!priceMap.containsKey("LINGERING_POTION")) { priceMap.put("LINGERING_POTION", 150); config.set("LINGERING_POTION", 150); modified = true; }
+        if (!priceMap.containsKey("TIPPED_ARROW")) { priceMap.put("TIPPED_ARROW", 60); config.set("TIPPED_ARROW", 60); modified = true; }
+        if (!priceMap.containsKey("ENCHANTED_BOOK")) { priceMap.put("ENCHANTED_BOOK", 400); config.set("ENCHANTED_BOOK", 400); modified = true; }
+
         if (modified) {
             save();
         }
     }
 
-    private static Material resolveLegacyMaterial(String key) {
-        // Handle UNWAXED_BLOCK_OF_X -> X_BLOCK
-        if (key.startsWith("UNWAXED_BLOCK_OF_")) {
-            String base = key.substring(17);
-            try { return Material.valueOf(base + "_BLOCK"); } catch (IllegalArgumentException ignored) {}
-        }
-
-        // Handle UNWAXED_X -> X
-        if (key.startsWith("UNWAXED_")) {
-            String base = key.substring(8);
-            try { return Material.valueOf(base); } catch (IllegalArgumentException ignored) {}
-        }
-
-        // Handle BLOCK_OF_RAW_X -> RAW_X_BLOCK
-        if (key.startsWith("BLOCK_OF_RAW_")) {
-            String base = key.substring(13);
-            try { return Material.valueOf("RAW_" + base + "_BLOCK"); } catch (IllegalArgumentException ignored) {}
-        }
-
-        // Handle BLOCK_OF_X -> X_BLOCK
-        if (key.startsWith("BLOCK_OF_")) {
-            String base = key.substring(9);
-            try { return Material.valueOf(base + "_BLOCK"); } catch (IllegalArgumentException ignored) {}
-        }
-        
-        // Handle X_BOAT_WITH_CHEST -> X_CHEST_BOAT
-        if (key.endsWith("_BOAT_WITH_CHEST")) {
-            String base = key.substring(0, key.length() - 16);
-            try { return Material.valueOf(base + "_CHEST_BOAT"); } catch (IllegalArgumentException ignored) {}
-        }
-
-        // Common manual mappings
-        switch (key) {
-            case "BOTTLE_O'_ENCHANTING": return Material.EXPERIENCE_BOTTLE;
-            case "JACK_O'LANTERN": return Material.JACK_O_LANTERN;
-            case "REDSTONE_DUST": return Material.REDSTONE;
-            case "REDSTONE_REPEATER": return Material.REPEATER;
-            case "REDSTONE_COMPARATOR": return Material.COMPARATOR;
-            case "BOOK_AND_QUILL": return Material.WRITABLE_BOOK;
-            case "EYE_OF_ENDER": return Material.ENDER_EYE;
-            case "HAY_BALE": return Material.HAY_BLOCK;
-            case "SKULL": return Material.SKELETON_SKULL;
-            case "WEB": return Material.COBWEB;
-            case "WOODEN_DOOR": return Material.OAK_DOOR;
-            case "WOODEN_BUTTON": return Material.OAK_BUTTON;
-            case "WOODEN_PRESSURE_PLATE": return Material.OAK_PRESSURE_PLATE;
-            case "WOODEN_SLAB": return Material.OAK_SLAB;
-            case "WOODEN_STAIRS": return Material.OAK_STAIRS;
-            case "STEAK": return Material.COOKED_BEEF;
-            case "RAW_BEEF": return Material.BEEF;
-            case "RAW_CHICKEN": return Material.CHICKEN;
-            case "RAW_PORKCHOP": return Material.PORKCHOP;
-            case "RAW_RABBIT": return Material.RABBIT;
-            case "RAW_MUTTON": return Material.MUTTON;
-            case "RAW_SALMON": return Material.SALMON;
-            case "RAW_COD": return Material.COD;
-        }
-
-        return null;
+    public static Integer getPrice(String key) {
+        if (key == null) return null;
+        return priceMap.get(key.toUpperCase());
     }
 
-    public static Integer getPrice(Material material) {
-        return priceMap.get(material);
-    }
-
-    public static void setPrice(Material material, int price) {
-        priceMap.put(material, price);
-        config.set(material.name(), price);
+    public static void setPrice(String key, int price) {
+        if (key == null) return;
+        String upper = key.toUpperCase();
+        priceMap.put(upper, price);
+        config.set(upper, price);
         save();
     }
 

@@ -96,9 +96,9 @@ public class AllItemsMenu extends Menu {
             ItemMeta meta = itemStack.getItemMeta();
             meta.setDisplayName(ChatColor.YELLOW + ShopUtils.getShopDisplayName(representative));
             
-            Material material = representative.getItem();
-            double dynamicPrice = net.craftnepal.market.managers.DynamicPriceManager.getDynamicPrice(material);
-            String trendStr = net.craftnepal.market.managers.DynamicPriceManager.getTrendString(material);
+            String itemKey = net.craftnepal.market.utils.ShopUtils.getItemKey(representative.getItem());
+            double dynamicPrice = net.craftnepal.market.managers.DynamicPriceManager.getDynamicPrice(itemKey);
+            String trendStr = net.craftnepal.market.managers.DynamicPriceManager.getTrendString(itemKey);
             
             List<String> lore = new ArrayList<>();
             lore.add(ChatColor.GRAY + "Global Stock: " + ChatColor.GREEN + count);

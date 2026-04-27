@@ -25,10 +25,10 @@ public class PriceCalculator {
         for (Material material : Material.values()) {
             if (material.isAir() || !material.isItem()) continue;
             
-            if (PriceData.getPrice(material) == null) {
+            if (PriceData.getPrice(material.name()) == null) {
                 Integer calculatedPrice = calculatePrice(material, 0);
                 if (calculatedPrice != null && calculatedPrice > 0) {
-                    PriceData.setPrice(material, calculatedPrice);
+                    PriceData.setPrice(material.name(), calculatedPrice);
                     count++;
                 }
             }
@@ -49,7 +49,7 @@ public class PriceCalculator {
         if (depth > 5) return null; // Prevent deep recursion
         
         // Check if we already have a price
-        Integer existingPrice = PriceData.getPrice(material);
+        Integer existingPrice = PriceData.getPrice(material.name());
         if (existingPrice != null) return existingPrice;
 
         if (processing.contains(material)) return null; // Circular dependency

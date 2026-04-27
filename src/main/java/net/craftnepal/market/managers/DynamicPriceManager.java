@@ -60,33 +60,33 @@ public class DynamicPriceManager {
         }, 6000L, 6000L);
     }
 
-    public static double getDynamicPrice(Material material) {
-        Integer basePrice = PriceData.getPrice(material);
+    public static double getDynamicPrice(String itemKey) {
+        Integer basePrice = PriceData.getPrice(itemKey);
         if (basePrice == null || basePrice <= 0) return 0;
 
-        if (dynamicPricesConfig.contains(material.name() + ".price")) {
-            return dynamicPricesConfig.getDouble(material.name() + ".price");
-        } else if (dynamicPricesConfig.contains(material.name())) {
+        if (dynamicPricesConfig.contains(itemKey + ".price")) {
+            return dynamicPricesConfig.getDouble(itemKey + ".price");
+        } else if (dynamicPricesConfig.contains(itemKey)) {
             // Legacy support
-            return dynamicPricesConfig.getDouble(material.name());
+            return dynamicPricesConfig.getDouble(itemKey);
         } else {
             // Initialize dynamic price to base price
-            dynamicPricesConfig.set(material.name() + ".price", basePrice.doubleValue());
-            dynamicPricesConfig.set(material.name() + ".trend", 0.0);
+            dynamicPricesConfig.set(itemKey + ".price", basePrice.doubleValue());
+            dynamicPricesConfig.set(itemKey + ".trend", 0.0);
             saveDynamicPrices();
             return basePrice.doubleValue();
         }
     }
 
-    public static double getTrend(Material material) {
-        if (dynamicPricesConfig.contains(material.name() + ".trend")) {
-            return dynamicPricesConfig.getDouble(material.name() + ".trend");
+    public static double getTrend(String itemKey) {
+        if (dynamicPricesConfig.contains(itemKey + ".trend")) {
+            return dynamicPricesConfig.getDouble(itemKey + ".trend");
         }
         return 0.0;
     }
 
-    public static String getTrendString(Material material) {
-        double trend = getTrend(material);
+    public static String getTrendString(String itemKey) {
+        double trend = getTrend(itemKey);
         if (trend > 0.0) {
             return String.format("§a(↑ +%.1f%%)", trend * 100);
         } else if (trend < 0.0) {
@@ -95,8 +95,8 @@ public class DynamicPriceManager {
         return "§7(-)";
     }
 
-    public static void recordPurchase(Material material, int amount) {
-        String path = "purchased_today." + material.name();
+    public static void recordPurchase(String itemKey, int amount) {
+        String path = "purchased_today." + itemKey;
         int current = metricsConfig.getInt(path, 0);
         metricsConfig.set(path, current + amount);
         saveMetrics();
@@ -106,30 +106,36 @@ public class DynamicPriceManager {
         Bukkit.getLogger().info("[Market] Running daily dynamic price update...");
         
         // 1. Gather Total Supply (Stock) across all shops
-        Map<Material, Integer> totalStockMap = new HashMap<>();
+        Map<String, Integer> totalStockMap = new HashMap<>();
         Map<String, ChestShop> allShops = ShopUtils.getAllShops();
         for (ChestShop shop : allShops.values()) {
-            Material mat = shop.getItem();
+            String key = ShopUtils.getItemKey(shop);
             int stock = ShopUtils.getShopStock(shop);
-            totalStockMap.put(mat, totalStockMap.getOrDefault(mat, 0) + stock);
+            totalStockMap.put(key, totalStockMap.getOrDefault(key, 0) + stock);
         }
 
         ConfigurationSection purchasedSection = metricsConfig.getConfigurationSection("purchased_today");
         
         // We will process every material that has either base price or stock or purchases
-        // To be safe, let's just process materials that have a base price
         boolean pricesChanged = false;
         
-        for (Material material : Material.values()) {
-            Integer basePrice = PriceData.getPrice(material);
+        // To compute over all active keys, we take materials + any recorded stock/purchases
+        java.util.Set<String> allKeys = new java.util.HashSet<>(totalStockMap.keySet());
+        if (purchasedSection != null) allKeys.addAll(purchasedSection.getKeys(false));
+        for (Material m : Material.values()) {
+            if (m.isItem() && !m.isAir()) allKeys.add(m.name());
+        }
+        
+        for (String itemKey : allKeys) {
+            Integer basePrice = PriceData.getPrice(itemKey);
             if (basePrice == null || basePrice <= 0) continue;
 
             int demand = 0;
-            if (purchasedSection != null && purchasedSection.contains(material.name())) {
-                demand = purchasedSection.getInt(material.name());
+            if (purchasedSection != null && purchasedSection.contains(itemKey)) {
+                demand = purchasedSection.getInt(itemKey);
             }
 
-            int supply = totalStockMap.getOrDefault(material, 0);
+            int supply = totalStockMap.getOrDefault(itemKey, 0);
 
             // If there's no supply and no demand, price stays same
             if (supply == 0 && demand == 0) continue;
@@ -147,7 +153,7 @@ public class DynamicPriceManager {
             }
 
             if (percentChange != 0.0) {
-                double currentPrice = getDynamicPrice(material);
+                double currentPrice = getDynamicPrice(itemKey);
                 double newPrice = currentPrice * (1.0 + percentChange);
 
                 // Clamp to [0.5 * Base, 3.0 * Base]
@@ -159,14 +165,14 @@ public class DynamicPriceManager {
                 if (Math.abs(newPrice - currentPrice) > 0.01) {
                     double actualMultiplier = newPrice / currentPrice;
                     double trend = actualMultiplier - 1.0;
-                    dynamicPricesConfig.set(material.name() + ".price", newPrice);
-                    dynamicPricesConfig.set(material.name() + ".trend", trend);
+                    dynamicPricesConfig.set(itemKey + ".price", newPrice);
+                    dynamicPricesConfig.set(itemKey + ".trend", trend);
                     pricesChanged = true;
                     
-                    Bukkit.getLogger().info("[Market] " + material.name() + " price changed by " + String.format("%.1f%%", (actualMultiplier - 1.0) * 100) + " (New: " + newPrice + ")");
+                    Bukkit.getLogger().info("[Market] " + itemKey + " price changed by " + String.format("%.1f%%", (actualMultiplier - 1.0) * 100) + " (New: " + newPrice + ")");
                     
                     // Auto-scale existing shops for this material
-                    autoScaleShops(material, actualMultiplier);
+                    autoScaleShops(itemKey, actualMultiplier);
                 }
             }
         }
@@ -184,7 +190,7 @@ public class DynamicPriceManager {
         saveMetrics();
     }
 
-    private static void autoScaleShops(Material material, double multiplier) {
+    private static void autoScaleShops(String itemKey, double multiplier) {
         ConfigurationSection plots = RegionData.get().getConfigurationSection("market.plots");
         if (plots == null) return;
 
@@ -192,12 +198,15 @@ public class DynamicPriceManager {
             ConfigurationSection shops = plots.getConfigurationSection(plotId + ".shops");
             if (shops != null) {
                 for (String shopId : shops.getKeys(false)) {
-                    String path = plotId + ".shops." + shopId;
-                    String itemStr = shops.getString(shopId + ".item");
-                    if (itemStr != null && itemStr.equalsIgnoreCase(material.name())) {
-                        double oldPrice = shops.getDouble(shopId + ".price");
-                        double newShopPrice = oldPrice * multiplier;
-                        RegionData.get().set("market.plots." + path + ".price", newShopPrice);
+                    ChestShop shop = ShopUtils.getShop(plotId, shopId);
+                    if (shop != null) {
+                        if (ShopUtils.getItemKey(shop).equalsIgnoreCase(itemKey)) {
+                            double oldPrice = shop.getPrice();
+                            double newShopPrice = oldPrice * multiplier;
+                            shop.setPrice(newShopPrice);
+                            String path = plotId + ".shops." + shopId;
+                            RegionData.get().set("market.plots." + path + ".price", newShopPrice);
+                        }
                     }
                 }
             }

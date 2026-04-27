@@ -505,6 +505,17 @@ public class ShopUtils {
                 org.bukkit.potion.PotionType type = data.getType();
                 String base = type != null ? formatKey(type.name()) : "Unknown";
                 
+                // Minecraft-standard names for potion effects
+                if (type != null) {
+                    base = switch (type.name()) {
+                        case "SPEED" -> "Swiftness";
+                        case "JUMP" -> "Leaping";
+                        case "INSTANT_HEALTH" -> "Healing";
+                        case "INSTANT_DAMAGE" -> "Harming";
+                        default -> base;
+                    };
+                }
+                
                 String suffix = "";
                 if (data.isUpgraded()) suffix = " II";
                 else if (data.isExtended()) suffix = " (Extended)";

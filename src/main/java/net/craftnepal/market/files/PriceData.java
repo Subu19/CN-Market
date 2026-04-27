@@ -1,7 +1,6 @@
 package net.craftnepal.market.files;
 
 import org.bukkit.Bukkit;
-import org.bukkit.Material;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 
@@ -16,9 +15,11 @@ public class PriceData {
     private static final Map<String, Integer> priceMap = new HashMap<>();
 
     public static void setup() {
-        file = new File(Bukkit.getServer().getPluginManager().getPlugin("Market").getDataFolder(), "price.yml");
+        file = new File(Bukkit.getServer().getPluginManager().getPlugin("Market").getDataFolder(),
+                "price.yml");
         if (!file.exists()) {
-            Bukkit.getServer().getPluginManager().getPlugin("Market").saveResource("price.yml", false);
+            Bukkit.getServer().getPluginManager().getPlugin("Market").saveResource("price.yml",
+                    false);
         }
         config = YamlConfiguration.loadConfiguration(file);
         loadPrices();
@@ -26,41 +27,70 @@ public class PriceData {
 
     private static void loadPrices() {
         priceMap.clear();
-        boolean modified = false;
-        for (String key : config.getKeys(false)) {
-            String upperKey = key.toUpperCase();
+
+        // Use getKeys(true) to handle nested structures correctly (e.g., POTION:SPEED)
+        // Bukkit's YamlConfiguration may interpret colons as nested sections depending on
+        // formatting.
+        for (String key : config.getKeys(true)) {
+            if (config.isConfigurationSection(key))
+                continue;
+
             int price = config.getInt(key);
-            priceMap.put(upperKey, price);
-            
-            if (!key.equals(upperKey)) {
-                config.set(key, null);
-                config.set(upperKey, price);
-                modified = true;
+            // Replace internal Bukkit separators (.) with colons (:) to match our internal key
+            // format
+            String normalizedKey = normalizeKey(key.replace(".", ":"));
+            priceMap.put(normalizedKey, price);
+        }
+    }
+
+    private static String normalizeKey(String key) {
+        if (key == null)
+            return null;
+        String[] parts = key.toUpperCase().split(":");
+        for (int i = 0; i < parts.length; i++) {
+            switch (parts[i]) {
+                case "SWIFTNESS":
+                    parts[i] = "SPEED";
+                    break;
+                case "LEAPING":
+                    parts[i] = "JUMP_BOOST";
+                    break;
+                case "HEALING":
+                    parts[i] = "INSTANT_HEALTH";
+                    break;
+                case "HARMING":
+                    parts[i] = "INSTANT_DAMAGE";
+                    break;
+                case "REGEN":
+                    parts[i] = "REGENERATION";
+                    break;
+                case "ENANTED_BOOK":
+                    parts[i] = "ENCHANTED_BOOK";
+                    break; // Fix typo found in price.yml
+                case "SLOW":
+                    parts[i] = "SLOWNESS";
+                    break;
+                case "STRENGTH_POTION":
+                    parts[i] = "STRENGTH";
+                    break;
             }
         }
-        
-        // Inject base prices for generic items if missing
-        if (!priceMap.containsKey("POTION")) { priceMap.put("POTION", 100); config.set("POTION", 100); modified = true; }
-        if (!priceMap.containsKey("SPLASH_POTION")) { priceMap.put("SPLASH_POTION", 120); config.set("SPLASH_POTION", 120); modified = true; }
-        if (!priceMap.containsKey("LINGERING_POTION")) { priceMap.put("LINGERING_POTION", 150); config.set("LINGERING_POTION", 150); modified = true; }
-        if (!priceMap.containsKey("TIPPED_ARROW")) { priceMap.put("TIPPED_ARROW", 60); config.set("TIPPED_ARROW", 60); modified = true; }
-        if (!priceMap.containsKey("ENCHANTED_BOOK")) { priceMap.put("ENCHANTED_BOOK", 400); config.set("ENCHANTED_BOOK", 400); modified = true; }
-
-        if (modified) {
-            save();
-        }
+        return String.join(":", parts);
     }
 
     public static Integer getPrice(String key) {
-        if (key == null) return null;
-        return priceMap.get(key.toUpperCase());
+        if (key == null)
+            return null;
+        return priceMap.get(normalizeKey(key));
     }
 
     public static void setPrice(String key, int price) {
-        if (key == null) return;
-        String upper = key.toUpperCase();
-        priceMap.put(upper, price);
-        config.set(upper, price);
+        if (key == null)
+            return;
+        String normalized = normalizeKey(key);
+        priceMap.put(normalized, price);
+        config.set(normalized.replace(":", "."), price); // Save as nested in YAML for better
+                                                         // readability
         save();
     }
 

@@ -81,14 +81,14 @@ public class PlotTeleport extends SubCommand {
     }
 
     private void teleportToPlot(Player player, String plotId) {
-        Location min = RegionData.get().getLocation("market.plots." + plotId + ".posMin");
-        Location max = RegionData.get().getLocation("market.plots." + plotId + ".posMax");
+        Location min = net.craftnepal.market.utils.LocationUtils.loadLocation(RegionData.get(), "market.plots." + plotId + ".posMin");
+        Location max = net.craftnepal.market.utils.LocationUtils.loadLocation(RegionData.get(), "market.plots." + plotId + ".posMax");
         if (min == null || max == null) {
             SendMessage.sendPlayerMessage(player, "&cError: Plot boundaries not found for " + plotId);
             return;
         }
 
-        Location plotSpawn = RegionData.get().getLocation("market.plots." + plotId + ".spawn");
+        Location plotSpawn = net.craftnepal.market.utils.LocationUtils.loadLocation(RegionData.get(), "market.plots." + plotId + ".spawn");
         Location tpLocation;
 
         if (plotSpawn != null) {

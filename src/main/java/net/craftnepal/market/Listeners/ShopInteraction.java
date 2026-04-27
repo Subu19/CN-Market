@@ -345,17 +345,11 @@ public class ShopInteraction implements Listener {
                 
                 double price = RegionData.get().getDouble("market.plots." + plot + ".shops." + shopId + ".price");
                 
-                // Count stock
-                org.bukkit.block.Barrel barrel = (org.bukkit.block.Barrel) clickedBlock.getState();
-                int stock = 0;
-                for (ItemStack item : barrel.getInventory().getContents()) {
-                    if (item != null && item.getType() == itemType) {
-                        stock += item.getAmount();
-                    }
-                }
+                // Count stock & Build Interactive Chat Menu
+                ChestShop shop = net.craftnepal.market.utils.ShopUtils.getShop(plot, shopId);
+                int stock = net.craftnepal.market.utils.ShopUtils.getShopStock(shop);
 
                 // Build Interactive Chat Menu
-                ChestShop shop = net.craftnepal.market.utils.ShopUtils.getShop(plot, shopId);
                 String itemKey = net.craftnepal.market.utils.ShopUtils.getItemKey(shop);
                 String itemName = net.craftnepal.market.utils.ShopUtils.getShopDisplayName(shop);
                 String trendStr = net.craftnepal.market.managers.DynamicPriceManager.getTrendString(itemKey);
@@ -401,17 +395,8 @@ public class ShopInteraction implements Listener {
         String ownerUUID = shopSection.getString("owner");
         Location loc = LocationUtils.loadLocation(RegionData.get(), "market.plots." + plotId + ".shops." + shopId + ".location");
 
-        int stock = 0;
-        if (loc != null && loc.getBlock().getType() == Material.BARREL) {
-            org.bukkit.block.Barrel barrel = (org.bukkit.block.Barrel) loc.getBlock().getState();
-            for (ItemStack item : barrel.getInventory().getContents()) {
-                if (item != null && item.getType() == itemType) {
-                    stock += item.getAmount();
-                }
-            }
-        }
-
         ChestShop shop = net.craftnepal.market.utils.ShopUtils.getShop(plotId, shopId);
+        int stock = net.craftnepal.market.utils.ShopUtils.getShopStock(shop);
         String itemKey = net.craftnepal.market.utils.ShopUtils.getItemKey(shop);
         String itemName = net.craftnepal.market.utils.ShopUtils.getShopDisplayName(shop);
         String trendStr = net.craftnepal.market.managers.DynamicPriceManager.getTrendString(itemKey);

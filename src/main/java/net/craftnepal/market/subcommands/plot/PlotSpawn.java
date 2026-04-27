@@ -10,7 +10,7 @@ import java.util.List;
 public class PlotSpawn extends SubCommand {
     @Override
     public String getName() {
-        return "plotspawn";
+        return "spawn";
     }
 
     @Override
@@ -25,7 +25,7 @@ public class PlotSpawn extends SubCommand {
 
     @Override
     public String getSyntax() {
-        return "/market plotspawn";
+        return "/market plot spawn";
     }
 
     @Override

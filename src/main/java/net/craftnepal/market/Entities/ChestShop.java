@@ -1,18 +1,18 @@
 package net.craftnepal.market.Entities;
 
 import org.bukkit.Location;
-import org.bukkit.Material;
+import org.bukkit.inventory.ItemStack;
 
 import java.util.UUID;
 
 public class ChestShop {
     private String id;
     private Location location;
-    private Material item;
+    private ItemStack item;
     private UUID owner;
     private double price;
 
-    public ChestShop(String id, Location location, Material item, UUID owner, double price) {
+    public ChestShop(String id, Location location, ItemStack item, UUID owner, double price) {
         this.id = id;
         this.location = location;
         this.item = item;
@@ -37,11 +37,11 @@ public class ChestShop {
         this.location = location;
     }
 
-    public Material getItem() {
+    public ItemStack getItem() {
         return item;
     }
 
-    public void setItem(Material item) {
+    public void setItem(ItemStack item) {
         this.item = item;
     }
 

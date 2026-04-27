@@ -111,16 +111,16 @@ public class RegionSelection implements Listener {
         }
 
         // Save the new plot
-        RegionData.get().set("market.plots." + newPlotId + ".posMin", bounds.getMin());
-        RegionData.get().set("market.plots." + newPlotId + ".posMax", bounds.getMax());
+        net.craftnepal.market.utils.LocationUtils.saveLocation(RegionData.get(), "market.plots." + newPlotId + ".posMin", bounds.getMin());
+        net.craftnepal.market.utils.LocationUtils.saveLocation(RegionData.get(), "market.plots." + newPlotId + ".posMax", bounds.getMax());
         RegionData.save();
 
         player.sendMessage("Created new manual plot: " + newPlotId);
     }
 
     private RegionBounds getPlotBounds(String plotId) {
-        Location min = RegionData.get().getLocation("market.plots." + plotId + ".posMin");
-        Location max = RegionData.get().getLocation("market.plots." + plotId + ".posMax");
+        Location min = net.craftnepal.market.utils.LocationUtils.loadLocation(RegionData.get(), "market.plots." + plotId + ".posMin");
+        Location max = net.craftnepal.market.utils.LocationUtils.loadLocation(RegionData.get(), "market.plots." + plotId + ".posMax");
         return new RegionBounds(min, max);
     }
 

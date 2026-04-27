@@ -11,7 +11,6 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.configuration.ConfigurationSection;
 import net.craftnepal.market.files.RegionData;
 import net.craftnepal.market.Entities.ChestShop;
-import net.craftnepal.market.Entities.EnchantedBookChestShop;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.NamespacedKey;
 
@@ -21,45 +20,40 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.AbstractMap;
+import java.util.stream.Collectors;
 
 public class ShopUtils {
 
-    public static Map<Material, Integer> getAllShopItemsAndCountsByPlotID(String plotId) {
-        Map<Material, Integer> itemCounts = new HashMap<>();
+    public static Map<String, Integer> getAllShopItemKeysAndCountsByPlotID(String plotId) {
+        Map<String, Integer> itemCounts = new HashMap<>();
         ConfigurationSection shops =
                 RegionData.get().getConfigurationSection("market.plots." + plotId + ".shops");
 
         if (shops != null) {
             for (String shopId : shops.getKeys(false)) {
-                String materialName = shops.getString(shopId + ".item");
-                Material material = Material.matchMaterial(materialName);
+                String path = "market.plots." + plotId + ".shops." + shopId;
+                ChestShop shop = createShopFromConfig(shopId, path);
+                if (shop == null) continue;
 
-                if (material == null)
-                    continue;
+                String key = getItemKey(shop);
+                int stock = getShopStock(shop);
 
-                Location loc = LocationUtils.loadLocation(RegionData.get(),
-                        "market.plots." + plotId + ".shops." + shopId + ".location");
-                if (loc == null)
-                    continue;
-
-                Block block = loc.getBlock();
-
-                if (block.getType() == Material.BARREL) {
-                    Barrel chest = (Barrel) block.getState();
-                    int count = 0;
-
-                    // Create a dummy shop to use isMatchingItem
-                    ChestShop tempShop = createShopFromConfig(shopId,
-                            "market.plots." + plotId + ".shops." + shopId);
-
-                    for (ItemStack item : chest.getInventory().getContents()) {
-                        if (item != null && isMatchingItem(tempShop, item)) {
-                            count += item.getAmount();
-                        }
-                    }
-
-                    itemCounts.put(material, itemCounts.getOrDefault(material, 0) + count);
+                if (stock > 0) {
+                    itemCounts.put(key, itemCounts.getOrDefault(key, 0) + stock);
                 }
+            }
+        }
+        return itemCounts;
+    }
+
+    public static Map<Material, Integer> getAllShopItemsAndCountsByPlotID(String plotId) {
+        Map<Material, Integer> itemCounts = new HashMap<>();
+        Map<String, Integer> keyCounts = getAllShopItemKeysAndCountsByPlotID(plotId);
+        
+        for (Map.Entry<String, Integer> entry : keyCounts.entrySet()) {
+            Material mat = Material.matchMaterial(entry.getKey().split(":")[0]);
+            if (mat != null) {
+                itemCounts.put(mat, itemCounts.getOrDefault(mat, 0) + entry.getValue());
             }
         }
         return itemCounts;
@@ -67,27 +61,51 @@ public class ShopUtils {
 
     private static ChestShop createShopFromConfig(String shopId, String path) {
         Location location = LocationUtils.loadLocation(RegionData.get(), path + ".location");
-        String materialName = RegionData.get().getString(path + ".item");
-        Material material = Material.matchMaterial(materialName);
         String ownerString = RegionData.get().getString(path + ".owner");
-        UUID owner = UUID.fromString(ownerString);
+        UUID owner = ownerString != null ? UUID.fromString(ownerString) : null;
         double price = RegionData.get().getDouble(path + ".price");
 
-        if (material != null && location != null) {
-            if (material == Material.ENCHANTED_BOOK) {
-                String enchantKey = RegionData.get().getString(path + ".enchantment.key");
-                int level = RegionData.get().getInt(path + ".enchantment.level");
-                if (enchantKey != null) {
-                    enchantKey = enchantKey.toLowerCase();
-                    Enchantment enchantment =
-                            Enchantment.getByKey(NamespacedKey.minecraft(enchantKey));
-                    if (enchantment != null) {
-                        return new EnchantedBookChestShop(shopId, location, material, owner, price,
-                                new AbstractMap.SimpleEntry<>(enchantment, level));
+        ItemStack itemStack = null;
+
+        // Try to load from Base64 bytes first
+        if (RegionData.get().contains(path + ".item_bytes")) {
+            String b64 = RegionData.get().getString(path + ".item_bytes");
+            if (b64 != null) {
+                try {
+                    byte[] bytes = java.util.Base64.getDecoder().decode(b64);
+                    itemStack = deserializeItem(bytes);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        } else {
+            // Legacy loading fallback
+            String materialName = RegionData.get().getString(path + ".item");
+            if (materialName != null) {
+                Material material = Material.matchMaterial(materialName);
+                if (material != null) {
+                    itemStack = new ItemStack(material);
+                    if (material == Material.ENCHANTED_BOOK) {
+                        String enchantKey = RegionData.get().getString(path + ".enchantment.key");
+                        int level = RegionData.get().getInt(path + ".enchantment.level");
+                        if (enchantKey != null) {
+                            enchantKey = enchantKey.toLowerCase();
+                            Enchantment enchantment = Enchantment.getByKey(NamespacedKey.minecraft(enchantKey));
+                            if (enchantment != null) {
+                                EnchantmentStorageMeta meta = (EnchantmentStorageMeta) itemStack.getItemMeta();
+                                if (meta != null) {
+                                    meta.addStoredEnchant(enchantment, level, true);
+                                    itemStack.setItemMeta(meta);
+                                }
+                            }
+                        }
                     }
                 }
             }
-            return new ChestShop(shopId, location, material, owner, price);
+        }
+
+        if (itemStack != null && location != null && owner != null) {
+            return new ChestShop(shopId, location, itemStack, owner, price);
         }
         return null;
     }
@@ -170,6 +188,11 @@ public class ShopUtils {
         return null;
     }
 
+    public static ChestShop getShop(String plotId, String shopId) {
+        String path = "market.plots." + plotId + ".shops." + shopId;
+        return createShopFromConfig(shopId, path);
+    }
+
     public static boolean isShopLocation(Location location) {
         String plotId = PlotUtils.getPlotIdByLocation(location);
         if (plotId == null)
@@ -206,26 +229,10 @@ public class ShopUtils {
     }
 
     public static boolean isMatchingItem(ChestShop shop, ItemStack item) {
-        if (item == null || item.getType() != shop.getItem()) {
-            return false;
-        }
-
-        if (shop instanceof EnchantedBookChestShop) {
-            EnchantedBookChestShop enchantedShop = (EnchantedBookChestShop) shop;
-            Map.Entry<Enchantment, Integer> targetEnchant = enchantedShop.getEnchantment();
-
-            if (targetEnchant != null) {
-                if (item.getItemMeta() instanceof EnchantmentStorageMeta) {
-                    EnchantmentStorageMeta meta = (EnchantmentStorageMeta) item.getItemMeta();
-                    // Books must have EXACTLY one enchantment and it must match target
-                    return meta.getStoredEnchants().size() == 1
-                            && meta.getStoredEnchantLevel(targetEnchant.getKey()) == targetEnchant
-                                    .getValue();
-                }
-                return false;
-            }
-        }
-        return true;
+        if (item == null) return false;
+        
+        // Deep compare using Bukkit's isSimilar (compares type, durability, and ItemMeta)
+        return item.isSimilar(shop.getItem());
     }
 
     public static void processPurchase(org.bukkit.entity.Player player, String plotId,
@@ -257,22 +264,6 @@ public class ShopUtils {
             return;
         }
 
-        String itemNameStr = RegionData.get().getString(basePath + ".item");
-        Material itemType = Material.matchMaterial(itemNameStr != null ? itemNameStr : "");
-        if (itemType == null) {
-            SendMessage.sendPlayerMessage(player, "§cInvalid item type in shop data.");
-            return;
-        }
-
-        double pricePerItem = RegionData.get().getDouble(basePath + ".price");
-        double totalPrice = pricePerItem * amount;
-
-        if (!EconomyUtils.hasBalance(player.getUniqueId(), totalPrice)) {
-            SendMessage.sendPlayerMessage(player,
-                    "§cYou do not have enough money. You need " + EconomyUtils.format(totalPrice));
-            return;
-        }
-
         // --- Validate barrel ---
         Location shopLoc = LocationUtils.loadLocation(RegionData.get(), basePath + ".location");
         if (shopLoc == null || shopLoc.getBlock().getType() != Material.BARREL) {
@@ -285,6 +276,17 @@ public class ShopUtils {
             SendMessage.sendPlayerMessage(player, "§cShop data not found.");
             return;
         }
+        Material itemType = shop.getItem().getType();
+
+        double pricePerItem = RegionData.get().getDouble(basePath + ".price");
+        double totalPrice = pricePerItem * amount;
+
+        if (!EconomyUtils.hasBalance(player.getUniqueId(), totalPrice)) {
+            SendMessage.sendPlayerMessage(player,
+                    "§cYou do not have enough money. You need " + EconomyUtils.format(totalPrice));
+            return;
+        }
+
 
         // Always re-fetch block state fresh to get live inventory
         org.bukkit.block.BlockState blockState = shopLoc.getBlock().getState();
@@ -421,9 +423,10 @@ public class ShopUtils {
         // =========================================================
         // STEP 4: Notify and update display.
         // =========================================================
-        net.craftnepal.market.managers.DynamicPriceManager.recordPurchase(itemType, actualGiven);
+        String itemKey = getItemKey(shop);
+        net.craftnepal.market.managers.DynamicPriceManager.recordPurchase(itemKey, actualGiven);
         
-        String itemDisplayName = itemType.name().toLowerCase().replace("_", " ");
+        String itemDisplayName = getShopDisplayName(shop);
 
         if (overflowAmount > 0) {
             SendMessage.sendPlayerMessage(player,
@@ -444,5 +447,119 @@ public class ShopUtils {
         org.bukkit.Bukkit.getScheduler().runTask(net.craftnepal.market.Market.getPlugin(), () -> {
             DisplayUtils.getInstance().updateDisplay(shop);
         });
+    }
+
+    /**
+     * Generates a unique key for an item sold in a shop.
+     * For enchanted books, includes enchantment type and level.
+     */
+    public static String getItemKey(ChestShop shop) {
+        return getItemKey(shop.getItem());
+    }
+
+    public static String getItemKey(ItemStack item) {
+        if (item.hasItemMeta()) {
+            ItemMeta meta = item.getItemMeta();
+            if (meta instanceof EnchantmentStorageMeta) {
+                EnchantmentStorageMeta bookMeta = (EnchantmentStorageMeta) meta;
+                if (!bookMeta.getStoredEnchants().isEmpty()) {
+                    Map.Entry<Enchantment, Integer> enchant = bookMeta.getStoredEnchants().entrySet().iterator().next();
+                    return "ENCHANTED_BOOK:" + enchant.getKey().getKey().getKey().toUpperCase() + ":" + enchant.getValue();
+                }
+            } else if (meta instanceof org.bukkit.inventory.meta.PotionMeta) {
+                org.bukkit.inventory.meta.PotionMeta potionMeta = (org.bukkit.inventory.meta.PotionMeta) meta;
+                org.bukkit.potion.PotionData data = potionMeta.getBasePotionData();
+                org.bukkit.potion.PotionType type = data.getType();
+                String key = item.getType().name() + ":" + (type != null ? type.name() : "UNKNOWN");
+                if (data.isUpgraded()) key += ":UPGRADED";
+                else if (data.isExtended()) key += ":EXTENDED";
+                return key;
+            }
+        }
+        return item.getType().name();
+    }
+
+    /**
+     * Gets a user-friendly display name for a shop's item.
+     */
+    public static String getShopDisplayName(ChestShop shop) {
+        return getShopDisplayName(shop.getItem());
+    }
+
+    public static String getShopDisplayName(ItemStack item) {
+        if (item.hasItemMeta()) {
+            ItemMeta meta = item.getItemMeta();
+            if (meta.hasDisplayName()) {
+                return meta.getDisplayName();
+            }
+            if (meta instanceof EnchantmentStorageMeta) {
+                EnchantmentStorageMeta bookMeta = (EnchantmentStorageMeta) meta;
+                if (!bookMeta.getStoredEnchants().isEmpty()) {
+                    Map.Entry<Enchantment, Integer> enchant = bookMeta.getStoredEnchants().entrySet().iterator().next();
+                    return formatKey(enchant.getKey().getKey().getKey()) + " " + enchant.getValue();
+                }
+                return "Enchanted Book";
+            } else if (meta instanceof org.bukkit.inventory.meta.PotionMeta) {
+                org.bukkit.inventory.meta.PotionMeta potionMeta = (org.bukkit.inventory.meta.PotionMeta) meta;
+                org.bukkit.potion.PotionData data = potionMeta.getBasePotionData();
+                org.bukkit.potion.PotionType type = data.getType();
+                String base = type != null ? formatKey(type.name()) : "Unknown";
+                
+                // Minecraft-standard names for potion effects
+                if (type != null) {
+                    base = switch (type.name()) {
+                        case "SPEED" -> "Swiftness";
+                        case "JUMP" -> "Leaping";
+                        case "INSTANT_HEALTH" -> "Healing";
+                        case "INSTANT_DAMAGE" -> "Harming";
+                        default -> base;
+                    };
+                }
+                
+                String suffix = "";
+                if (data.isUpgraded()) suffix = " II";
+                else if (data.isExtended()) suffix = " (Extended)";
+
+                String prefix = switch (item.getType()) {
+                    case TIPPED_ARROW -> "Arrow of ";
+                    case POTION -> "Potion of ";
+                    case SPLASH_POTION -> "Splash Potion of ";
+                    case LINGERING_POTION -> "Lingering Potion of ";
+                    default -> "";
+                };
+                return prefix + base + suffix;
+            }
+        }
+        return formatKey(item.getType().name());
+    }
+
+    public static String formatKey(String key) {
+        return java.util.Arrays.stream(key.split("_"))
+                .map(w -> Character.toUpperCase(w.charAt(0)) + w.substring(1).toLowerCase())
+                .collect(Collectors.joining(" "));
+    }
+
+    public static byte[] serializeItem(ItemStack item) {
+        try {
+            java.io.ByteArrayOutputStream io = new java.io.ByteArrayOutputStream();
+            org.bukkit.util.io.BukkitObjectOutputStream os = new org.bukkit.util.io.BukkitObjectOutputStream(io);
+            os.writeObject(item);
+            os.flush();
+            return io.toByteArray();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new byte[0];
+        }
+    }
+
+    public static ItemStack deserializeItem(byte[] bytes) {
+        try {
+            java.io.ByteArrayInputStream in = new java.io.ByteArrayInputStream(bytes);
+            org.bukkit.util.io.BukkitObjectInputStream is = new org.bukkit.util.io.BukkitObjectInputStream(in);
+            return (ItemStack) is.readObject();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 }

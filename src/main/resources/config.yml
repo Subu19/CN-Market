@@ -15,9 +15,8 @@ protection:
   prevent-mob-spawn: true
 
 market-world:
-  name: "market"
-  plot-size: 16
-  pathway-width: 3
+  # Maximum height players can build in their plots
+  max-height: 100
   floor-material: "GRASS_BLOCK"
   pathway-material: "STONE_BRICKS"
   border-material: "SMOOTH_STONE_SLAB"

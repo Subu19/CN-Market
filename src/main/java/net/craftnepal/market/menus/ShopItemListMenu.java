@@ -17,13 +17,26 @@ public class ShopItemListMenu extends Menu {
 
     private final String plotId;
     private int currentPage = 0;
-    private final Map<Material, Integer> itemCounts;
+    private final Map<String, Integer> itemCounts;
+    private final Map<String, ChestShop> representativeShops = new HashMap<>();
     private static final int ITEMS_PER_PAGE = 45;
 
     public ShopItemListMenu(PlayerMenuUtility playerMenuUtility, String plotId) {
         super(playerMenuUtility);
         this.plotId = plotId;
-        this.itemCounts = ShopUtils.getAllShopItemsAndCountsByPlotID(plotId);
+        this.itemCounts = ShopUtils.getAllShopItemKeysAndCountsByPlotID(plotId);
+        
+        // Populate representative shops
+        Map<String, ChestShop> allShops = ShopUtils.getAllShops();
+        for (ChestShop shop : allShops.values()) {
+            String shopPlot = PlotUtils.getPlotIdByLocation(shop.getLocation());
+            if (plotId.equals(shopPlot)) {
+                String key = ShopUtils.getItemKey(shop);
+                if (itemCounts.containsKey(key)) {
+                    representativeShops.putIfAbsent(key, shop);
+                }
+            }
+        }
     }
 
     @Override
@@ -55,20 +68,21 @@ public class ShopItemListMenu extends Menu {
         }
 
         // Calculate pagination
-        List<Material> materials = new ArrayList<>(itemCounts.keySet());
-        int totalPages = (int) Math.ceil((double) materials.size() / ITEMS_PER_PAGE);
+        List<String> keys = new ArrayList<>(itemCounts.keySet());
+        int totalPages = (int) Math.ceil((double) keys.size() / ITEMS_PER_PAGE);
 
         // Add items for current page
         int startIndex = currentPage * ITEMS_PER_PAGE;
-        int endIndex = Math.min(startIndex + ITEMS_PER_PAGE, materials.size());
+        int endIndex = Math.min(startIndex + ITEMS_PER_PAGE, keys.size());
 
         for (int i = startIndex; i < endIndex; i++) {
-            Material material = materials.get(i);
-            int count = itemCounts.get(material);
+            String key = keys.get(i);
+            int count = itemCounts.get(key);
+            ChestShop representative = representativeShops.get(key);
 
-            ItemStack itemStack = new ItemStack(material);
+            ItemStack itemStack = new ItemStack(representative.getItem());
             ItemMeta meta = itemStack.getItemMeta();
-            meta.setDisplayName(ChatColor.YELLOW + material.name());
+            meta.setDisplayName(ChatColor.YELLOW + ShopUtils.getShopDisplayName(representative));
             meta.setLore(Arrays.asList(
                     ChatColor.GRAY + "In Stock: " + ChatColor.GREEN + count,
                     ChatColor.DARK_GRAY + "Click to teleport to shop"
@@ -136,12 +150,29 @@ public class ShopItemListMenu extends Menu {
             if (shopLocation != null) {
                 SendMessage.sendPlayerMessage(playerMenuUtility.getOwner(),"Teleporting to the shop in 5 seconds! Don't move..");
                 playerMenuUtility.getOwner().closeInventory();
+                
+                // Find the matched key from display name
+                String name = ChatColor.stripColor(clickedItem.getItemMeta().getDisplayName());
+                String matchedKey = null;
+                for (String key : representativeShops.keySet()) {
+                    if (ShopUtils.getShopDisplayName(representativeShops.get(key)).equals(name)) {
+                        matchedKey = key;
+                        break;
+                    }
+                }
+
+                final String finalKey = matchedKey;
                 TeleportUtils.scheduleTeleport(playerMenuUtility.getOwner(),shopLocation,()->{
-                    SendMessage.sendPlayerMessage(playerMenuUtility.getOwner(), "Teleported to shop selling: " +
-                            ChatColor.YELLOW + clickedMaterial.name());
-                    List<ChestShop> allShops =  ShopUtils.getPlotShopsByItemName(plotId,clickedItem.getType().toString());
-                    for (ChestShop shop:allShops){
-                        RegionUtils.showVerticalParticleLine(playerMenuUtility.getOwner(), shop.getLocation().clone().add(0, 2, 0), null, Market.getPlugin());
+                    SendMessage.sendPlayerMessage(playerMenuUtility.getOwner(), "Teleported to shop!");
+                    
+                    if (finalKey != null) {
+                        Map<String, ChestShop> plotShops = ShopUtils.getAllShops();
+                        for (ChestShop shop : plotShops.values()) {
+                            String shopPlot = PlotUtils.getPlotIdByLocation(shop.getLocation());
+                            if (plotId.equals(shopPlot) && ShopUtils.getItemKey(shop).equals(finalKey)) {
+                                RegionUtils.showVerticalParticleLine(playerMenuUtility.getOwner(), shop.getLocation().clone().add(0, 2, 0), null, Market.getPlugin());
+                            }
+                        }
                     }
                 });
             } else {

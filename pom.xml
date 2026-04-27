@@ -17,6 +17,7 @@
     </properties>
 
     <build>
+        <finalName>Market</finalName>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

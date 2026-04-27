@@ -1,7 +1,6 @@
 package net.craftnepal.market.Listeners;
 
 import net.craftnepal.market.Entities.ChestShop;
-import net.craftnepal.market.Entities.EnchantedBookChestShop;
 import net.craftnepal.market.Market;
 import net.craftnepal.market.files.PriceData;
 import net.craftnepal.market.files.RegionData;
@@ -118,37 +117,48 @@ public class ShopInteraction implements Listener {
 
         // Retrieve the item in hand
         Material itemType = item.getType();
-        String itemName = itemType.name().replace("_", " ").toLowerCase();
-
-        final Map.Entry<Enchantment, Integer> enchantment;
-        if (itemType == Material.ENCHANTED_BOOK) {
-            EnchantmentStorageMeta meta = (EnchantmentStorageMeta) item.getItemMeta();
-            if (meta == null || meta.getStoredEnchants().size() != 1) {
-                SendMessage.sendPlayerMessage(player, "§cYou can only sell books with exactly one enchantment.");
-                return;
-            }
-            enchantment = meta.getStoredEnchants().entrySet().iterator().next();
-        } else {
-            enchantment = null;
-        }
+        String itemName = net.craftnepal.market.utils.ShopUtils.getShopDisplayName(item);
 
         // Get the base price to check if item is sellable
-        Integer basePriceValue = PriceData.getPrice(itemType);
+        String itemKey = net.craftnepal.market.utils.ShopUtils.getItemKey(item);
+        Integer basePriceValue = PriceData.getPrice(itemKey);
         if (basePriceValue == null || basePriceValue <= 0) {
             SendMessage.sendPlayerMessage(player, "§cThis item cannot be sold in shops as it has no base price set.");
             event.setCancelled(true);
             return;
         }
-        double fairPrice = net.craftnepal.market.managers.DynamicPriceManager.getDynamicPrice(itemType);
+        double fairPrice = net.craftnepal.market.managers.DynamicPriceManager.getDynamicPrice(itemKey);
 
         double minPrice = fairPrice * 0.85; // 15% below base price
         double maxPrice = fairPrice * 1.50; // 50% above base price
         String priceDisplay = String.format("§e%.2f", fairPrice);
 
         // Send detailed messages to the player
-        String trendStr = net.craftnepal.market.managers.DynamicPriceManager.getTrendString(itemType);
+        String trendStr = net.craftnepal.market.managers.DynamicPriceManager.getTrendString(itemKey);
         SendMessage.sendPlayerMessage(player, "§7=============================");
-        SendMessage.sendPlayerMessage(player, "§aYou're creating a shop for: §b" + itemName);
+        
+        net.md_5.bungee.api.chat.TextComponent msg = new net.md_5.bungee.api.chat.TextComponent("§aYou're creating a shop for: ");
+        net.md_5.bungee.api.chat.TextComponent itemCmp = new net.md_5.bungee.api.chat.TextComponent("§b[" + itemName + "]");
+
+        StringBuilder hoverText = new StringBuilder();
+        hoverText.append("§e").append(itemName);
+        if (item.hasItemMeta() && item.getItemMeta().hasLore()) {
+            for (String line : item.getItemMeta().getLore()) {
+                hoverText.append("\n").append(line);
+            }
+        }
+        if (item.hasItemMeta() && item.getItemMeta() instanceof org.bukkit.inventory.meta.EnchantmentStorageMeta) {
+            org.bukkit.inventory.meta.EnchantmentStorageMeta meta = (org.bukkit.inventory.meta.EnchantmentStorageMeta) item.getItemMeta();
+            for (java.util.Map.Entry<org.bukkit.enchantments.Enchantment, Integer> entry : meta.getStoredEnchants().entrySet()) {
+                hoverText.append("\n§7").append(net.craftnepal.market.utils.ShopUtils.formatKey(entry.getKey().getKey().getKey())).append(" ").append(entry.getValue());
+            }
+        }
+        itemCmp.setHoverEvent(new net.md_5.bungee.api.chat.HoverEvent(
+                net.md_5.bungee.api.chat.HoverEvent.Action.SHOW_TEXT,
+                new net.md_5.bungee.api.chat.ComponentBuilder(hoverText.toString()).create()
+        ));
+        msg.addExtra(itemCmp);
+        player.spigot().sendMessage(msg);
         SendMessage.sendPlayerMessage(player, "§7Market price: " + priceDisplay + " " + trendStr);
         SendMessage.sendPlayerMessage(player, String.format("§7Price range: §c%.2f §7to §a%.2f", minPrice, maxPrice));
         SendMessage.sendPlayerMessage(player, "§7----------------------------------------");
@@ -231,65 +241,37 @@ public class ShopInteraction implements Listener {
                 // Generate a new shop ID
                 String shopId = UUID.randomUUID().toString();
 
-                if (enchantment != null) {
+                ItemStack shopItem = item.clone();
+                shopItem.setAmount(1);
 
-                    // Create a new EnchantedBookChestShop instance
-                    EnchantedBookChestShop enchantedBookChestShop = new EnchantedBookChestShop(
-                            shopId,
-                            chestLocation,
-                            item.getType(),
-                            uuid,
-                            price,
-                            enchantment);
-                    // Define the base path in the YAML configuration
-                    String basePath = "market.plots." + playerPlot + ".shops." + shopId;
+                // Create a new ChestShop instance
+                ChestShop chestShop = new ChestShop(
+                        shopId,
+                        chestLocation,
+                        shopItem,
+                        uuid,
+                        price);
 
-                    // Serialize and save the ChestShop data to the YAML configuration
-                    LocationUtils.saveLocation(RegionData.get(), basePath + ".location", enchantedBookChestShop.getLocation());
-                    RegionData.get().set(basePath + ".item", enchantedBookChestShop.getItem().toString());
-                    RegionData.get().set(basePath + ".owner", enchantedBookChestShop.getOwner().toString());
-                    RegionData.get().set(basePath + ".price", enchantedBookChestShop.getPrice());
-                    RegionData.get().set(basePath + ".enchantment.key", enchantment.getKey().getKey().getKey());
-                    RegionData.get().set(basePath + ".enchantment.level", enchantment.getValue());
+                // Define the base path in the YAML configuration
+                String basePath = "market.plots." + playerPlot + ".shops." + shopId;
 
-                    // Save the configuration to persist the data
-                    RegionData.save();
+                // Serialize and save the ChestShop data to the YAML configuration
+                LocationUtils.saveLocation(RegionData.get(), basePath + ".location", chestShop.getLocation());
+                String base64Item = java.util.Base64.getEncoder().encodeToString(net.craftnepal.market.utils.ShopUtils.serializeItem(shopItem));
+                RegionData.get().set(basePath + ".item_bytes", base64Item);
+                RegionData.get().set(basePath + ".item", chestShop.getItem().getType().toString()); // Fallback / reference
+                RegionData.get().set(basePath + ".owner", chestShop.getOwner().toString());
+                RegionData.get().set(basePath + ".price", chestShop.getPrice());
 
-                    // Notify the player
-                    player.sendMessage(
-                            ChatColor.GREEN + "Shop created successfully with price: " + ChatColor.GOLD + price);
+                // Save the configuration to persist the data
+                RegionData.save();
 
-                    // Spawn display after creation
-                    displayUtils.spawnDisplayPair(enchantedBookChestShop);
-                } else {
-                    // Create a new ChestShop instance
-                    ChestShop chestShop = new ChestShop(
-                            shopId,
-                            chestLocation,
-                            item.getType(),
-                            uuid,
-                            price);
+                // Notify the player
+                player.sendMessage(
+                        ChatColor.GREEN + "Shop created successfully with price: " + ChatColor.GOLD + price);
 
-                    // Define the base path in the YAML configuration
-                    String basePath = "market.plots." + playerPlot + ".shops." + shopId;
-
-                    // Serialize and save the ChestShop data to the YAML configuration
-                    LocationUtils.saveLocation(RegionData.get(), basePath + ".location", chestShop.getLocation());
-                    RegionData.get().set(basePath + ".item", chestShop.getItem().toString());
-                    RegionData.get().set(basePath + ".owner", chestShop.getOwner().toString());
-                    RegionData.get().set(basePath + ".price", chestShop.getPrice());
-
-                    // Save the configuration to persist the data
-                    RegionData.save();
-
-                    // Notify the player
-                    player.sendMessage(
-                            ChatColor.GREEN + "Shop created successfully with price: " + ChatColor.GOLD + price);
-
-                    // Spawn display after creation
-                    displayUtils.spawnDisplayPair(chestShop);
-
-                }
+                // Spawn display after creation
+                displayUtils.spawnDisplayPair(chestShop);
 
             } catch (NumberFormatException e) {
                 player.sendMessage(ChatColor.RED + "Invalid price entered. Please enter a valid number.");
@@ -363,18 +345,14 @@ public class ShopInteraction implements Listener {
                 
                 double price = RegionData.get().getDouble("market.plots." + plot + ".shops." + shopId + ".price");
                 
-                // Count stock
-                org.bukkit.block.Barrel barrel = (org.bukkit.block.Barrel) clickedBlock.getState();
-                int stock = 0;
-                for (ItemStack item : barrel.getInventory().getContents()) {
-                    if (item != null && item.getType() == itemType) {
-                        stock += item.getAmount();
-                    }
-                }
+                // Count stock & Build Interactive Chat Menu
+                ChestShop shop = net.craftnepal.market.utils.ShopUtils.getShop(plot, shopId);
+                int stock = net.craftnepal.market.utils.ShopUtils.getShopStock(shop);
 
                 // Build Interactive Chat Menu
-                String itemName = itemType.name().replace("_", " ").toLowerCase();
-                String trendStr = net.craftnepal.market.managers.DynamicPriceManager.getTrendString(itemType);
+                String itemKey = net.craftnepal.market.utils.ShopUtils.getItemKey(shop);
+                String itemName = net.craftnepal.market.utils.ShopUtils.getShopDisplayName(shop);
+                String trendStr = net.craftnepal.market.managers.DynamicPriceManager.getTrendString(itemKey);
                 SendMessage.sendPlayerMessage(player, "§7=============================");
                 SendMessage.sendPlayerMessage(player, "§aShop Item: §b" + itemName);
                 SendMessage.sendPlayerMessage(player, "§7Price per item: §e" + EconomyUtils.format(price) + " " + trendStr);
@@ -417,18 +395,11 @@ public class ShopInteraction implements Listener {
         String ownerUUID = shopSection.getString("owner");
         Location loc = LocationUtils.loadLocation(RegionData.get(), "market.plots." + plotId + ".shops." + shopId + ".location");
 
-        int stock = 0;
-        if (loc != null && loc.getBlock().getType() == Material.BARREL) {
-            org.bukkit.block.Barrel barrel = (org.bukkit.block.Barrel) loc.getBlock().getState();
-            for (ItemStack item : barrel.getInventory().getContents()) {
-                if (item != null && item.getType() == itemType) {
-                    stock += item.getAmount();
-                }
-            }
-        }
-
-        String itemName = itemType.name().replace("_", " ").toLowerCase();
-        String trendStr = net.craftnepal.market.managers.DynamicPriceManager.getTrendString(itemType);
+        ChestShop shop = net.craftnepal.market.utils.ShopUtils.getShop(plotId, shopId);
+        int stock = net.craftnepal.market.utils.ShopUtils.getShopStock(shop);
+        String itemKey = net.craftnepal.market.utils.ShopUtils.getItemKey(shop);
+        String itemName = net.craftnepal.market.utils.ShopUtils.getShopDisplayName(shop);
+        String trendStr = net.craftnepal.market.managers.DynamicPriceManager.getTrendString(itemKey);
         SendMessage.sendPlayerMessage(player, "§7=============================");
         SendMessage.sendPlayerMessage(player, "§6§lSHOP STATS");
         SendMessage.sendPlayerMessage(player, "§aItem: §b" + itemName);

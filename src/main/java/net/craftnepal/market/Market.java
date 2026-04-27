@@ -36,7 +36,7 @@ public final class Market extends JavaPlugin {
         config.options().copyDefaults(true);
         saveConfig();
         cfile = new File(getDataFolder(), "config.yml");
-        
+
         // initialize data files
         RegionData.setup();
         PriceData.setup();
@@ -50,8 +50,8 @@ public final class Market extends JavaPlugin {
             return;
         }
 
-        // initialize world
-        initializeMarketWorld();
+        // Attempt to load the market world if it already exists on disk
+        initializeMarketWorld(false);
 
         // initialize display utils
         displayUtils = DisplayUtils.getInstance();
@@ -74,9 +74,12 @@ public final class Market extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new MarketDisplayListener(this), this);
         getServer().getPluginManager().registerEvents(new ShopStockListener(), this);
         getServer().getPluginManager().registerEvents(new MarketWorldListener(), this);
-        getServer().getPluginManager().registerEvents(new net.craftnepal.market.Listeners.InternalCommandListener(), this);
-        getServer().getPluginManager().registerEvents(new net.craftnepal.market.Listeners.SearchListener(), this);
-        getServer().getPluginManager().registerEvents(new net.craftnepal.market.Listeners.CommandTabFilter(), this);
+        getServer().getPluginManager().registerEvents(
+                new net.craftnepal.market.Listeners.InternalCommandListener(), this);
+        getServer().getPluginManager()
+                .registerEvents(new net.craftnepal.market.Listeners.SearchListener(), this);
+        getServer().getPluginManager()
+                .registerEvents(new net.craftnepal.market.Listeners.CommandTabFilter(), this);
 
         // command register
         try {
@@ -85,24 +88,27 @@ public final class Market extends JavaPlugin {
                         if (sender instanceof org.bukkit.entity.Player) {
                             org.bukkit.entity.Player p = (org.bukkit.entity.Player) sender;
                             org.bukkit.World marketWorld = Market.getPlugin().getMarketWorld();
-                            if(marketWorld != null){
+                            if (marketWorld != null) {
                                 org.bukkit.Location location = marketWorld.getSpawnLocation();
-                                if (!net.craftnepal.market.utils.MarketUtils.isInMarketArea(p.getLocation())) {
+                                if (!net.craftnepal.market.utils.MarketUtils
+                                        .isInMarketArea(p.getLocation())) {
                                     net.craftnepal.market.utils.PlayerUtils.saveLastLocation(p);
                                 }
                                 p.teleport(location);
-                                p.playSound(location, org.bukkit.Sound.ENTITY_ENDERMAN_TELEPORT, 1, 1);
+                                p.playSound(location, org.bukkit.Sound.ENTITY_ENDERMAN_TELEPORT, 1,
+                                        1);
                                 // Enable flight on arrival if configured
                                 net.craftnepal.market.Listeners.Movement.checkAndToggle(p, true);
                             } else {
-                                p.sendMessage("§cMarket world not loaded!");
+                                net.craftnepal.market.utils.SendMessage.sendPlayerMessage(p,
+                                        "§cThe market world has not been set up yet.");
+                                if (p.hasPermission("market.admin")) {
+                                    net.craftnepal.market.utils.SendMessage.sendPlayerMessage(p,
+                                            "§eAdmin: §7Use §f/market admin setup <world> <plotSize> <pathwayWidth> §7to initialize the market.");
+                                }
                             }
                         }
-                    },
-                    PlotCommand.class,
-                    AdminCommand.class,
-                    Back.class,
-                    Shops.class,
+                    }, PlotCommand.class, AdminCommand.class, Back.class, Shops.class,
                     HelpCommand.class);
         } catch (NoSuchFieldException | IllegalAccessException e) {
             throw new RuntimeException(e);
@@ -111,16 +117,30 @@ public final class Market extends JavaPlugin {
         Bukkit.getLogger().info("Market was loaded successfully!");
     }
 
-    public void initializeMarketWorld() {
+    /**
+     * Initializes the market world.
+     * 
+     * @param forceCreate If true, the world will be created even if the folder doesn't exist (used
+     *        for initial setup).
+     */
+    public void initializeMarketWorld(boolean forceCreate) {
+        if (!config.contains("market-world.name") && !forceCreate) {
+            return;
+        }
+
         String worldName = config.getString("market-world.name", "market");
         World marketWorld = Bukkit.getWorld(worldName);
+
         if (marketWorld == null) {
-            Bukkit.getLogger().info("Loading Market world: " + worldName);
+            Bukkit.getLogger().info((forceCreate ? "Creating new" : "Loading existing")
+                    + " Market world: " + worldName);
             WorldCreator creator = new WorldCreator(worldName);
             creator.generator(new MarketGenerator());
             marketWorld = creator.createWorld();
         }
+
         if (marketWorld != null) {
+            // Ensure spawn is set correctly
             marketWorld.setSpawnLocation(0, 65, 0);
         }
     }

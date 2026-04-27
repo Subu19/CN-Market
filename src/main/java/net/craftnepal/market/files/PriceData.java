@@ -1,7 +1,6 @@
 package net.craftnepal.market.files;
 
 import org.bukkit.Bukkit;
-import org.bukkit.Material;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 
@@ -13,12 +12,14 @@ import java.util.Map;
 public class PriceData {
     private static File file;
     private static FileConfiguration config;
-    private static final Map<Material, Integer> priceMap = new HashMap<>();
+    private static final Map<String, Integer> priceMap = new HashMap<>();
 
     public static void setup() {
-        file = new File(Bukkit.getServer().getPluginManager().getPlugin("Market").getDataFolder(), "price.yml");
+        file = new File(Bukkit.getServer().getPluginManager().getPlugin("Market").getDataFolder(),
+                "price.yml");
         if (!file.exists()) {
-            Bukkit.getServer().getPluginManager().getPlugin("Market").saveResource("price.yml", false);
+            Bukkit.getServer().getPluginManager().getPlugin("Market").saveResource("price.yml",
+                    false);
         }
         config = YamlConfiguration.loadConfiguration(file);
         loadPrices();
@@ -26,24 +27,70 @@ public class PriceData {
 
     private static void loadPrices() {
         priceMap.clear();
-        for (String key : config.getKeys(false)) {
-            try {
-                Material material = Material.valueOf(key.toUpperCase());
-                int price = config.getInt(key);
-                priceMap.put(material, price);
-            } catch (IllegalArgumentException e) {
-                Bukkit.getLogger().warning("Invalid material in prices.yml: " + key);
-            }
+
+        // Use getKeys(true) to handle nested structures correctly (e.g., POTION:SPEED)
+        // Bukkit's YamlConfiguration may interpret colons as nested sections depending on
+        // formatting.
+        for (String key : config.getKeys(true)) {
+            if (config.isConfigurationSection(key))
+                continue;
+
+            int price = config.getInt(key);
+            // Replace internal Bukkit separators (.) with colons (:) to match our internal key
+            // format
+            String normalizedKey = normalizeKey(key.replace(".", ":"));
+            priceMap.put(normalizedKey, price);
         }
     }
 
-    public static Integer getPrice(Material material) {
-        return priceMap.get(material);
+    private static String normalizeKey(String key) {
+        if (key == null)
+            return null;
+        String[] parts = key.toUpperCase().split(":");
+        for (int i = 0; i < parts.length; i++) {
+            switch (parts[i]) {
+                case "SWIFTNESS":
+                    parts[i] = "SPEED";
+                    break;
+                case "LEAPING":
+                    parts[i] = "JUMP_BOOST";
+                    break;
+                case "HEALING":
+                    parts[i] = "INSTANT_HEALTH";
+                    break;
+                case "HARMING":
+                    parts[i] = "INSTANT_DAMAGE";
+                    break;
+                case "REGEN":
+                    parts[i] = "REGENERATION";
+                    break;
+                case "ENANTED_BOOK":
+                    parts[i] = "ENCHANTED_BOOK";
+                    break; // Fix typo found in price.yml
+                case "SLOW":
+                    parts[i] = "SLOWNESS";
+                    break;
+                case "STRENGTH_POTION":
+                    parts[i] = "STRENGTH";
+                    break;
+            }
+        }
+        return String.join(":", parts);
     }
 
-    public static void setPrice(Material material, int price) {
-        priceMap.put(material, price);
-        config.set(material.name(), price);
+    public static Integer getPrice(String key) {
+        if (key == null)
+            return null;
+        return priceMap.get(normalizeKey(key));
+    }
+
+    public static void setPrice(String key, int price) {
+        if (key == null)
+            return;
+        String normalized = normalizeKey(key);
+        priceMap.put(normalized, price);
+        config.set(normalized.replace(":", "."), price); // Save as nested in YAML for better
+                                                         // readability
         save();
     }
 

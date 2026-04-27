@@ -2,7 +2,6 @@ package net.craftnepal.market.utils;
 
 import net.craftnepal.market.Entities.ChestShop;
 import net.craftnepal.market.Entities.DisplayPair;
-import net.craftnepal.market.Entities.EnchantedBookChestShop;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
@@ -179,8 +178,8 @@ public class DisplayUtils {
     private String buildDisplayText(ChestShop shop) {
         int stock = ShopUtils.getShopStock(shop);
         String color = stock > 0 ? "§a" : "§c";
-        String trend =
-                net.craftnepal.market.managers.DynamicPriceManager.getTrendString(shop.getItem());
+        String itemKey = ShopUtils.getItemKey(shop);
+        String trend = net.craftnepal.market.managers.DynamicPriceManager.getTrendString(itemKey);
         // StringBuilder is faster than String.format in a hot update loop
         return color + getDisplayName(shop) + "\n§6Price: §f$"
                 + String.format("%.2f", shop.getPrice()) + " " + trend;
@@ -191,18 +190,7 @@ public class DisplayUtils {
     }
 
     private String getDisplayName(ChestShop shop) {
-        if (shop.getItem() == Material.ENCHANTED_BOOK
-                && shop instanceof EnchantedBookChestShop) {
-            EnchantedBookChestShop enchantedShop = (EnchantedBookChestShop) shop;
-            Map.Entry<Enchantment, Integer> enchant = enchantedShop.getEnchantment();
-            if (enchant != null) {
-                return enchant.getKey().getKey().getKey().replace('_', ' ').toUpperCase() + " "
-                        + enchant.getValue();
-            }
-            return "Enchanted Book";
-        }
-        // Fresh ItemStack has no custom meta — just format the material name
-        return shop.getItem().toString().replace('_', ' ');
+        return ShopUtils.getShopDisplayName(shop);
     }
 
     // ── Accessors ─────────────────────────────────────────────────────

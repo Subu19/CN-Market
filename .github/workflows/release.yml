@@ -1,26 +1,52 @@
-name: CI/CD Pipeline
+name: Release
+
+# Fires only when a version tag is pushed (v1.2.3, v1.0.6-SNAPSHOT, etc.)
+# The branch the tag lives on determines the release type:
+#   main    → Market-<version>.jar        (stable release)
+#   develop → Market-<version>-SNAPSHOT.jar  (pre-release / snapshot)
 
 on:
   push:
-    branches: [ "main" ]
-    tags: [ "v*" ]
-  pull_request:
-    branches: [ "main" ]
+    tags:
+      - 'v*'
 
 permissions:
   contents: write
 
 jobs:
-  build:
-    name: Build and Package
+  release:
+    name: Build and Release
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0   # needed for branch-reachability check
 
+      # ── Determine which branch this tag was pushed from ──────────────────
+      - name: Detect release branch
+        id: branch
+        run: |
+          git fetch origin main develop --no-tags 2>/dev/null || true
+
+          if git branch -r --contains "${{ github.sha }}" | grep -q 'origin/main'; then
+            echo "name=main"      >> $GITHUB_OUTPUT
+            echo "snapshot=false" >> $GITHUB_OUTPUT
+          else
+            echo "name=develop"   >> $GITHUB_OUTPUT
+            echo "snapshot=true"  >> $GITHUB_OUTPUT
+          fi
+
+      # ── Derive the version string from the tag (strip leading 'v') ───────
+      - name: Parse version from tag
+        id: version
+        run: |
+          RAW_TAG="${{ github.ref_name }}"       # e.g. v1.0.6 or v1.0.6-SNAPSHOT
+          VERSION="${RAW_TAG#v}"                 # strip leading 'v'
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      # ── Build ─────────────────────────────────────────────────────────────
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
@@ -31,50 +57,33 @@ jobs:
       - name: Build with Maven
         run: mvn clean package -DskipTests
 
-      - name: Get Version
-        id: get_version
-        run: |
-          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Prepare Artifacts
+      # ── Name the artifact ─────────────────────────────────────────────────
+      - name: Prepare release artifact
+        id: artifact
         run: |
           mkdir -p artifacts
-          # Remove the 'original-' jar if it exists to avoid conflicts
-          rm -f target/original-*.jar
-          
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            cp target/Market-*.jar artifacts/Market-${{ steps.get_version.outputs.version }}.jar
+          rm -f target/original-*.jar          # drop the un-shaded jar
+
+          VERSION="${{ steps.version.outputs.version }}"
+          SNAPSHOT="${{ steps.branch.outputs.snapshot }}"
+
+          if [ "$SNAPSHOT" = "true" ]; then
+            JAR_NAME="Market-${VERSION}-SNAPSHOT.jar"
           else
-            cp target/Market-*.jar artifacts/Market-Dev-b${{ github.run_number }}.jar
+            JAR_NAME="Market-${VERSION}.jar"
           fi
 
-      - name: Upload Build Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Market-Build
-          path: artifacts/*.jar
+          cp target/Market.jar "artifacts/${JAR_NAME}"
+          echo "jar_name=${JAR_NAME}" >> $GITHUB_OUTPUT
 
-  release:
-    name: Create Release
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Download Build Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: Market-Build
-          path: release-files
-
+      # ── Publish GitHub Release ────────────────────────────────────────────
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          files: release-files/*.jar
+          name: "${{ steps.artifact.outputs.jar_name }}"
+          files: artifacts/*.jar
           generate_release_notes: true
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.branch.outputs.snapshot == 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

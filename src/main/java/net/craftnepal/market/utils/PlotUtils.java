@@ -115,8 +115,9 @@ public class PlotUtils {
         int startZ = (plotZ * totalSize) - (pathwayWidth / 2) + pathwayWidth;
 
         World world = Market.getPlugin().getMarketWorld();
+        int maxHeight = config.getInt("market-world.max-height", 255);
         Location min = new Location(world, startX, 64, startZ);
-        Location max = new Location(world, startX + plotSize - 1, 255, startZ + plotSize - 1);
+        Location max = new Location(world, startX + plotSize - 1, maxHeight, startZ + plotSize - 1);
 
         ConfigurationSection plotSection = RegionData.get().getConfigurationSection("market.plots." + plotId);
         if (plotSection == null) {

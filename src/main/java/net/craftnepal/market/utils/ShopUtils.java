@@ -21,45 +21,40 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.AbstractMap;
+import java.util.stream.Collectors;
 
 public class ShopUtils {
 
-    public static Map<Material, Integer> getAllShopItemsAndCountsByPlotID(String plotId) {
-        Map<Material, Integer> itemCounts = new HashMap<>();
+    public static Map<String, Integer> getAllShopItemKeysAndCountsByPlotID(String plotId) {
+        Map<String, Integer> itemCounts = new HashMap<>();
         ConfigurationSection shops =
                 RegionData.get().getConfigurationSection("market.plots." + plotId + ".shops");
 
         if (shops != null) {
             for (String shopId : shops.getKeys(false)) {
-                String materialName = shops.getString(shopId + ".item");
-                Material material = Material.matchMaterial(materialName);
+                String path = "market.plots." + plotId + ".shops." + shopId;
+                ChestShop shop = createShopFromConfig(shopId, path);
+                if (shop == null) continue;
 
-                if (material == null)
-                    continue;
+                String key = getItemKey(shop);
+                int stock = getShopStock(shop);
 
-                Location loc = LocationUtils.loadLocation(RegionData.get(),
-                        "market.plots." + plotId + ".shops." + shopId + ".location");
-                if (loc == null)
-                    continue;
-
-                Block block = loc.getBlock();
-
-                if (block.getType() == Material.BARREL) {
-                    Barrel chest = (Barrel) block.getState();
-                    int count = 0;
-
-                    // Create a dummy shop to use isMatchingItem
-                    ChestShop tempShop = createShopFromConfig(shopId,
-                            "market.plots." + plotId + ".shops." + shopId);
-
-                    for (ItemStack item : chest.getInventory().getContents()) {
-                        if (item != null && isMatchingItem(tempShop, item)) {
-                            count += item.getAmount();
-                        }
-                    }
-
-                    itemCounts.put(material, itemCounts.getOrDefault(material, 0) + count);
+                if (stock > 0) {
+                    itemCounts.put(key, itemCounts.getOrDefault(key, 0) + stock);
                 }
+            }
+        }
+        return itemCounts;
+    }
+
+    public static Map<Material, Integer> getAllShopItemsAndCountsByPlotID(String plotId) {
+        Map<Material, Integer> itemCounts = new HashMap<>();
+        Map<String, Integer> keyCounts = getAllShopItemKeysAndCountsByPlotID(plotId);
+        
+        for (Map.Entry<String, Integer> entry : keyCounts.entrySet()) {
+            Material mat = Material.matchMaterial(entry.getKey().split(":")[0]);
+            if (mat != null) {
+                itemCounts.put(mat, itemCounts.getOrDefault(mat, 0) + entry.getValue());
             }
         }
         return itemCounts;
@@ -444,5 +439,33 @@ public class ShopUtils {
         org.bukkit.Bukkit.getScheduler().runTask(net.craftnepal.market.Market.getPlugin(), () -> {
             DisplayUtils.getInstance().updateDisplay(shop);
         });
+    }
+
+    /**
+     * Generates a unique key for an item sold in a shop.
+     * For enchanted books, includes enchantment type and level.
+     */
+    public static String getItemKey(ChestShop shop) {
+        if (shop instanceof EnchantedBookChestShop) {
+            EnchantedBookChestShop eb = (EnchantedBookChestShop) shop;
+            if (eb.getEnchantment() != null) {
+                return "ENCHANTED_BOOK:" + eb.getEnchantment().getKey().getKey().getKey() + ":" + eb.getEnchantment().getValue();
+            }
+        }
+        return shop.getItem().name();
+    }
+
+    /**
+     * Gets a user-friendly display name for a shop's item.
+     */
+    public static String getShopDisplayName(ChestShop shop) {
+        if (shop instanceof EnchantedBookChestShop) {
+            EnchantedBookChestShop eb = (EnchantedBookChestShop) shop;
+            if (eb.getEnchantment() != null) {
+                String name = eb.getEnchantment().getKey().getKey().getKey().replace('_', ' ').toUpperCase();
+                return name + " " + eb.getEnchantment().getValue();
+            }
+        }
+        return shop.getItem().name().replace('_', ' ').toUpperCase();
     }
 }

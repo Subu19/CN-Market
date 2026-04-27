@@ -60,6 +60,13 @@ public class MarketRegionProtection implements Listener {
             return true;
         }
 
+        // Check for max height restriction
+        int maxHeight = net.craftnepal.market.Market.getMainConfig().getInt("market-world.max-height", 255);
+        if (location.getBlockY() > maxHeight) {
+            SendMessage.sendPlayerMessage(player, "&cYou cannot build above height " + maxHeight + "!");
+            return false;
+        }
+
         // Check if inside any plot
         String plot = PlotUtils.getPlotIdByLocation(location);
         if (plot != null) {

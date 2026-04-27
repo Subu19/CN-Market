@@ -19,7 +19,8 @@ public class AllItemsMenu extends Menu {
     private int currentPage = 0;
     private static final int ITEMS_PER_PAGE = 45;
     private String searchQuery = null;
-    private Map<Material, Integer> itemStocks = new HashMap<>();
+    private Map<String, Integer> itemStocks = new HashMap<>();
+    private Map<String, ChestShop> representativeShops = new HashMap<>();
 
     public AllItemsMenu(PlayerMenuUtility playerMenuUtility) {
         super(playerMenuUtility);
@@ -53,12 +54,14 @@ public class AllItemsMenu extends Menu {
         
         // Calculate global stock for each item dynamically
         itemStocks.clear();
+        representativeShops.clear();
         Map<String, ChestShop> allShops = ShopUtils.getAllShops();
         for (ChestShop shop : allShops.values()) {
-            Material mat = shop.getItem();
+            String key = ShopUtils.getItemKey(shop);
             int stock = ShopUtils.getShopStock(shop);
             if (stock > 0) {
-                itemStocks.put(mat, itemStocks.getOrDefault(mat, 0) + stock);
+                itemStocks.put(key, itemStocks.getOrDefault(key, 0) + stock);
+                representativeShops.putIfAbsent(key, shop);
             }
         }
 
@@ -67,31 +70,33 @@ public class AllItemsMenu extends Menu {
         for (int i = 0; i < 9; i++) inventory.setItem(i, border);
         for (int i = 45; i < 54; i++) inventory.setItem(i, border);
 
-        List<Material> sortedMaterials = new ArrayList<>(itemStocks.keySet());
+        List<String> sortedKeys = new ArrayList<>(itemStocks.keySet());
         
         // Filter by search query if any
         if (searchQuery != null && !searchQuery.isEmpty()) {
             String lowerQuery = searchQuery.toLowerCase();
-            sortedMaterials.removeIf(mat -> !mat.name().replace("_", " ").toLowerCase().contains(lowerQuery));
+            sortedKeys.removeIf(key -> !key.replace("_", " ").toLowerCase().contains(lowerQuery));
         }
 
         // Sort alphabetically
-        sortedMaterials.sort(Comparator.comparing(Enum::name));
+        sortedKeys.sort(String::compareTo);
 
-        int totalPages = (int) Math.ceil((double) sortedMaterials.size() / ITEMS_PER_PAGE);
+        int totalPages = (int) Math.ceil((double) sortedKeys.size() / ITEMS_PER_PAGE);
         if (totalPages == 0) totalPages = 1;
 
         int startIndex = currentPage * ITEMS_PER_PAGE;
-        int endIndex = Math.min(startIndex + ITEMS_PER_PAGE, sortedMaterials.size());
+        int endIndex = Math.min(startIndex + ITEMS_PER_PAGE, sortedKeys.size());
 
         for (int i = startIndex; i < endIndex; i++) {
-            Material material = sortedMaterials.get(i);
-            int count = itemStocks.get(material);
+            String key = sortedKeys.get(i);
+            int count = itemStocks.get(key);
+            ChestShop representative = representativeShops.get(key);
 
-            ItemStack itemStack = new ItemStack(material);
+            ItemStack itemStack = new ItemStack(representative.getItem());
             ItemMeta meta = itemStack.getItemMeta();
-            meta.setDisplayName(ChatColor.YELLOW + material.name().replace("_", " "));
+            meta.setDisplayName(ChatColor.YELLOW + ShopUtils.getShopDisplayName(representative));
             
+            Material material = representative.getItem();
             double dynamicPrice = net.craftnepal.market.managers.DynamicPriceManager.getDynamicPrice(material);
             String trendStr = net.craftnepal.market.managers.DynamicPriceManager.getTrendString(material);
             
@@ -148,14 +153,25 @@ public class AllItemsMenu extends Menu {
             }
         } else if (!clickedItem.getType().equals(Material.BLUE_STAINED_GLASS_PANE) &&
                 !clickedItem.getType().equals(Material.BOOK)) {
-            // It's a material item
-            Material clickedMaterial = clickedItem.getType();
-            try {
-                PlotsSellingItemMenu nextMenu = new PlotsSellingItemMenu(playerMenuUtility);
-                nextMenu.setTargetMaterial(clickedMaterial);
-                nextMenu.open();
-            } catch (Exception e) {
-                e.printStackTrace();
+            
+            // Get the display name to match back to our keys (a bit hacky but works with SimpAPI)
+            String name = ChatColor.stripColor(clickedItem.getItemMeta().getDisplayName());
+            String matchedKey = null;
+            for (String key : representativeShops.keySet()) {
+                if (ShopUtils.getShopDisplayName(representativeShops.get(key)).equals(name)) {
+                    matchedKey = key;
+                    break;
+                }
+            }
+
+            if (matchedKey != null) {
+                try {
+                    PlotsSellingItemMenu nextMenu = new PlotsSellingItemMenu(playerMenuUtility);
+                    nextMenu.setTargetProduct(matchedKey);
+                    nextMenu.open();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
         }
     }

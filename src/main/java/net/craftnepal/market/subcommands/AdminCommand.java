@@ -17,6 +17,7 @@ public class AdminCommand extends NestedCommand {
         registerSubCommand(new ToggleBorder());
         registerSubCommand(new Setup());
         registerSubCommand(new ForceUpdate());
+        registerSubCommand(new CalcPrices());
     }
 
     @Override

@@ -43,6 +43,9 @@ public class Reload extends SubCommand {
         RegionData.reload();
         net.craftnepal.market.files.LocationData.reload();
         net.craftnepal.market.files.PriceData.setup(); // Re-reads price.yml
+        
+        // Re-initialize schematic manager with new config values
+        net.craftnepal.market.world.SchematicManager.getInstance().init();
         if (commandSender instanceof Player) {
             SendMessage.sendPlayerMessage((Player) commandSender,
                     "§aMarket configuration reloaded!");

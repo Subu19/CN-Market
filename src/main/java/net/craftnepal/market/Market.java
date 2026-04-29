@@ -8,6 +8,7 @@ import net.craftnepal.market.subcommands.*;
 import net.craftnepal.market.subcommands.player.Back;
 import net.craftnepal.market.subcommands.player.Shops;
 import net.craftnepal.market.world.MarketGenerator;
+import net.craftnepal.market.world.SchematicManager;
 import net.craftnepal.market.utils.DisplayUtils;
 import net.craftnepal.market.utils.EconomyUtils;
 import org.bukkit.Bukkit;
@@ -50,19 +51,6 @@ public final class Market extends JavaPlugin {
             return;
         }
 
-        // Attempt to load the market world if it already exists on disk
-        initializeMarketWorld(false);
-
-        // initialize display utils
-        displayUtils = DisplayUtils.getInstance();
-
-        // Spawn displays after world is loaded
-        Bukkit.getScheduler().runTaskLater(this, () -> {
-            if (getMarketWorld() != null) {
-                displayUtils.spawnMarketDisplays();
-            }
-        }, 20L);
-
         // Setup SimpAPI MenuManager
         me.kodysimpson.simpapi.menu.MenuManager.setup(getServer(), this);
 
@@ -80,6 +68,24 @@ public final class Market extends JavaPlugin {
                 .registerEvents(new net.craftnepal.market.Listeners.SearchListener(), this);
         getServer().getPluginManager()
                 .registerEvents(new net.craftnepal.market.Listeners.CommandTabFilter(), this);
+
+        // initialize schematic manager
+        SchematicManager.getInstance().init();
+
+        // Attempt to load the market world if it already exists on disk
+        initializeMarketWorld(false);
+
+        // initialize display utils
+        displayUtils = DisplayUtils.getInstance();
+
+        // Spawn displays after world is loaded
+        Bukkit.getScheduler().runTaskLater(this, () -> {
+            if (getMarketWorld() != null) {
+                displayUtils.spawnMarketDisplays();
+            }
+        }, 20L);
+
+
 
         // command register
         try {

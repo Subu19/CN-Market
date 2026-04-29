@@ -5,18 +5,17 @@ join-message: "&eHello there! %player%"
 # Allow players to fly within the market world
 allow-flight: true
 
-# Market world protection settings
-protection:
-  # Prevent all player damage (fall, mobs, void, etc.)
-  prevent-damage: true
-  # Prevent hunger loss
-  prevent-hunger: true
-  # Prevent natural mob spawning
-  prevent-mob-spawn: true
+# Note: Player protection (damage, hunger, mob spawning) is now handled by WorldGuard and Paper.
 
 market-world:
   # Maximum height players can build in their plots
-  max-height: 100
+  # Optional: WorldEdit schematic for pathways (relative to plugin folder)
+  # If provided, the generator will skip material-based pathway generation
+  # and paste this schematic instead.
+  pathway-schematic: "schematics/pathway.schem"
+  # The Y-level where the schematic will be pasted. 
+  # Increase this if the road is buried, decrease if it's floating.
+  pathway-y-level: 65
   floor-material: "GRASS_BLOCK"
   pathway-material: "STONE_BRICKS"
   border-material: "SMOOTH_STONE_SLAB"

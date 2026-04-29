@@ -21,6 +21,7 @@ permissions:
       market.admin.toggleborder: true
       market.admin.setup: true
       market.admin.forceupdate: true
+      market.admin.reset: true
       market.use: true
 
   market.admin.bypass:
@@ -52,6 +53,9 @@ permissions:
     default: op
   market.admin.forceupdate:
     description: Force a dynamic price update cycle
+    default: op
+  market.admin.reset:
+    description: Reset the market world and all data
     default: op
 
   # === PLAYER PERMISSIONS ===

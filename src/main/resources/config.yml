@@ -19,3 +19,6 @@ market-world:
   floor-material: "GRASS_BLOCK"
   pathway-material: "STONE_BRICKS"
   border-material: "SMOOTH_STONE_SLAB"
+  # Maximum number of plots a player can claim.
+  # You can also use permissions: market.plots.limit.<number> to override this.
+  max-plots-per-player: 1

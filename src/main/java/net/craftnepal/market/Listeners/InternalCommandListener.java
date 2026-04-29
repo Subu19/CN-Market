@@ -41,10 +41,8 @@ public class InternalCommandListener implements Listener {
             }
             String owner = RegionData.get().getString(basePath + ".owner");
             if (player.hasPermission("market.admin") || (owner != null && owner.equals(player.getUniqueId().toString()))) {
-                RegionData.get().set(basePath, null);
-                RegionData.save();
+                ShopUtils.removeShop(plotId, shopId);
                 SendMessage.sendPlayerMessage(player, "§aShop removed successfully.");
-                DisplayUtils.getInstance().removeDisplayPair(plotId, shopId);
             } else {
                 SendMessage.sendPlayerMessage(player, "§cYou do not have permission to remove this shop.");
             }

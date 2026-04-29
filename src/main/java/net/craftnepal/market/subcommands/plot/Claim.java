@@ -52,6 +52,16 @@ public class Claim extends SubCommand {
 
                 String owner = PlotUtils.getPlotOwner(selectedPlot);
                 if (owner == null || owner.isEmpty()) {
+                    // Check if the player has reached their plot limit
+                    int currentPlots = PlotUtils.getPlotCount(player);
+                    int maxPlots = PlotUtils.getPlotLimit(player);
+
+                    if (currentPlots >= maxPlots) {
+                        SendMessage.sendPlayerMessage(player, "&cYou have reached your plot limit of " + maxPlots + " plot(s).");
+                        player.playSound(location, Sound.ITEM_SHIELD_BREAK, 1, 1);
+                        return;
+                    }
+
                     PlotUtils.setPlotOwner(selectedPlot, player.getUniqueId().toString());
                     SendMessage.sendPlayerMessage(player, "&aYou successfully claimed plot: " + selectedPlot);
                     player.playSound(location, Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1, 1);

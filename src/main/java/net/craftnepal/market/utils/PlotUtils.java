@@ -146,6 +146,41 @@ public class PlotUtils {
         return null;
     }
 
+    public static int getPlotCount(Player player) {
+        ConfigurationSection plots = RegionData.get().getConfigurationSection("market.plots");
+        if (plots == null) return 0;
+
+        int count = 0;
+        String playerUuid = player.getUniqueId().toString();
+        for (String plotId : plots.getKeys(false)) {
+            String owner = getPlotOwner(plotId);
+            if (owner != null && owner.equals(playerUuid)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    public static int getPlotLimit(Player player) {
+        if (player.hasPermission("market.plots.limit.unlimited")) {
+            return Integer.MAX_VALUE;
+        }
+
+        // Check for permission-based limits (highest one wins)
+        int limit = Market.getMainConfig().getInt("market-world.max-plots-per-player", 1);
+        
+        // This is a bit expensive but common for plot plugins
+        // We check from 100 down to the config limit
+        for (int i = 100; i > limit; i--) {
+            if (player.hasPermission("market.plots.limit." + i)) {
+                return i;
+            }
+        }
+
+        return limit;
+    }
+
+
     public static boolean isPlotAvailable(String plotId) {
         return getPlotOwner(plotId) == null;
     }

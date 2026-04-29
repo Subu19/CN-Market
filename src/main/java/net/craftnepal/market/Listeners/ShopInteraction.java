@@ -454,10 +454,8 @@ public class ShopInteraction implements Listener {
                 String owner = RegionData.get().getString("market.plots." + plot + ".shops." + shopId + ".owner");
 
                 if (player.hasPermission("market.admin") || (owner != null && owner.equals(player.getUniqueId().toString()))) {
-                    RegionData.get().set("market.plots." + plot + ".shops." + shopId, null);
-                    RegionData.save();
+                    ShopUtils.removeShop(plot, shopId);
                     SendMessage.sendPlayerMessage(player, "§aShop removed successfully.");
-                    displayUtils.removeDisplayPair(plot, shopId);
                 } else {
                     SendMessage.sendPlayerMessage(player, "§cYou cannot break someone else's shop!");
                     event.setCancelled(true);

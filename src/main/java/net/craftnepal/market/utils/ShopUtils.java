@@ -213,6 +213,16 @@ public class ShopUtils {
         return false;
     }
 
+    public static void removeShop(String plotId, String shopId) {
+        String path = "market.plots." + plotId + ".shops." + shopId;
+        if (RegionData.get().contains(path)) {
+            RegionData.get().set(path, null);
+            RegionData.save();
+            DisplayUtils.getInstance().removeDisplayPair(plotId, shopId);
+        }
+    }
+
+
     public static int getShopStock(ChestShop shop) {
         Location loc = shop.getLocation();
         if (loc == null || loc.getBlock().getType() != Material.BARREL)

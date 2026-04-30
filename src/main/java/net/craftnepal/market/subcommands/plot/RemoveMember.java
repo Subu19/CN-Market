@@ -35,6 +35,11 @@ public class RemoveMember extends SubCommand {
         if (!(sender instanceof Player)) return;
         Player player = (Player) sender;
 
+        if (!player.hasPermission("market.plot.removemember")) {
+            SendMessage.sendPlayerMessage(player, "§cYou do not have permission to remove members.");
+            return;
+        }
+
         if (args.length < 2) {
             SendMessage.sendPlayerMessage(player, "§cUsage: /market removemember <player>");
             return;

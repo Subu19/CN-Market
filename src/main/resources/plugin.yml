@@ -61,28 +61,28 @@ permissions:
   # === PLAYER PERMISSIONS ===
   market.use:
     description: Use the market — teleport, browse, buy
-    default: true
+    default: false
   market.plot.claim:
     description: Claim a market plot
-    default: true
+    default: false
   market.plot.info:
     description: View plot info
-    default: true
+    default: false
   market.plot.teleport:
     description: Teleport to own plot
-    default: true
+    default: false
   market.plot.setspawn:
     description: Set your plot spawn
-    default: true
+    default: false
   market.plot.addmember:
     description: Add a trusted member to your plot
-    default: true
+    default: false
   market.plot.removemember:
     description: Remove a member from your plot
-    default: true
+    default: false
   market.back:
     description: Return to previous location from market
-    default: true
+    default: false
   market.shops:
     description: Browse the market shops GUI
-    default: true
+    default: false

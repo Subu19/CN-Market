@@ -39,6 +39,12 @@ public class Claim extends SubCommand {
     public void perform(CommandSender commandSender, String[] strings) {
         if(commandSender instanceof Player){
             Player player = (Player) commandSender;
+
+            if (!player.hasPermission("market.plot.claim")) {
+                SendMessage.sendPlayerMessage(player, "&cYou do not have permission to claim plots.");
+                return;
+            }
+
             Location location = player.getLocation();
             
             // Get the plot ID at the player's location (checks both manual and automatic plots)

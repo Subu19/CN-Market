@@ -35,6 +35,11 @@ public class AddMember extends SubCommand {
         if (!(sender instanceof Player)) return;
         Player player = (Player) sender;
 
+        if (!player.hasPermission("market.plot.addmember")) {
+            SendMessage.sendPlayerMessage(player, "§cYou do not have permission to add members.");
+            return;
+        }
+
         if (args.length < 2) {
             SendMessage.sendPlayerMessage(player, "§cUsage: /market addmember <player>");
             return;

@@ -94,6 +94,11 @@ public final class Market extends JavaPlugin {
                     (sender, subCommandList) -> {
                         if (sender instanceof org.bukkit.entity.Player) {
                             org.bukkit.entity.Player p = (org.bukkit.entity.Player) sender;
+                            if (!p.hasPermission("market.use")) {
+                                net.craftnepal.market.utils.SendMessage.sendPlayerMessage(p, "§cYou do not have permission to use the market.");
+                                return;
+                            }
+                            
                             org.bukkit.World marketWorld = Market.getPlugin().getMarketWorld();
                             if (marketWorld != null) {
                                 org.bukkit.Location location = marketWorld.getSpawnLocation();

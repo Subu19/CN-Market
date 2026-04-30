@@ -36,6 +36,12 @@ public class PlotSpawn extends SubCommand {
         }
 
         Player player = (Player) commandSender;
+
+        if (!player.hasPermission("market.plot.teleport")) {
+            net.craftnepal.market.utils.SendMessage.sendPlayerMessage(player, "&cYou do not have permission to teleport to plots.");
+            return;
+        }
+
         PlotUtils.teleportToOwnPlotSpawn(player);
     }
 

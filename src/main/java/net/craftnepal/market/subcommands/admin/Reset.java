@@ -32,16 +32,19 @@ public class Reset extends SubCommand {
 
     @Override
     public void perform(CommandSender sender, String[] args) {
-        if (!(sender instanceof Player)) return;
+        if (!(sender instanceof Player))
+            return;
         Player player = (Player) sender;
 
         if (!player.hasPermission("market.admin")) {
-            SendMessage.sendPlayerMessage(player, "§cYou don't have permission to use this command.");
+            SendMessage.sendPlayerMessage(player,
+                    "§cYou don't have permission to use this command.");
             return;
         }
 
         if (args.length < 2 || !args[1].equalsIgnoreCase("confirm")) {
-            SendMessage.sendPlayerMessage(player, "§c§lWARNING: This will delete the market world and ALL plot/shop data!");
+            SendMessage.sendPlayerMessage(player,
+                    "§c§lWARNING: This will delete the market world and ALL plot/shop data!");
             SendMessage.sendPlayerMessage(player, "§cTo proceed, type: §f/amarket reset confirm");
             return;
         }
@@ -57,37 +60,68 @@ public class Reset extends SubCommand {
         if (world != null) {
             // Teleport players out
             World overworld = Bukkit.getWorlds().get(0);
-            for (Player p : world.getPlayers()) {
-                p.teleport(overworld.getSpawnLocation());
-                SendMessage.sendPlayerMessage(p, "§cThe market world is being reset. You have been teleported to spawn.");
+            List<Player> worldPlayers = world.getPlayers();
+            if (!worldPlayers.isEmpty()) {
+                SendMessage.sendPlayerMessage(player,
+                        "§7Teleporting " + worldPlayers.size() + " players out of market...");
+                for (Player p : worldPlayers) {
+                    p.teleport(overworld.getSpawnLocation());
+                    SendMessage.sendPlayerMessage(p,
+                            "§cThe market world is being reset. You have been teleported to spawn.");
+                }
             }
-            
-            Bukkit.unloadWorld(world, false);
-            SendMessage.sendPlayerMessage(player, "§7Unloaded world '" + worldName + "'.");
         }
 
-        // 3. Delete world folder
-        File worldFolder = new File(Bukkit.getWorldContainer(), worldName);
-        if (worldFolder.exists()) {
-            deleteDirectory(worldFolder);
-            SendMessage.sendPlayerMessage(player, "§7Deleted world folder.");
-        }
+        SendMessage.sendPlayerMessage(player, "§eWaiting a moment for world to clear...");
 
-        // 4. Clear Data Files
-        RegionData.get().set("market", null);
-        RegionData.save();
-        
-        LocationData.get().set("market", null);
-        LocationData.save();
-        
-        SendMessage.sendPlayerMessage(player, "§7Cleared all region and location data.");
+        Bukkit.getScheduler().runTaskLater(Market.getPlugin(), () -> {
+            World worldToUnload = Bukkit.getWorld(worldName);
+            if (worldToUnload != null) {
+                boolean unloaded = Bukkit.unloadWorld(worldToUnload, false);
+                if (unloaded) {
+                    SendMessage.sendPlayerMessage(player,
+                            "§aSuccessfully unloaded world '" + worldName + "'.");
+                } else {
+                    SendMessage.sendPlayerMessage(player, "§cFailed to unload world '" + worldName
+                            + "'. It might be a primary world or in use.");
+                    // We shouldn't proceed to delete if it's still loaded
+                    return;
+                }
+            }
 
-        // 5. Update config
-        Market.getMainConfig().set("market-world.name", null);
-        Market.getPlugin().saveConfig();
-        
-        SendMessage.sendPlayerMessage(player, "§a§lMarket system reset successfully!");
-        SendMessage.sendPlayerMessage(player, "§eUse §f/market admin setup §eto start over.");
+            // 3. Delete world folder
+            File worldFolder = new File(Bukkit.getWorldContainer(), worldName);
+            if (worldFolder.exists()) {
+                SendMessage.sendPlayerMessage(player,
+                        "§7Deleting world folder: §f" + worldFolder.getName());
+                deleteDirectory(worldFolder);
+                if (worldFolder.exists()) {
+                    SendMessage.sendPlayerMessage(player,
+                            "§cFailed to fully delete world folder. Some files might be locked.");
+                } else {
+                    SendMessage.sendPlayerMessage(player, "§7Deleted world folder successfully.");
+                }
+            } else {
+                SendMessage.sendPlayerMessage(player,
+                        "§7World folder not found at: " + worldFolder.getAbsolutePath());
+            }
+
+            // 4. Clear Data Files
+            RegionData.get().set("market", null);
+            RegionData.save();
+
+            LocationData.get().set("market", null);
+            LocationData.save();
+
+            SendMessage.sendPlayerMessage(player, "§7Cleared all region and location data.");
+
+            // 5. Update config
+            Market.getMainConfig().set("market-world.name", null);
+            Market.getPlugin().saveConfig();
+
+            SendMessage.sendPlayerMessage(player, "§a§lMarket system reset successfully!");
+            SendMessage.sendPlayerMessage(player, "§eUse §f/market admin setup §eto start over.");
+        }, 20L); // 1 second delay
     }
 
     private void deleteDirectory(File path) {
@@ -98,11 +132,16 @@ public class Reset extends SubCommand {
                     if (file.isDirectory()) {
                         deleteDirectory(file);
                     } else {
-                        file.delete();
+                        if (!file.delete()) {
+                            Bukkit.getLogger()
+                                    .warning("Failed to delete file: " + file.getAbsolutePath());
+                        }
                     }
                 }
             }
-            path.delete();
+            if (!path.delete()) {
+                Bukkit.getLogger().warning("Failed to delete directory: " + path.getAbsolutePath());
+            }
         }
     }
 

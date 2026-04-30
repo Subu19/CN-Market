@@ -34,6 +34,11 @@ public class Info extends SubCommand {
         if (!(sender instanceof Player)) return;
         Player player = (Player) sender;
 
+        if (!player.hasPermission("market.plot.info")) {
+            SendMessage.sendPlayerMessage(player, "§cYou do not have permission to use this command.");
+            return;
+        }
+
         String plotId = PlotUtils.getPlotIdByLocation(player.getLocation());
 
         if (plotId == null) {

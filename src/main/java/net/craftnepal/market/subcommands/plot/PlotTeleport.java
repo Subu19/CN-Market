@@ -44,6 +44,12 @@ public class PlotTeleport extends SubCommand {
     public void perform(CommandSender commandSender, String[] strings) {
         if(commandSender instanceof Player){
             Player player = (Player) commandSender;
+
+            if (!player.hasPermission("market.plot.teleport")) {
+                SendMessage.sendPlayerMessage(player, "&cYou do not have permission to use this command.");
+                return;
+            }
+
             if (strings.length < 2) {
                 SendMessage.sendPlayerMessage(player, "&cUsage: /market visit <playername/plotID>");
                 return;

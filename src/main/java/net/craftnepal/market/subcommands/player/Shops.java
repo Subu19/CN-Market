@@ -40,6 +40,11 @@ public class Shops extends SubCommand {
 
         Player player = (Player) sender;
 
+        if (!player.hasPermission("market.shops")) {
+            net.craftnepal.market.utils.SendMessage.sendPlayerMessage(player, "§cYou do not have permission to use this command.");
+            return;
+        }
+
         try {
             MenuManager.openMenu(ShopMainMenu.class, player);
         } catch (MenuManagerException | MenuManagerNotSetupException e) {

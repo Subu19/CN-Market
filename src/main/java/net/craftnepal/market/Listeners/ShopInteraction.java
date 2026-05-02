@@ -12,6 +12,7 @@ import org.bukkit.block.Block;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
@@ -28,7 +29,7 @@ public class ShopInteraction implements Listener {
         this.displayUtils = DisplayUtils.getInstance();
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onChestInteraction(PlayerInteractEvent event) {
         Player player = event.getPlayer();
         UUID uuid = player.getUniqueId();
@@ -66,9 +67,12 @@ public class ShopInteraction implements Listener {
         // Members can also see their own shop stats (treated as co-owners)
         String owner = PlotUtils.getPlotOwner(plot);
         if (owner == null || !owner.equals(uuid.toString())) {
+            // Allow admins to create shops ONLY in the designated spawn plots
+            boolean isAdminInSpawn = player.hasPermission("market.admin") && PlotUtils.isSpawnPlot(plot);
+
             // check members
             java.util.List<String> members = RegionData.get().getStringList("market.plots." + plot + ".members");
-            if (!player.hasPermission("market.admin") && !members.contains(uuid.toString())) {
+            if (!isAdminInSpawn && !members.contains(uuid.toString())) {
                 SendMessage.sendPlayerMessage(player, "§cYou can only create shops in your own plot.");
                 event.setCancelled(true);
                 return;
@@ -115,7 +119,7 @@ public class ShopInteraction implements Listener {
     }
 
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onVisitorShopClick(PlayerInteractEvent event) {
         Player player = event.getPlayer();
 
@@ -172,7 +176,7 @@ public class ShopInteraction implements Listener {
         }
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onChestBreak(BlockBreakEvent event) {
         Block block = event.getBlock();
         Material blockType = block.getType();

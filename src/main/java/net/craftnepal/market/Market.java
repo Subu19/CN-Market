@@ -95,13 +95,20 @@ public final class Market extends JavaPlugin {
                         if (sender instanceof org.bukkit.entity.Player) {
                             org.bukkit.entity.Player p = (org.bukkit.entity.Player) sender;
                             if (!p.hasPermission("market.use")) {
-                                net.craftnepal.market.utils.SendMessage.sendPlayerMessage(p, "§cYou do not have permission to use the market.");
+                                net.craftnepal.market.utils.SendMessage.sendPlayerMessage(p,
+                                        "§cYou do not have permission to use the market.");
                                 return;
                             }
-                            
+
                             org.bukkit.World marketWorld = Market.getPlugin().getMarketWorld();
                             if (marketWorld != null) {
-                                org.bukkit.Location location = marketWorld.getSpawnLocation();
+                                org.bukkit.Location location =
+                                        net.craftnepal.market.files.RegionData.get()
+                                                .getLocation("market.spawn");
+                                if (location == null) {
+                                    location = marketWorld.getSpawnLocation();
+                                }
+
                                 if (!net.craftnepal.market.utils.MarketUtils
                                         .isInMarketArea(p.getLocation())) {
                                     net.craftnepal.market.utils.PlayerUtils.saveLastLocation(p);
@@ -166,7 +173,7 @@ public final class Market extends JavaPlugin {
         if (displayUtils != null) {
             displayUtils.clearAllDisplays();
         }
-        Bukkit.getLogger().info("Market is shutting down!");
+        Bukkit.getLogger().info("Market is shuttingggggggggggg down!");
     }
 
     public static Market getPlugin() {

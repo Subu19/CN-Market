@@ -78,6 +78,43 @@ public class DynamicPriceManager {
         }
     }
 
+    /**
+     * Returns the total dynamic price for an ItemStack that may carry enchantments.
+     * <p>
+     * The returned value is the sum of:
+     * <ul>
+     *   <li>The dynamic market price of the base item (fluctuates with supply/demand).</li>
+     *   <li>The static book price of every enchantment on the item at its level.</li>
+     * </ul>
+     * Enchanted books use the existing single-key path and are NOT double-counted.
+     */
+    public static double getDynamicPrice(org.bukkit.inventory.ItemStack item) {
+        if (item == null) return 0;
+
+        // Enchanted books already encode the enchant in their key — use the normal path.
+        if (item.getType() == org.bukkit.Material.ENCHANTED_BOOK) {
+            return getDynamicPrice(net.craftnepal.market.utils.ShopUtils.getItemKey(item));
+        }
+
+        // Use the full composite key (handles TIPPED_ARROW:SPEED, POTION:SPEED, etc.)
+        String baseKey = net.craftnepal.market.utils.ShopUtils.getItemKey(item);
+        double basePrice = getDynamicPrice(baseKey);
+        if (basePrice <= 0) return 0;
+
+        // Add static enchantment prices on top
+        org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
+        if (meta != null && meta.hasEnchants()) {
+            for (java.util.Map.Entry<org.bukkit.enchantments.Enchantment, Integer> entry
+                    : meta.getEnchants().entrySet()) {
+                String enchantName = entry.getKey().getKey().getKey().toUpperCase();
+                int level = entry.getValue();
+                basePrice += net.craftnepal.market.files.PriceData.getEnchantmentPrice(enchantName, level);
+            }
+        }
+
+        return basePrice;
+    }
+
     public static double getTrend(String itemKey) {
         if (dynamicPricesConfig.contains(itemKey + ".trend")) {
             return dynamicPricesConfig.getDouble(itemKey + ".trend");

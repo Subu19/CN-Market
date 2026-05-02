@@ -40,7 +40,7 @@ public class ShopCreateMenu extends Menu {
         this.itemToSell.setAmount(1);
 
         String itemKey = ShopUtils.getItemKey(itemToSell);
-        this.fairPrice = DynamicPriceManager.getDynamicPrice(itemKey);
+        this.fairPrice = DynamicPriceManager.getDynamicPrice(itemToSell);
         this.currentPrice = fairPrice;
         this.minPrice = fairPrice * 0.85;
         this.maxPrice = fairPrice * 1.50;
@@ -91,6 +91,24 @@ public class ShopCreateMenu extends Menu {
             lore.add("");
             lore.add(ChatColor.GRAY + "Market Fair Price: " + ChatColor.GOLD
                     + String.format("%.2f", fairPrice) + " " + trendStr);
+
+            // Show per-enchant price breakdown if the item has enchantments
+            org.bukkit.inventory.meta.ItemMeta realMeta = itemToSell.getItemMeta();
+            if (realMeta != null && realMeta.hasEnchants()) {
+                double baseOnly = net.craftnepal.market.managers.DynamicPriceManager.getDynamicPrice(itemKey);
+                lore.add(ChatColor.DARK_GRAY + "  Base item: " + ChatColor.GRAY + String.format("%.2f", baseOnly));
+                for (java.util.Map.Entry<org.bukkit.enchantments.Enchantment, Integer> entry
+                        : realMeta.getEnchants().entrySet()) {
+                    String enchantName = entry.getKey().getKey().getKey().toUpperCase();
+                    int enchantLevel = entry.getValue();
+                    int enchantPrice = net.craftnepal.market.files.PriceData.getEnchantmentPrice(enchantName, enchantLevel);
+                    String displayName = net.craftnepal.market.utils.ShopUtils.formatKey(enchantName)
+                            + " " + toRoman(enchantLevel);
+                    lore.add(ChatColor.DARK_GRAY + "  + " + displayName + ": "
+                            + ChatColor.GRAY + String.format("%.2f", (double) enchantPrice));
+                }
+            }
+
             lore.add(ChatColor.GRAY + "Allowed Range: " + ChatColor.RED
                     + String.format("%.2f", minPrice) + ChatColor.GRAY + " to " + ChatColor.GREEN
                     + String.format("%.2f", maxPrice));
@@ -200,5 +218,21 @@ public class ShopCreateMenu extends Menu {
             item.setItemMeta(meta);
         }
         return item;
+    }
+
+    private static String toRoman(int level) {
+        return switch (level) {
+            case 1 -> "I";
+            case 2 -> "II";
+            case 3 -> "III";
+            case 4 -> "IV";
+            case 5 -> "V";
+            case 6 -> "VI";
+            case 7 -> "VII";
+            case 8 -> "VIII";
+            case 9 -> "IX";
+            case 10 -> "X";
+            default -> String.valueOf(level);
+        };
     }
 }

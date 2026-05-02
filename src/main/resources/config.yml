@@ -22,3 +22,9 @@ market-world:
   # Maximum number of plots a player can claim.
   # You can also use permissions: market.plots.limit.<number> to override this.
   max-plots-per-player: 1
+
+  # Blocks that anyone can interact with anywhere in the market world
+  # (e.g. Ender Chests, Crafting Tables)
+  allowed-interact-blocks:
+    - ENDER_CHEST
+    - CRAFTING_TABLE

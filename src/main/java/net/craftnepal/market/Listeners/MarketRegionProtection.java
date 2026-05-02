@@ -92,6 +92,14 @@ public class MarketRegionProtection implements Listener {
 
         if (clickedBlock == null) return;
 
+        // Allow interacting with configurable global blocks (like Ender Chests) anywhere
+        if (e.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK) {
+            List<String> allowedBlocks = net.craftnepal.market.Market.getMainConfig().getStringList("market-world.allowed-interact-blocks");
+            if (allowedBlocks.contains(clickedBlock.getType().name())) {
+                return;
+            }
+        }
+
         // Always allow interacting with shop blocks (chest-shops, etc.)
         if (net.craftnepal.market.utils.ShopUtils.isShopLocation(clickedBlock.getLocation())) {
             return;

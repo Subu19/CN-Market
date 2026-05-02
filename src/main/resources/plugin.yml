@@ -22,6 +22,7 @@ permissions:
       market.admin.setup: true
       market.admin.forceupdate: true
       market.admin.reset: true
+      market.admin.adminmode: true
       market.use: true
 
   market.admin.bypass:
@@ -57,6 +58,9 @@ permissions:
   market.admin.reset:
     description: Reset the market world and all data
     default: op
+  market.admin.adminmode:
+    description: Toggle admin mode for infinite shops
+    default: op
 
   # === PLAYER PERMISSIONS ===
   market.use:
@@ -64,6 +68,9 @@ permissions:
     default: op
   market.plot.claim:
     description: Claim a market plot
+    default: op
+  market.plot.unclaim:
+    description: Unclaim your market plot
     default: op
   market.plot.info:
     description: View plot info

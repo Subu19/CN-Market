@@ -30,7 +30,7 @@ public class ShopBuyerMenu extends Menu {
 
     @Override
     public String getMenuName() {
-        return ChatColor.DARK_BLUE + "Buy Item";
+        return shop != null && shop.isBuyingShop() ? ChatColor.DARK_BLUE + "Sell Item" : ChatColor.DARK_BLUE + "Buy Item";
     }
 
     @Override
@@ -81,25 +81,39 @@ public class ShopBuyerMenu extends Menu {
             if (lore == null)
                 lore = new ArrayList<>();
             lore.add("");
-            lore.add(ChatColor.GRAY + "Price per item: " + ChatColor.GOLD
+            lore.add(ChatColor.GRAY + (shop.isBuyingShop() ? "Selling price: " : "Price per item: ") + ChatColor.GOLD
                     + EconomyUtils.format(shop.getPrice()) + " " + trendStr);
-            lore.add(ChatColor.GRAY + "Stock available: "
-                    + (stock > 0 ? ChatColor.GREEN : ChatColor.RED) + stock);
+            
+            if (shop.isBuyingShop()) {
+                if (!shop.isAdmin()) {
+                    double ownerBalance = EconomyUtils.getBalance(shop.getOwner());
+                    lore.add(ChatColor.GRAY + "Shop Funds: " + ChatColor.GREEN + EconomyUtils.format(ownerBalance));
+                }
+            } else {
+                lore.add(ChatColor.GRAY + "Stock available: "
+                        + (stock > 0 ? ChatColor.GREEN : ChatColor.RED) + stock);
+            }
+            
             lore.add("");
             lore.add(ChatColor.DARK_GRAY + "Owner: " + ChatColor.WHITE
-                    + org.bukkit.Bukkit.getOfflinePlayer(shop.getOwner()).getName());
+                    + (shop.isAdmin() ? "Server" : org.bukkit.Bukkit.getOfflinePlayer(shop.getOwner()).getName()));
 
             meta.setLore(lore);
             displayItem.setItemMeta(meta);
         }
         inventory.setItem(13, displayItem);
 
-        // Buying buttons
-        int stock = ShopUtils.getShopStock(shop);
-
-        inventory.setItem(29, makeBuyButton(1, stock));
-        inventory.setItem(31, makeBuyButton(16, stock));
-        inventory.setItem(33, makeBuyButton(64, stock));
+        // Buttons
+        if (shop.isBuyingShop()) {
+            inventory.setItem(29, makeSellButton(1));
+            inventory.setItem(31, makeSellButton(16));
+            inventory.setItem(33, makeSellButton(64));
+        } else {
+            int stock = ShopUtils.getShopStock(shop);
+            inventory.setItem(29, makeBuyButton(1, stock));
+            inventory.setItem(31, makeBuyButton(16, stock));
+            inventory.setItem(33, makeBuyButton(64, stock));
+        }
 
         // Close button
         inventory.setItem(40, makeItem(Material.DARK_OAK_DOOR, ChatColor.RED + "Close Menu"));
@@ -114,7 +128,17 @@ public class ShopBuyerMenu extends Menu {
                         : ChatColor.GRAY + "Status: " + ChatColor.RED + "Out of Stock";
 
         ItemStack item = makeItem(mat, title, "", priceLine, stockLine, "", ChatColor.YELLOW + "► Click to purchase");
-        item.setAmount(Math.max(1, amount)); // set stack size for visual flair
+        item.setAmount(Math.max(1, amount));
+        return item;
+    }
+
+    private ItemStack makeSellButton(int amount) {
+        Material mat = Material.GOLD_INGOT;
+        String title = ChatColor.GOLD + "" + ChatColor.BOLD + "Sell " + amount;
+        String priceLine = ChatColor.GRAY + "You receive: " + ChatColor.GOLD + EconomyUtils.format(shop.getPrice() * amount);
+        
+        ItemStack item = makeItem(mat, title, "", priceLine, "", ChatColor.YELLOW + "► Click to sell");
+        item.setAmount(Math.max(1, amount));
         return item;
     }
 
@@ -131,7 +155,10 @@ public class ShopBuyerMenu extends Menu {
         } else if (name.startsWith("Buy ")) {
             int amount = Integer.parseInt(name.split(" ")[1]);
             ShopUtils.processPurchase(playerMenuUtility.getOwner(), plotId, shopId, amount);
-            // Refresh menu to show new stock
+            setMenuItems();
+        } else if (name.startsWith("Sell ")) {
+            int amount = Integer.parseInt(name.split(" ")[1]);
+            ShopUtils.processPlayerSale(playerMenuUtility.getOwner(), plotId, shopId, amount);
             setMenuItems();
         }
     }

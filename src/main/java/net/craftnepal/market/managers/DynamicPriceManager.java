@@ -146,6 +146,8 @@ public class DynamicPriceManager {
         Map<String, Integer> totalStockMap = new HashMap<>();
         Map<String, ChestShop> allShops = ShopUtils.getAllShops();
         for (ChestShop shop : allShops.values()) {
+            if (shop.isAdmin()) continue; // Admin shops have infinite supply, ignore for market balance
+            
             String key = ShopUtils.getItemKey(shop);
             int stock = ShopUtils.getShopStock(shop);
             totalStockMap.put(key, totalStockMap.getOrDefault(key, 0) + stock);

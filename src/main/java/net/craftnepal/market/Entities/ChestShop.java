@@ -11,13 +11,21 @@ public class ChestShop {
     private ItemStack item;
     private UUID owner;
     private double price;
+    private boolean isAdmin;
+    private boolean isBuyingShop; // true if the shop BUYS items from players (Player sells to shop)
 
     public ChestShop(String id, Location location, ItemStack item, UUID owner, double price) {
+        this(id, location, item, owner, price, false, false);
+    }
+
+    public ChestShop(String id, Location location, ItemStack item, UUID owner, double price, boolean isAdmin, boolean isBuyingShop) {
         this.id = id;
         this.location = location;
         this.item = item;
         this.owner = owner;
         this.price = price;
+        this.isAdmin = isAdmin;
+        this.isBuyingShop = isBuyingShop;
     }
 
     // Getters and Setters
@@ -59,5 +67,21 @@ public class ChestShop {
 
     public void setPrice(double price) {
         this.price = price;
+    }
+
+    public boolean isAdmin() {
+        return isAdmin;
+    }
+
+    public void setAdmin(boolean admin) {
+        isAdmin = admin;
+    }
+
+    public boolean isBuyingShop() {
+        return isBuyingShop;
+    }
+
+    public void setBuyingShop(boolean buyingShop) {
+        isBuyingShop = buyingShop;
     }
 }

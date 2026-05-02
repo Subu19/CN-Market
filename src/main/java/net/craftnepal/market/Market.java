@@ -11,6 +11,8 @@ import net.craftnepal.market.world.MarketGenerator;
 import net.craftnepal.market.world.SchematicManager;
 import net.craftnepal.market.utils.DisplayUtils;
 import net.craftnepal.market.utils.EconomyUtils;
+import net.craftnepal.market.utils.SendMessage;
+import net.craftnepal.market.utils.TeleportUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.WorldCreator;
@@ -95,7 +97,7 @@ public final class Market extends JavaPlugin {
                         if (sender instanceof org.bukkit.entity.Player) {
                             org.bukkit.entity.Player p = (org.bukkit.entity.Player) sender;
                             if (!p.hasPermission("market.use")) {
-                                net.craftnepal.market.utils.SendMessage.sendPlayerMessage(p,
+                                SendMessage.sendPlayerMessage(p,
                                         "§cYou do not have permission to use the market.");
                                 return;
                             }
@@ -109,20 +111,22 @@ public final class Market extends JavaPlugin {
                                     location = marketWorld.getSpawnLocation();
                                 }
 
-                                if (!net.craftnepal.market.utils.MarketUtils
-                                        .isInMarketArea(p.getLocation())) {
-                                    net.craftnepal.market.utils.PlayerUtils.saveLastLocation(p);
-                                }
-                                p.teleport(location);
-                                p.playSound(location, org.bukkit.Sound.ENTITY_ENDERMAN_TELEPORT, 1,
-                                        1);
-                                // Enable flight on arrival if configured
-                                net.craftnepal.market.Listeners.Movement.checkAndToggle(p, true);
+                                org.bukkit.Location origin = p.getLocation();
+                                SendMessage.sendPlayerMessage(p, "&eTeleporting to the market in 5 seconds... don't move!");
+                                
+                                TeleportUtils.scheduleTeleport(p, location, () -> {
+                                    if (!net.craftnepal.market.utils.MarketUtils.isInMarketArea(origin)) {
+                                        net.craftnepal.market.utils.PlayerUtils.saveLastLocation(p, origin);
+                                    }
+                                    p.playSound(p.getLocation(), org.bukkit.Sound.ENTITY_ENDERMAN_TELEPORT, 1, 1);
+                                    // Enable flight on arrival if configured
+                                    net.craftnepal.market.Listeners.Movement.checkAndToggle(p, true);
+                                });
                             } else {
-                                net.craftnepal.market.utils.SendMessage.sendPlayerMessage(p,
+                                SendMessage.sendPlayerMessage(p,
                                         "§cThe market world has not been set up yet.");
                                 if (p.hasPermission("market.admin")) {
-                                    net.craftnepal.market.utils.SendMessage.sendPlayerMessage(p,
+                                    SendMessage.sendPlayerMessage(p,
                                             "§eAdmin: §7Use §f/market admin setup <world> <plotSize> <pathwayWidth> §7to initialize the market.");
                                 }
                             }

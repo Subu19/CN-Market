@@ -5,6 +5,7 @@ import me.kodysimpson.simpapi.menu.PlayerMenuUtility;
 import net.craftnepal.market.Entities.ChestShop;
 import net.craftnepal.market.Market;
 import net.craftnepal.market.files.RegionData;
+import net.craftnepal.market.managers.AdminModeManager;
 import net.craftnepal.market.managers.DynamicPriceManager;
 import net.craftnepal.market.utils.DisplayUtils;
 import net.craftnepal.market.utils.LocationUtils;
@@ -30,6 +31,8 @@ public class ShopCreateMenu extends Menu {
     private final double minPrice;
     private final double maxPrice;
     private final double fairPrice;
+    private boolean isBuyingShop = false; // Toggle between Shop Sells (false) and Shop Buys (true)
+    private final boolean isAdminShop;
 
     public ShopCreateMenu(PlayerMenuUtility playerMenuUtility, String plotId,
             Location chestLocation, ItemStack itemToSell) {
@@ -38,6 +41,7 @@ public class ShopCreateMenu extends Menu {
         this.chestLocation = chestLocation;
         this.itemToSell = itemToSell.clone();
         this.itemToSell.setAmount(1);
+        this.isAdminShop = AdminModeManager.isInAdminMode(playerMenuUtility.getOwner().getUniqueId());
 
         String itemKey = ShopUtils.getItemKey(itemToSell);
         this.fairPrice = DynamicPriceManager.getDynamicPrice(itemToSell);
@@ -48,7 +52,8 @@ public class ShopCreateMenu extends Menu {
 
     @Override
     public String getMenuName() {
-        return ChatColor.DARK_GREEN + "Create Shop";
+        String prefix = isAdminShop ? ChatColor.RED + "§l⭐ [Admin] " : "";
+        return prefix + ChatColor.DARK_GREEN + "Create Shop";
     }
 
     @Override
@@ -66,23 +71,31 @@ public class ShopCreateMenu extends Menu {
         inventory.clear();
 
         // Outer border
-        ItemStack outerBorder = makeItem(Material.GREEN_STAINED_GLASS_PANE, " ");
+        ItemStack outerBorder = makeItem(isAdminShop ? Material.RED_STAINED_GLASS_PANE : (isBuyingShop ? Material.LIGHT_BLUE_STAINED_GLASS_PANE : Material.GREEN_STAINED_GLASS_PANE), " ");
         for (int i : new int[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 17, 18, 26, 27, 35, 36, 37, 38, 39, 41, 42, 43, 44}) {
             inventory.setItem(i, outerBorder);
         }
 
         // Inner border
         ItemStack innerBorder = makeItem(Material.LIME_STAINED_GLASS_PANE, " ");
-        for (int i : new int[]{10, 11, 12, 14, 15, 16, 19, 25, 28, 29, 30, 32, 33, 34}) {
+        for (int i : new int[]{11, 12, 14, 15, 16, 19, 25, 28, 29, 30, 32, 33, 34}) {
             inventory.setItem(i, innerBorder);
         }
 
-        // Show item being sold
+        // Shop Type Toggle Button
+        ItemStack toggleButton = makeItem(isBuyingShop ? Material.HOPPER : Material.CHEST,
+                ChatColor.YELLOW + "" + ChatColor.BOLD + "Shop Type: " + (isBuyingShop ? ChatColor.AQUA + "BUYING" : ChatColor.GOLD + "SELLING"),
+                ChatColor.GRAY + "Currently: " + (isBuyingShop ? "You buy items from players" : "You sell items to players"),
+                "",
+                ChatColor.YELLOW + "► Click to toggle mode");
+        inventory.setItem(10, toggleButton);
+
+        // Show item being handled
         ItemStack displayItem = itemToSell.clone();
         ItemMeta meta = displayItem.getItemMeta();
         if (meta != null) {
             String itemName = ShopUtils.getShopDisplayName(itemToSell);
-            meta.setDisplayName(ChatColor.YELLOW + "" + ChatColor.BOLD + "Selling: " + itemName);
+            meta.setDisplayName(ChatColor.YELLOW + "" + ChatColor.BOLD + (isBuyingShop ? "Buying: " : "Selling: ") + itemName);
 
             String itemKey = ShopUtils.getItemKey(itemToSell);
             String trendStr = DynamicPriceManager.getTrendString(itemKey);
@@ -115,6 +128,11 @@ public class ShopCreateMenu extends Menu {
             lore.add("");
             lore.add(ChatColor.GRAY + "Your Set Price: " + ChatColor.AQUA + ChatColor.BOLD
                     + String.format("%.2f", currentPrice));
+            
+            if (isAdminShop) {
+                lore.add("");
+                lore.add(ChatColor.RED + "§l⭐ " + ChatColor.BOLD + "ADMIN SHOP - INFINITE STOCK");
+            }
 
             meta.setLore(lore);
             displayItem.setItemMeta(meta);
@@ -134,8 +152,10 @@ public class ShopCreateMenu extends Menu {
                 ChatColor.GRAY + "New price: " + String.format("%.2f", currentPrice * 1.10)));
 
         // Confirm / Cancel
-        inventory.setItem(31, makeItem(Material.EMERALD_BLOCK,
+        Material confirmMat = isAdminShop ? Material.NETHERITE_BLOCK : (isBuyingShop ? Material.DIAMOND_BLOCK : Material.EMERALD_BLOCK);
+        inventory.setItem(31, makeItem(confirmMat,
                 ChatColor.GREEN + "" + ChatColor.BOLD + "CONFIRM AND CREATE",
+                ChatColor.GRAY + "Type: " + (isBuyingShop ? ChatColor.AQUA + "BUYING" : ChatColor.GOLD + "SELLING"),
                 ChatColor.GRAY + "Price: " + ChatColor.GOLD + String.format("%.2f", currentPrice)));
 
         inventory.setItem(40, makeItem(Material.DARK_OAK_DOOR, ChatColor.RED + "Cancel"));
@@ -153,6 +173,9 @@ public class ShopCreateMenu extends Menu {
             playerMenuUtility.getOwner().closeInventory();
             net.craftnepal.market.utils.SendMessage.sendPlayerMessage(playerMenuUtility.getOwner(),
                     "§cShop creation cancelled.");
+        } else if (name.startsWith("Shop Type:")) {
+            isBuyingShop = !isBuyingShop;
+            setMenuItems();
         } else if (name.equals("-10%")) {
             adjustPrice(0.90);
         } else if (name.equals("-5%")) {
@@ -194,16 +217,22 @@ public class ShopCreateMenu extends Menu {
         RegionData.get().set(basePath + ".item", itemToSell.getType().toString());
         RegionData.get().set(basePath + ".owner", uuid.toString());
         RegionData.get().set(basePath + ".price", currentPrice);
+        RegionData.get().set(basePath + ".is_buying_shop", isBuyingShop);
+        
+        if (isAdminShop) {
+            RegionData.get().set(basePath + ".is_admin", true);
+        }
 
         RegionData.save();
 
         playerMenuUtility.getOwner().closeInventory();
         playerMenuUtility.getOwner()
-                .sendMessage(ChatColor.GREEN + "Shop created successfully with price: "
+                .sendMessage(ChatColor.GREEN + (isAdminShop ? "§l⭐ [Admin] " : "") + "Shop created successfully as a " 
+                        + (isBuyingShop ? "BUYING" : "SELLING") + " shop with price: "
                         + ChatColor.GOLD + String.format("%.2f", currentPrice));
 
         // Spawn display
-        ChestShop chestShop = new ChestShop(shopId, chestLocation, itemToSell, uuid, currentPrice);
+        ChestShop chestShop = new ChestShop(shopId, chestLocation, itemToSell, uuid, currentPrice, isAdminShop, isBuyingShop);
         DisplayUtils.getInstance().spawnDisplayPair(chestShop);
     }
 

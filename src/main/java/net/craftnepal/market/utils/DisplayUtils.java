@@ -176,13 +176,35 @@ public class DisplayUtils {
 
     /** Builds the display text without String.format for speed. */
     private String buildDisplayText(ChestShop shop) {
-        int stock = ShopUtils.getShopStock(shop);
-        String color = stock > 0 ? "§a" : "§c";
+        StringBuilder sb = new StringBuilder();
+
+        // 1. Admin Icon/Prefix
+        if (shop.isAdmin()) {
+            sb.append("§d§l⭐ "); // Star icon for admin shops
+        }
+
+        // 2. Name and Color based on type
+        if (shop.isBuyingShop()) {
+            sb.append("§b"); // Aqua for Buying shops
+        } else {
+            int stock = ShopUtils.getShopStock(shop);
+            sb.append(stock > 0 ? "§a" : "§c"); // Green/Red for Selling shops
+        }
+        sb.append(getDisplayName(shop)).append("\n");
+
+        // 3. Action Label and Price
+        if (shop.isBuyingShop()) {
+            sb.append("§bBuying at: §f");
+        } else {
+            sb.append("§6Selling at: §f");
+        }
+
         String itemKey = ShopUtils.getItemKey(shop);
         String trend = net.craftnepal.market.managers.DynamicPriceManager.getTrendString(itemKey);
-        // StringBuilder is faster than String.format in a hot update loop
-        return color + getDisplayName(shop) + "\n§6Price: §f$"
-                + String.format("%.2f", shop.getPrice()) + " " + trend;
+        
+        sb.append(EconomyUtils.format(shop.getPrice())).append(" ").append(trend);
+
+        return sb.toString();
     }
 
     private ItemStack buildDisplayItem(ChestShop shop) {

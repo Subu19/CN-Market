@@ -13,6 +13,7 @@ public class PlotCommand extends NestedCommand {
         registerSubCommand(new SetPlotSpawn());
         registerSubCommand(new AddMember());
         registerSubCommand(new RemoveMember());
+        registerSubCommand(new Unclaim());
         registerSubCommand(new Info());
     }
     

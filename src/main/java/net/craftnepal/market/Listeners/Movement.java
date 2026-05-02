@@ -17,8 +17,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class Movement implements Listener {
     private static final Map<UUID, Boolean> playersInMarket = new ConcurrentHashMap<>();
-    private static final Map<UUID, BukkitRunnable> pendingFlightDisables = new ConcurrentHashMap<>();
-    private static final int FLIGHT_DISABLE_WARNING_TIME = 5; // seconds
 
     private final Market plugin;
 
@@ -63,9 +61,6 @@ public class Movement implements Listener {
             handleExitMarket(player, uuid);
         }
     }    private void handleEnterMarket(Player player, UUID uuid) {
-        // Cancel any pending flight disable
-        cancelPendingFlightDisable(uuid);
-
         if (!player.getAllowFlight()) {
             player.setAllowFlight(true);
             playersInMarket.put(uuid, true);
@@ -75,32 +70,9 @@ public class Movement implements Listener {
 
     private void handleExitMarket(Player player, UUID uuid) {
         if (playersInMarket.containsKey(uuid) && player.getAllowFlight()) {
-            // If already has a pending disable, don't create another one
-            if (pendingFlightDisables.containsKey(uuid)) {
-                return;
-            }
-
-            SendMessage.sendPlayerMessage(player, "&eFlight will be disabled in " + FLIGHT_DISABLE_WARNING_TIME + " seconds!");            BukkitRunnable disableTask = new BukkitRunnable() {
-                @Override
-                public void run() {
-                    if (player.isOnline()) {
-                        player.setAllowFlight(false);
-                        playersInMarket.remove(uuid);
-                        SendMessage.sendPlayerMessage(player, "&cDisabled flying!");
-                    }
-                    pendingFlightDisables.remove(uuid);
-                }
-            };
-
-            disableTask.runTaskLater(plugin, FLIGHT_DISABLE_WARNING_TIME * 20L); // 20 ticks = 1 second
-            pendingFlightDisables.put(uuid, disableTask);
-        }
-    }
-
-    private void cancelPendingFlightDisable(UUID uuid) {
-        BukkitRunnable task = pendingFlightDisables.remove(uuid);
-        if (task != null) {
-            task.cancel();
+            player.setAllowFlight(false);
+            playersInMarket.remove(uuid);
+            SendMessage.sendPlayerMessage(player, "&cDisabled flying!");
         }
     }
 
@@ -111,7 +83,6 @@ public class Movement implements Listener {
 
             if (toggle) {
                 playersInMarket.put(player.getUniqueId(), true);
-                pendingFlightDisables.remove(player.getUniqueId());
             } else {
                 playersInMarket.remove(player.getUniqueId());
             }

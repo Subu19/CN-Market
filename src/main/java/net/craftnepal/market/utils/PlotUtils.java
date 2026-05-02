@@ -181,6 +181,37 @@ public class PlotUtils {
     }
 
 
+    public static boolean isSpawnPlot(String plotId) {
+        if (plotId == null || !plotId.startsWith("plot_")) return false;
+        try {
+            String[] parts = plotId.split("_");
+            if (parts.length != 3) return false;
+            int x = Integer.parseInt(parts[1]);
+            int z = Integer.parseInt(parts[2]);
+            int radius = Market.getMainConfig().getInt("market-world.spawn-radius", 1);
+            return x >= -radius && x < radius && z >= -radius && z < radius;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public static boolean isSpawnLocation(org.bukkit.Location location) {
+        org.bukkit.World marketWorld = Market.getPlugin().getMarketWorld();
+        if (marketWorld == null || !location.getWorld().equals(marketWorld)) {
+            return false;
+        }
+
+        org.bukkit.configuration.file.FileConfiguration config = Market.getMainConfig();
+        int plotSize = config.getInt("market-world.plot-size", 16);
+        int pathwayWidth = config.getInt("market-world.pathway-width", 3);
+        int totalSize = plotSize + pathwayWidth;
+        int halfPath = pathwayWidth / 2;
+        int spawnRadius = config.getInt("market-world.spawn-radius", 1);
+        int symmetricRadius = spawnRadius * totalSize - (pathwayWidth - halfPath);
+
+        return Math.abs(location.getBlockX()) <= symmetricRadius && Math.abs(location.getBlockZ()) <= symmetricRadius;
+    }
+
     public static boolean isPlotAvailable(String plotId) {
         return getPlotOwner(plotId) == null;
     }

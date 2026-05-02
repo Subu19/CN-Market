@@ -189,26 +189,34 @@ public class SchematicManager {
         int maxWorldX = minWorldX + 15;
         int maxWorldZ = minWorldZ + 15;
 
-        int nXStart = (int) Math.floor((double) (minWorldX + halfPath) / totalSize);
-        int nZStart = (int) Math.floor((double) (minWorldZ + halfPath) / totalSize);
-        int nXEnd = (int) Math.floor((double) (maxWorldX + halfPath) / totalSize);
-        int nZEnd = (int) Math.floor((double) (maxWorldZ + halfPath) / totalSize);
+        // Expand bounds slightly to ensure we don't miss any intersection centers
+        int nXStart = (minWorldX / totalSize) - 1;
+        int nZStart = (minWorldZ / totalSize) - 1;
+        int nXEnd = (maxWorldX / totalSize) + 1;
+        int nZEnd = (maxWorldZ / totalSize) + 1;
 
         boolean pastedAny = false;
         for (int nx = nXStart; nx <= nXEnd; nx++) {
-            int tileX = nx * totalSize - halfPath;
-            if (tileX < minWorldX || tileX > maxWorldX)
+            int pasteX = nx * totalSize;
+            if (pasteX < minWorldX || pasteX > maxWorldX)
                 continue;
 
             for (int nz = nZStart; nz <= nZEnd; nz++) {
-                int tileZ = nz * totalSize - halfPath;
-                if (tileZ < minWorldZ || tileZ > maxWorldZ)
+                int pasteZ = nz * totalSize;
+                if (pasteZ < minWorldZ || pasteZ > maxWorldZ)
                     continue;
 
+                // Skip ONLY the strictly internal pathway intersections
+                int spawnRadius = Market.getMainConfig().getInt("market-world.spawn-radius", 1);
+                int limit = spawnRadius - 1;
+                if (nx >= -limit && nx <= limit && nz >= -limit && nz <= limit) {
+                    continue;
+                }
+
                 int y = Market.getMainConfig().getInt("market-world.pathway-y-level", 65);
-                pasteSchematic(pending.world, tileX, y, tileZ);
+                pasteSchematic(pending.world, pasteX, y, pasteZ);
                 pastedAny = true;
-                Market.getPlugin().getLogger().info("[Market] Pasted tile at " + tileX + "," + tileZ
+                Market.getPlugin().getLogger().info("[Market] Pasted tile at " + pasteX + "," + pasteZ
                         + " for chunk " + pending.chunk.getX() + "," + pending.chunk.getZ());
             }
         }
@@ -230,6 +238,25 @@ public class SchematicManager {
                     com.sk89q.worldedit.WorldEdit.getInstance().newEditSessionBuilder().world(weWorld).build()) {
                 
                 editSession.setFastMode(true);
+
+                // Prevent the schematic arms from overwriting ANY blocks in the 3D spawn area column
+                int plotSize = Market.getMainConfig().getInt("market-world.plot-size", 16);
+                int pathwayWidth = Market.getMainConfig().getInt("market-world.pathway-width", 3);
+                int totalSize = plotSize + pathwayWidth;
+                int halfPath = pathwayWidth / 2;
+                int spawnRadiusConfig = Market.getMainConfig().getInt("market-world.spawn-radius", 1);
+                int symmetricRadius = spawnRadiusConfig * totalSize - (pathwayWidth - halfPath);
+
+                com.sk89q.worldedit.regions.CuboidRegion spawnRegion = new com.sk89q.worldedit.regions.CuboidRegion(
+                        weWorld,
+                        com.sk89q.worldedit.math.BlockVector3.at(-symmetricRadius, -100, -symmetricRadius),
+                        com.sk89q.worldedit.math.BlockVector3.at(symmetricRadius, 400, symmetricRadius)
+                );
+
+                com.sk89q.worldedit.function.mask.Mask spawnMask = com.sk89q.worldedit.function.mask.Masks.negate(
+                        new com.sk89q.worldedit.function.mask.RegionMask(spawnRegion)
+                );
+                editSession.setMask(spawnMask);
 
                 com.sk89q.worldedit.function.operation.Operation op =
                         new com.sk89q.worldedit.session.ClipboardHolder(cb).createPaste(editSession)

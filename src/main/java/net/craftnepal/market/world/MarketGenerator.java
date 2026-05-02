@@ -39,6 +39,7 @@ public class MarketGenerator extends ChunkGenerator {
     private final Material pathwayMaterial;
     private final Material borderMaterial;
     private final int totalSize;
+    private final int spawnRadius;
 
     public MarketGenerator() {
         FileConfiguration config = Market.getMainConfig();
@@ -48,6 +49,7 @@ public class MarketGenerator extends ChunkGenerator {
         this.pathwayMaterial = parseMaterial(config.getString("market-world.pathway-material"), Material.STONE_BRICKS);
         this.borderMaterial  = parseMaterial(config.getString("market-world.border-material"),  Material.SMOOTH_STONE_SLAB);
         this.totalSize = plotSize + pathwayWidth;
+        this.spawnRadius = config.getInt("market-world.spawn-radius", 1);
     }
 
     private static Material parseMaterial(String name, Material fallback) {
@@ -92,8 +94,17 @@ public class MarketGenerator extends ChunkGenerator {
                 boolean isPathwayZ = modZ < pathwayWidth;
                 boolean isPathway  = isPathwayX || isPathwayZ;
 
+                // A perfectly symmetric spawn area centered at (0,0) pathway intersection
+                // It covers all plots inside the radius and their internal pathways,
+                // but EXCLUDES the outer perimeter pathways so they can be generated normally.
+                int symmetricRadius = spawnRadius * totalSize - (pathwayWidth - halfPath);
+                boolean isSpawn = Math.abs(worldX) <= symmetricRadius && Math.abs(worldZ) <= symmetricRadius;
+
                 // ── Surface block ─────────────────────────────────────────
-                if (isPathway) {
+                if (isSpawn) {
+                    // Central plots reserved for server admins
+                    chunkData.setBlock(x, 64, z, Material.STONE);
+                } else if (isPathway) {
                     if (useSchematic) {
                         // Leave pathway surface as floor material so it looks neutral
                         // before the schematic is pasted by SchematicManager on ChunkLoad.

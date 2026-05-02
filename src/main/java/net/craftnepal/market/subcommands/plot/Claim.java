@@ -51,6 +51,12 @@ public class Claim extends SubCommand {
             String selectedPlot = PlotUtils.getPlotIdByLocation(location);
 
             if (selectedPlot != null) {
+                if (PlotUtils.isSpawnPlot(selectedPlot)) {
+                    SendMessage.sendPlayerMessage(player, "&cYou cannot claim plots in the spawn area.");
+                    player.playSound(location, Sound.ITEM_SHIELD_BREAK, 1, 1);
+                    return;
+                }
+
                 // If it's an automatic plot, register it if not already registered
                 if (selectedPlot.startsWith("plot_")) {
                     PlotUtils.registerAutomaticPlot(selectedPlot);

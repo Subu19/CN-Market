@@ -57,6 +57,10 @@ public class Reset extends SubCommand {
         // 2. Unload world
         String worldName = Market.getMainConfig().getString("market-world.name", "market");
         World world = Bukkit.getWorld(worldName);
+        
+        // Cache the world folder location before it gets unloaded
+        final File cachedWorldFolder = (world != null) ? world.getWorldFolder() : null;
+
         if (world != null) {
             // Teleport players out
             World overworld = Bukkit.getWorlds().get(0);
@@ -90,10 +94,23 @@ public class Reset extends SubCommand {
             }
 
             // 3. Delete world folder
-            File worldFolder = new File(Bukkit.getWorldContainer(), worldName);
+            File worldFolder = cachedWorldFolder;
+            if (worldFolder == null) {
+                // Fallback guessing if world wasn't loaded
+                File standardFolder = new File(Bukkit.getWorldContainer(), worldName);
+                File mainWorldFolder = Bukkit.getWorlds().get(0).getWorldFolder();
+                File paperFolder = new File(mainWorldFolder, "dimensions/minecraft/" + worldName);
+                
+                if (paperFolder.exists()) {
+                    worldFolder = paperFolder;
+                } else {
+                    worldFolder = standardFolder;
+                }
+            }
+
             if (worldFolder.exists()) {
                 SendMessage.sendPlayerMessage(player,
-                        "§7Deleting world folder: §f" + worldFolder.getName());
+                        "§7Deleting world folder: §f" + worldFolder.getPath());
                 deleteDirectory(worldFolder);
                 if (worldFolder.exists()) {
                     SendMessage.sendPlayerMessage(player,

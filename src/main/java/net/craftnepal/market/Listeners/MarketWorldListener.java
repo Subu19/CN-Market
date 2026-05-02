@@ -75,7 +75,10 @@ public class MarketWorldListener implements Listener {
 
         playerPlotCache.put(player.getUniqueId(), currentPlot);
 
-        if (currentPlot == null || currentPlot.isEmpty()) {
+        if (PlotUtils.isSpawnLocation(event.getTo())) {
+            player.spigot().sendMessage(net.md_5.bungee.api.ChatMessageType.ACTION_BAR,
+                    net.md_5.bungee.api.chat.TextComponent.fromLegacyText("§b§lMarket Spawn"));
+        } else if (currentPlot == null || currentPlot.isEmpty()) {
             player.spigot().sendMessage(net.md_5.bungee.api.ChatMessageType.ACTION_BAR,
                     net.md_5.bungee.api.chat.TextComponent.fromLegacyText("§7Market Pathway"));
         } else {

@@ -83,7 +83,6 @@ public class DisplayUtils {
 
         DisplayPair pair = new DisplayPair(itemDisplay, textDisplay, shopLoc);
         marketDisplays.computeIfAbsent(plotId, k -> new HashMap<>()).put(shop.getId(), pair);
-        Bukkit.getLogger().info("Created display for " + shop.getId());
         return pair;
     }
 
@@ -201,7 +200,7 @@ public class DisplayUtils {
 
         String itemKey = ShopUtils.getItemKey(shop);
         String trend = net.craftnepal.market.managers.DynamicPriceManager.getTrendString(itemKey);
-        
+
         sb.append(EconomyUtils.format(shop.getPrice())).append(" ").append(trend);
 
         return sb.toString();

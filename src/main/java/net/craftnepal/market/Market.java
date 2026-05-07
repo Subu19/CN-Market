@@ -163,8 +163,13 @@ public final class Market extends JavaPlugin {
         }
 
         if (marketWorld != null) {
-            // Ensure spawn is set correctly
-            marketWorld.setSpawnLocation(0, 65, 0);
+            // Ensure spawn is set correctly from saved data if available
+            org.bukkit.Location savedSpawn = RegionData.get().getLocation("market.spawn");
+            if (savedSpawn != null) {
+                marketWorld.setSpawnLocation(savedSpawn.getBlockX(), savedSpawn.getBlockY(), savedSpawn.getBlockZ());
+            } else {
+                marketWorld.setSpawnLocation(0, 65, 0);
+            }
         }
     }
 

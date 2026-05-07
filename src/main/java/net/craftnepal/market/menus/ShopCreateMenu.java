@@ -5,7 +5,6 @@ import me.kodysimpson.simpapi.menu.PlayerMenuUtility;
 import net.craftnepal.market.Entities.ChestShop;
 import net.craftnepal.market.Market;
 import net.craftnepal.market.files.RegionData;
-import net.craftnepal.market.managers.AdminModeManager;
 import net.craftnepal.market.managers.DynamicPriceManager;
 import net.craftnepal.market.utils.DisplayUtils;
 import net.craftnepal.market.utils.LocationUtils;
@@ -41,7 +40,7 @@ public class ShopCreateMenu extends Menu {
         this.chestLocation = chestLocation;
         this.itemToSell = itemToSell.clone();
         this.itemToSell.setAmount(1);
-        this.isAdminShop = AdminModeManager.isInAdminMode(playerMenuUtility.getOwner().getUniqueId());
+        this.isAdminShop = net.craftnepal.market.subcommands.admin.Bypass.bypassPlayers.containsKey(playerMenuUtility.getOwner().getUniqueId());
 
         String itemKey = ShopUtils.getItemKey(itemToSell);
         this.fairPrice = DynamicPriceManager.getDynamicPrice(itemToSell);

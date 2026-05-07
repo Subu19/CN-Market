@@ -39,49 +39,6 @@ public class MarketRegionProtection implements Listener {
         return MarketUtils.isInMarketArea(location);
     }
 
-    /**
-     * Core permission check for a player wanting to modify a block.
-     *
-     * Allow if:
-     *  - Player has bypass
-     *  - Location is outside the market world entirely
-     *  - Location is inside a plot the player owns or is a member of
-     *
-     * Deny (and optionally message the player) if:
-     *  - In market world but on a pathway / spawn area
-     *  - In market world but inside another player's plot
-     *  - In market world but above the configured max-height
-     */
-    private boolean isActionAllowed(Player player, Location location) {
-        if (Bypass.bypassPlayers.containsKey(player.getUniqueId())) {
-            return true;
-        }
-        if (!isMarketWorld(location)) {
-            return true;
-        }
-
-        // Max-height restriction
-        int maxHeight = net.craftnepal.market.Market.getMainConfig().getInt("market-world.max-height", 255);
-        if (location.getBlockY() > maxHeight) {
-            SendMessage.sendPlayerMessage(player, "&cYou cannot build above height " + maxHeight + "!");
-            return false;
-        }
-
-        // Must be inside own plot (or be a member)
-        String plot = PlotUtils.getPlotIdByLocation(location);
-        if (plot == null) {
-            // Pathway or spawn — no one builds here
-            return false;
-        }
-
-        String owner = PlotUtils.getPlotOwner(plot);
-        if (owner != null && owner.equals(player.getUniqueId().toString())) {
-            return true;
-        }
-        List<String> members = net.craftnepal.market.files.RegionData.get()
-                .getStringList("market.plots." + plot + ".members");
-        return members.contains(player.getUniqueId().toString());
-    }
 
     // ─── Direct Player Actions ────────────────────────────────────────────────
 
@@ -105,7 +62,7 @@ public class MarketRegionProtection implements Listener {
             return;
         }
 
-        if (!isActionAllowed(player, clickedBlock.getLocation())) {
+        if (!PlotUtils.canPlayerInteract(player, clickedBlock.getLocation())) {
             e.setCancelled(true);
             SendMessage.sendPlayerMessage(player, "&cYou are not allowed to interact here.");
         }
@@ -113,7 +70,7 @@ public class MarketRegionProtection implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onBlockBreak(BlockBreakEvent e) {
-        if (!isActionAllowed(e.getPlayer(), e.getBlock().getLocation())) {
+        if (!PlotUtils.canPlayerInteract(e.getPlayer(), e.getBlock().getLocation())) {
             e.setCancelled(true);
             SendMessage.sendPlayerMessage(e.getPlayer(), "&cYou are not allowed to build here.");
         }
@@ -121,7 +78,7 @@ public class MarketRegionProtection implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onBlockPlace(BlockPlaceEvent e) {
-        if (!isActionAllowed(e.getPlayer(), e.getBlock().getLocation())) {
+        if (!PlotUtils.canPlayerInteract(e.getPlayer(), e.getBlock().getLocation())) {
             e.setCancelled(true);
             SendMessage.sendPlayerMessage(e.getPlayer(), "&cYou are not allowed to build here.");
         }

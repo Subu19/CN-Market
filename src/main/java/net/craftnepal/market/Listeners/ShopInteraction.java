@@ -4,7 +4,6 @@ import me.kodysimpson.simpapi.exceptions.MenuManagerNotSetupException;
 import me.kodysimpson.simpapi.menu.MenuManager;
 import me.kodysimpson.simpapi.menu.PlayerMenuUtility;
 import net.craftnepal.market.Entities.ChestShop;
-import net.craftnepal.market.managers.AdminModeManager;
 import net.craftnepal.market.menus.ShopAdminMenu;
 import net.craftnepal.market.menus.ShopBuyerMenu;
 import net.craftnepal.market.menus.ShopCreateMenu;
@@ -74,13 +73,14 @@ public class ShopInteraction implements Listener {
 
         boolean isOwner = shop != null && shop.getOwner() != null && shop.getOwner().equals(uuid);
         boolean isAdmin  = player.hasPermission("market.admin");
+        boolean isBypass = net.craftnepal.market.subcommands.admin.Bypass.bypassPlayers.containsKey(uuid);
         boolean isRight  = event.getAction() == Action.RIGHT_CLICK_BLOCK;
         boolean isLeft   = event.getAction() == Action.LEFT_CLICK_BLOCK;
 
         // ── SHOP EXISTS ────────────────────────────────────────────────────────────
         if (shop != null) {
             if (isRight) {
-                if (isOwner || isAdmin) {
+                if (isOwner || isBypass) {
                     // Owner/Admin right-click → open the actual barrel inventory to restock.
                     // Do NOT cancel – Minecraft will open the barrel normally.
                     SendMessage.sendPlayerMessage(player, "&7Restocking your shop…");
@@ -94,7 +94,7 @@ public class ShopInteraction implements Listener {
             } else { // LEFT CLICK
                 // Always cancel left-click on a shop barrel to avoid block damage.
                 event.setCancelled(true);
-                if (isOwner || isAdmin) {
+                if (isOwner || isBypass) {
                     openGui(player, plotId, shop.getId(), true);
                 } else {
                     // Info message for non-owners.
@@ -107,10 +107,16 @@ public class ShopInteraction implements Listener {
 
         // ── EMPTY BARREL (NOT A SHOP) ──────────────────────────────────────────────
         if (isRight) {
-            // Let Minecraft open the barrel inventory normally.
-            SendMessage.sendPlayerMessage(player, "&7This barrel is not a shop. Left-click with an item to create one.");
-            event.setCancelled(false); // Ensure it's not cancelled
-            return; // Do NOT cancel.
+            if (PlotUtils.canPlayerInteract(player, block.getLocation())) {
+                // Let owner/member/admin open the barrel inventory normally.
+                SendMessage.sendPlayerMessage(player, "&7This barrel is not a shop. Left-click with an item to create one.");
+                event.setCancelled(false); // Ensure it's not cancelled for the owner
+            } else {
+                // Deny for everyone else
+                event.setCancelled(true);
+                SendMessage.sendPlayerMessage(player, "&cYou are not allowed to open barrels in this plot.");
+            }
+            return;
         }
 
         // LEFT CLICK on empty barrel → shop creation flow.
@@ -119,7 +125,7 @@ public class ShopInteraction implements Listener {
 
         String plotOwner = PlotUtils.getPlotOwner(plotId);
         boolean isPlotOwner   = plotOwner != null && plotOwner.equals(uuid.toString());
-        boolean isAdminInMode  = isAdmin && AdminModeManager.isInAdminMode(uuid);
+        boolean isAdminInMode  = isBypass;
         boolean isAdminInSpawn = isAdmin && PlotUtils.isSpawnPlot(plotId);
 
         if (isPlotOwner || isAdminInMode || isAdminInSpawn) {
@@ -162,10 +168,10 @@ public class ShopInteraction implements Listener {
         if (shop == null) return; // Not a registered shop barrel – leave alone.
 
         Player player = event.getPlayer();
-        boolean isAdmin = player.hasPermission("market.admin");
+        boolean isBypass = net.craftnepal.market.subcommands.admin.Bypass.bypassPlayers.containsKey(player.getUniqueId());
         boolean isOwner = shop.getOwner() != null && shop.getOwner().equals(player.getUniqueId());
 
-        if (!isOwner && !isAdmin) {
+        if (!isOwner && !isBypass) {
             event.setCancelled(true);
             SendMessage.sendPlayerMessage(player, "&cYou cannot break a shop you don't own.");
             return;

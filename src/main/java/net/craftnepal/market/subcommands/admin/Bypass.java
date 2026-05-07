@@ -44,9 +44,11 @@ public class Bypass extends SubCommand {
             if (bypassPlayers.containsKey(player.getUniqueId())) {
                 bypassPlayers.remove(player.getUniqueId());
                 SendMessage.sendPlayerMessage(player, "§aYou are no longer bypassing region restrictions.");
+                SendMessage.sendPlayerMessage(player, "§7Admin Shop mode §cDISABLED§7.");
             } else {
                 bypassPlayers.put(player.getUniqueId(), true);
                 SendMessage.sendPlayerMessage(player, "§aYou are now bypassing region restrictions.");
+                SendMessage.sendPlayerMessage(player, "§7Admin Shop mode §2ENABLED§7. Shops you create will be infinite.");
             }
         } else {
             Bukkit.getLogger().info("You aren't a player");

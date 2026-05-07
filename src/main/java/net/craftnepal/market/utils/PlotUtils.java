@@ -303,4 +303,41 @@ public class PlotUtils {
         });
         return true;
     }
+
+    /**
+     * Comprehensive check if a player can interact with or modify a block at a given location.
+     *
+     * @param player The player performing the action
+     * @param location The location being interacted with
+     * @return true if allowed, false if denied
+     */
+    public static boolean canPlayerInteract(Player player, Location location) {
+        if (net.craftnepal.market.subcommands.admin.Bypass.bypassPlayers.containsKey(player.getUniqueId())) {
+            return true;
+        }
+        if (!MarketUtils.isInMarketArea(location)) {
+            return true;
+        }
+
+        // Max-height restriction
+        int maxHeight = Market.getMainConfig().getInt("market-world.max-height", 255);
+        if (location.getBlockY() > maxHeight) {
+            return false;
+        }
+
+        // Must be inside own plot (or be a member)
+        String plot = getPlotIdByLocation(location);
+        if (plot == null) {
+            // Pathway or spawn — no one builds here
+            return false;
+        }
+
+        String owner = getPlotOwner(plot);
+        if (owner != null && owner.equals(player.getUniqueId().toString())) {
+            return true;
+        }
+
+        List<String> members = RegionData.get().getStringList("market.plots." + plot + ".members");
+        return members != null && members.contains(player.getUniqueId().toString());
+    }
 }

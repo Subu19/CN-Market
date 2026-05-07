@@ -28,7 +28,7 @@ public class DeletePlot extends SubCommand {
 
     @Override
     public String getSyntax() {
-        return "/amarket deleteplot <plot>";
+        return "/market admin deleteplot <plotId>";
     }
 
     @Override
@@ -36,17 +36,28 @@ public class DeletePlot extends SubCommand {
         if (commandSender instanceof Player) {
             Player player = (Player) commandSender;
             if (!player.hasPermission("market.admin")) {
-                SendMessage.sendPlayerMessage(player, "§cYou don't have permission to use this command.");
+                SendMessage.sendPlayerMessage(player, "&cYou do not have permission to use this command.");
                 return;
             }
             if (strings.length < 2) {
-                SendMessage.sendPlayerMessage(player, "§cUsage: /market admin deleteplot <plotId>");
+                SendMessage.sendPlayerMessage(player, "&cUsage: /market admin deleteplot <plotId>");
                 return;
             }
             String plot = strings[1];
             if (RegionData.get().get("market.plots." + plot) != null) {
-                PlotUtils.setPlotOwner(plot, null);
-                SendMessage.sendPlayerMessage(player, "§aDeleted plot: §b" + plot);
+                // Remove all shops in the plot
+                org.bukkit.configuration.ConfigurationSection shops = RegionData.get().getConfigurationSection("market.plots." + plot + ".shops");
+                if (shops != null) {
+                    for (String shopId : shops.getKeys(false)) {
+                        net.craftnepal.market.utils.ShopUtils.removeShop(plot, shopId);
+                    }
+                }
+
+                // Remove the entire plot data from config
+                RegionData.get().set("market.plots." + plot, null);
+                RegionData.save();
+
+                SendMessage.sendPlayerMessage(player, "&aDeleted plot: &b" + plot);
             } else {
                 SendMessage.sendPlayerMessage(player, "§cPlot not found: " + plot);
             }

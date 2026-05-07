@@ -26,7 +26,7 @@ public class SetOwner extends SubCommand {
 
     @Override
     public String getSyntax() {
-        return "/amarket setowner <plotId> <player>";
+        return "/market admin setowner <plotId> <player>";
     }
 
     @Override
@@ -35,12 +35,12 @@ public class SetOwner extends SubCommand {
         Player player = (Player) sender;
 
         if (!player.hasPermission("market.admin")) {
-            SendMessage.sendPlayerMessage(player, "§cYou don't have permission to use this command.");
+            SendMessage.sendPlayerMessage(player, "&cYou do not have permission to use this command.");
             return;
         }
 
         if (args.length < 3) {
-            SendMessage.sendPlayerMessage(player, "§cUsage: /amarket setowner <plotId> <player>");
+            SendMessage.sendPlayerMessage(player, "&cUsage: /market admin setowner <plotId> <player>");
             return;
         }
 

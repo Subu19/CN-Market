@@ -40,7 +40,8 @@ public class Unclaim extends SubCommand {
             Player player = (Player) commandSender;
 
             if (!player.hasPermission("market.plot.unclaim")) {
-                SendMessage.sendPlayerMessage(player, "&cYou do not have permission to unclaim plots.");
+                SendMessage.sendPlayerMessage(player,
+                        "&cYou do not have permission to unclaim plots.");
                 return;
             }
 
@@ -57,20 +58,20 @@ public class Unclaim extends SubCommand {
             }
 
             // Remove all shops in the plot
-            ConfigurationSection shops = RegionData.get().getConfigurationSection("market.plots." + plotId + ".shops");
+            org.bukkit.configuration.ConfigurationSection shops =
+                    RegionData.get().getConfigurationSection("market.plots." + plotId + ".shops");
             if (shops != null) {
                 for (String shopId : shops.getKeys(false)) {
-                    ShopUtils.removeShop(plotId, shopId);
+                    net.craftnepal.market.utils.ShopUtils.removeShop(plotId, shopId);
                 }
             }
 
-            // Remove members
-            RegionData.get().set("market.plots." + plotId + ".members", null);
-            
-            // Unset owner (this also saves and handles cleanup in PlotUtils)
-            PlotUtils.setPlotOwner(plotId, null);
+            // Remove the entire plot data from config
+            RegionData.get().set("market.plots." + plotId, null);
+            RegionData.save();
 
-            SendMessage.sendPlayerMessage(player, "&aYou have successfully unclaimed plot: " + plotId);
+            SendMessage.sendPlayerMessage(player,
+                    "&aYou have successfully unclaimed plot: " + plotId);
             player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1, 1);
 
         } else {

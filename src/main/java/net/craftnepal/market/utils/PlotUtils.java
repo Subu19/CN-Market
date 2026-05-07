@@ -256,7 +256,7 @@ public class PlotUtils {
         if (ownerUUID != null) {
             RegionData.get().set("market.plots." + plotId + ".owner", ownerUUID);
         } else {
-            // If unclaiming, remove all plot data
+            // If unclaiming, remove the owner node
             RegionData.get().set("market.plots." + plotId + ".owner", null);
         }
         RegionData.save();

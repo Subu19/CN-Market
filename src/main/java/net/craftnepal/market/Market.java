@@ -71,6 +71,7 @@ public final class Market extends JavaPlugin {
         getServer().getPluginManager()
                 .registerEvents(new net.craftnepal.market.Listeners.CommandTabFilter(), this);
         getServer().getPluginManager().registerEvents(new ShopProtectionListener(), this);
+        getServer().getPluginManager().registerEvents(new MenuCleanupListener(), this);
 
         // initialize schematic manager
         SchematicManager.getInstance().init();

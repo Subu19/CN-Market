@@ -1,9 +1,6 @@
 name: Build (PR Check)
 
 on:
-  push:
-    branches:
-      - '**'
   pull_request:
     branches:
       - main

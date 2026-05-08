@@ -479,7 +479,7 @@ public class ShopUtils {
 
         // Check if player has the items
         int playerHas = 0;
-        for (ItemStack item : player.getInventory().getContents()) {
+        for (ItemStack item : player.getInventory().getStorageContents()) {
             if (item != null && isMatchingItem(shop, item)) {
                 playerHas += item.getAmount();
             }

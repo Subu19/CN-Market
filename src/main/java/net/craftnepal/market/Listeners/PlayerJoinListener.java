@@ -1,0 +1,66 @@
+package net.craftnepal.market.Listeners;
+
+import net.craftnepal.market.Entities.ChestShop;
+import net.craftnepal.market.Market;
+import net.craftnepal.market.files.RegionData;
+import net.craftnepal.market.utils.EconomyUtils;
+import net.craftnepal.market.utils.SendMessage;
+import net.craftnepal.market.utils.ShopUtils;
+import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerJoinEvent;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+public class PlayerJoinListener implements Listener {
+
+    @EventHandler
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        Player player = event.getPlayer();
+        UUID uuid = player.getUniqueId();
+        
+        // Notify offline earnings
+        double offlineEarnings = RegionData.get().getDouble("market.players." + uuid.toString() + ".offline_earnings", 0.0);
+        if (offlineEarnings > 0) {
+            Bukkit.getScheduler().runTaskLater(Market.getPlugin(), () -> {
+                SendMessage.sendPlayerMessage(player, "§aWhile you were offline, your market shops earned you " + EconomyUtils.format(offlineEarnings) + "!");
+                // Clear offline earnings
+                RegionData.get().set("market.players." + uuid.toString() + ".offline_earnings", 0.0);
+                RegionData.save();
+            }, 60L); // 3 seconds after join
+        }
+
+        // Notify low stock
+        Bukkit.getScheduler().runTaskLaterAsynchronously(Market.getPlugin(), () -> {
+            Map<String, ChestShop> allShops = ShopUtils.getAllShops();
+            List<String> outOfStockItems = new ArrayList<>();
+            int emptyShops = 0;
+            
+            for (ChestShop shop : allShops.values()) {
+                if (shop.getOwner() != null && shop.getOwner().equals(uuid) && !shop.isAdmin() && !shop.isBuyingShop()) {
+                    int stock = ShopUtils.getShopStock(shop);
+                    if (stock == 0) {
+                        emptyShops++;
+                        String name = ShopUtils.getShopDisplayName(shop);
+                        if (!outOfStockItems.contains(name)) {
+                            outOfStockItems.add(name);
+                        }
+                    }
+                }
+            }
+            
+            if (emptyShops > 0) {
+                int finalEmptyShops = emptyShops;
+                Bukkit.getScheduler().runTaskLater(Market.getPlugin(), () -> {
+                    SendMessage.sendPlayerMessage(player, "§cYou have " + finalEmptyShops + " shop(s) out of stock! Items missing: " + String.join(", ", outOfStockItems));
+                    SendMessage.sendPlayerMessage(player, "§eUse §6/market manage §eto check your out of stock items.");
+                }, 100L); // 5 seconds after join
+            }
+        }, 40L);
+    }
+}

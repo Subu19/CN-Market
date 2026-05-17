@@ -65,33 +65,36 @@ public class DynamicPriceManager {
         if (basePrice == null || basePrice <= 0) return 0;
 
         if (dynamicPricesConfig.contains(itemKey + ".price")) {
-            double cachedPrice = dynamicPricesConfig.getDouble(itemKey + ".price");
-
-            // If the admin changed the base price, the cached dynamic price may now be
-            // completely out of range. Detect this by checking if the cached value is
-            // outside [0.1x, 5x] of the current base — if so, reset it to the new base.
-            double minSane = basePrice * 0.10;
-            double maxSane = basePrice * 5.0;
-            if (cachedPrice < minSane || cachedPrice > maxSane) {
+            // Check if the admin has changed the base price in price.yml since
+            // this entry was last seeded. We store the base that was used to seed
+            // the dynamic price as a ".base" field. If it differs from the current
+            // PriceData value, the admin edited price.yml — reset the dynamic price.
+            int storedBase = dynamicPricesConfig.getInt(itemKey + ".base", -1);
+            if (storedBase != basePrice) {
                 dynamicPricesConfig.set(itemKey + ".price", basePrice.doubleValue());
                 dynamicPricesConfig.set(itemKey + ".trend", 0.0);
+                dynamicPricesConfig.set(itemKey + ".base", basePrice);
                 saveDynamicPrices();
                 return basePrice.doubleValue();
             }
 
-            return cachedPrice;
+            return dynamicPricesConfig.getDouble(itemKey + ".price");
+
         } else if (dynamicPricesConfig.contains(itemKey)) {
             // Legacy support — migrate to new format
             double legacyPrice = dynamicPricesConfig.getDouble(itemKey);
             dynamicPricesConfig.set(itemKey, null);
             dynamicPricesConfig.set(itemKey + ".price", legacyPrice);
             dynamicPricesConfig.set(itemKey + ".trend", 0.0);
+            dynamicPricesConfig.set(itemKey + ".base", basePrice);
             saveDynamicPrices();
             return legacyPrice;
+
         } else {
             // First time we see this item — seed with base price
             dynamicPricesConfig.set(itemKey + ".price", basePrice.doubleValue());
             dynamicPricesConfig.set(itemKey + ".trend", 0.0);
+            dynamicPricesConfig.set(itemKey + ".base", basePrice);
             saveDynamicPrices();
             return basePrice.doubleValue();
         }

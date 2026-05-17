@@ -37,19 +37,17 @@ public class PlayerJoinListener implements Listener {
 
         // Notify low stock
         Bukkit.getScheduler().runTaskLater(Market.getPlugin(), () -> {
-            Map<String, ChestShop> allShops = ShopUtils.getAllShops();
+            List<ChestShop> playerShops = ShopUtils.getPlayerSellingShops(uuid);
             List<String> outOfStockItems = new ArrayList<>();
             int emptyShops = 0;
             
-            for (ChestShop shop : allShops.values()) {
-                if (shop.getOwner() != null && shop.getOwner().equals(uuid) && !shop.isAdmin() && !shop.isBuyingShop()) {
-                    int stock = ShopUtils.getShopStock(shop);
-                    if (stock == 0) {
-                        emptyShops++;
-                        String name = ShopUtils.getShopDisplayName(shop);
-                        if (!outOfStockItems.contains(name)) {
-                            outOfStockItems.add(name);
-                        }
+            for (ChestShop shop : playerShops) {
+                int stock = ShopUtils.getShopStock(shop);
+                if (stock == 0) {
+                    emptyShops++;
+                    String name = ShopUtils.getShopDisplayName(shop);
+                    if (!outOfStockItems.contains(name)) {
+                        outOfStockItems.add(name);
                     }
                 }
             }

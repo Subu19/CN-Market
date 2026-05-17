@@ -138,6 +138,40 @@ public class ShopUtils {
         return shops;
     }
 
+    public static List<ChestShop> getPlayerSellingShops(UUID ownerUUID) {
+        List<ChestShop> shops = new ArrayList<>();
+        ConfigurationSection plots = RegionData.get().getConfigurationSection("market.plots");
+
+        if (plots != null) {
+            String targetOwnerStr = ownerUUID.toString();
+            for (String plotId : plots.getKeys(false)) {
+                ConfigurationSection plotShops = plots.getConfigurationSection(plotId + ".shops");
+                if (plotShops != null) {
+                    for (String shopId : plotShops.getKeys(false)) {
+                        String path = "market.plots." + plotId + ".shops." + shopId;
+                        String ownerString = RegionData.get().getString(path + ".owner");
+                        
+                        if (targetOwnerStr.equals(ownerString)) {
+                            boolean isAdmin = RegionData.get().getBoolean(path + ".is_admin", false);
+                            boolean isBuyingShop = RegionData.get().getBoolean(path + ".is_buying_shop", false);
+                            if (!isBuyingShop && RegionData.get().contains(path + ".is_sell_shop")) {
+                                isBuyingShop = RegionData.get().getBoolean(path + ".is_sell_shop");
+                            }
+                            
+                            if (!isAdmin && !isBuyingShop) {
+                                ChestShop shop = createShopFromConfig(shopId, path);
+                                if (shop != null) {
+                                    shops.add(shop);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return shops;
+    }
+
     public static List<ChestShop> getPlotShopsByItemName(String plotId, String itemName) {
         List<ChestShop> matchingShops = new ArrayList<>();
         ConfigurationSection shops =

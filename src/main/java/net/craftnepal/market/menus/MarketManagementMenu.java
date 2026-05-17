@@ -11,6 +11,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -19,6 +20,7 @@ public class MarketManagementMenu extends Menu {
     private int currentPage = 0;
     private static final int ITEMS_PER_PAGE = 28;
     private List<ChestShop> outOfStockShops = new ArrayList<>();
+    private Map<Integer, ChestShop> slotToShopMap = new HashMap<>();
 
     public MarketManagementMenu(PlayerMenuUtility playerMenuUtility) {
         super(playerMenuUtility);
@@ -43,6 +45,7 @@ public class MarketManagementMenu extends Menu {
     public void setMenuItems() {
         inventory.clear();
         outOfStockShops.clear();
+        slotToShopMap.clear();
 
         // Get out of stock shops for this player
         Map<String, ChestShop> allShops = ShopUtils.getAllShops();
@@ -93,6 +96,7 @@ public class MarketManagementMenu extends Menu {
             item.setItemMeta(meta);
             
             inventory.setItem(slot, item);
+            slotToShopMap.put(slot, shop);
             slot++;
         }
 
@@ -117,6 +121,36 @@ public class MarketManagementMenu extends Menu {
         ItemStack clickedItem = event.getCurrentItem();
         if (clickedItem == null || !clickedItem.hasItemMeta()) return;
 
+        int slot = event.getSlot();
+        if (slotToShopMap.containsKey(slot)) {
+            ChestShop shop = slotToShopMap.get(slot);
+            String plotId = net.craftnepal.market.utils.PlotUtils.getPlotIdByLocation(shop.getLocation());
+            if (plotId != null) {
+                org.bukkit.entity.Player player = playerMenuUtility.getOwner();
+                org.bukkit.Location origin = player.getLocation();
+                org.bukkit.Location shopSpawn = net.craftnepal.market.utils.PlotUtils.getPlotSpawn(plotId);
+                org.bukkit.Location tpLoc = shopSpawn != null ? shopSpawn : net.craftnepal.market.utils.PlotUtils.getPlotCenter(plotId);
+                
+                if (tpLoc != null) {
+                    net.craftnepal.market.utils.SendMessage.sendPlayerMessage(player, "Teleporting to the shop in 5 seconds! Don't move..");
+                    player.closeInventory();
+                    
+                    net.craftnepal.market.utils.TeleportUtils.scheduleTeleport(player, tpLoc, () -> {
+                        if (!net.craftnepal.market.utils.MarketUtils.isInMarketArea(origin)) {
+                            net.craftnepal.market.utils.PlayerUtils.saveLastLocation(player, origin);
+                        }
+                        net.craftnepal.market.utils.SendMessage.sendPlayerMessage(player, "Teleported to your out-of-stock shop!");
+                        
+                        // Highlight the shop
+                        net.craftnepal.market.utils.RegionUtils.showVerticalParticleLine(player, shop.getLocation().clone().add(0, 2, 0), null, net.craftnepal.market.Market.getPlugin());
+                    });
+                }
+            } else {
+                net.craftnepal.market.utils.SendMessage.sendPlayerMessage(playerMenuUtility.getOwner(), "§cCould not find the plot for this shop.");
+            }
+            return;
+        }
+
         String displayName = ChatColor.stripColor(clickedItem.getItemMeta().getDisplayName());
 
         if (displayName.equals("Previous Page")) {
@@ -125,9 +159,6 @@ public class MarketManagementMenu extends Menu {
         } else if (displayName.equals("Next Page")) {
             currentPage++;
             setMenuItems();
-        } else if (displayName.startsWith("Out of Stock: ")) {
-            net.craftnepal.market.utils.SendMessage.sendPlayerMessage(playerMenuUtility.getOwner(), "§eThis item is out of stock in one of your shops! Teleport to your plot to restock.");
-            playerMenuUtility.getOwner().closeInventory();
         }
     }
 }

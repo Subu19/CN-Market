@@ -11,7 +11,6 @@ import net.craftnepal.market.managers.MarketWorldManager;
 import net.craftnepal.market.managers.StockNotificationManager;
 import net.craftnepal.market.subcommands.*;
 import net.craftnepal.market.subcommands.player.Back;
-import net.craftnepal.market.subcommands.player.Manage;
 import net.craftnepal.market.subcommands.player.Shops;
 import net.craftnepal.market.utils.DisplayUtils;
 import net.craftnepal.market.utils.EconomyUtils;
@@ -108,7 +107,7 @@ public final class Market extends JavaPlugin {
             CommandManager.createCoreCommand(this, "market", "Market Commands", "/market",
                     (sender, subCommandList) -> MarketCommandHandler.handle(sender),
                     PlotCommand.class, AdminCommand.class, Back.class, Shops.class,
-                    Manage.class, HelpCommand.class);
+                    HelpCommand.class);
         } catch (NoSuchFieldException | IllegalAccessException e) {
             throw new RuntimeException(e);
         }

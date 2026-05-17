@@ -1,4 +1,4 @@
-package net.craftnepal.market.subcommands.player;
+package net.craftnepal.market.subcommands.plot;
 
 import me.kodysimpson.simpapi.command.SubCommand;
 import me.kodysimpson.simpapi.exceptions.MenuManagerException;
@@ -28,7 +28,7 @@ public class Manage extends SubCommand {
 
     @Override
     public String getSyntax() {
-        return "/market manage";
+        return "/market plot manage";
     }
 
     @Override

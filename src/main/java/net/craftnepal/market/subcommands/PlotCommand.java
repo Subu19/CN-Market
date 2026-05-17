@@ -15,6 +15,7 @@ public class PlotCommand extends NestedCommand {
         registerSubCommand(new RemoveMember());
         registerSubCommand(new Unclaim());
         registerSubCommand(new Info());
+        registerSubCommand(new Manage());
     }
     
     @Override

@@ -463,7 +463,12 @@ public class ShopUtils {
             SendMessage.sendPlayerMessage(owner,
                     "§a" + player.getName() + " bought " + actualGiven + " " + itemDisplayName
                             + " from your shop for " + EconomyUtils.format(actualPrice) + ".");
+        } else if (!shop.isAdmin()) {
+            double currentOffline = RegionData.get().getDouble("market.players." + ownerUUID.toString() + ".offline_earnings", 0.0);
+            RegionData.get().set("market.players." + ownerUUID.toString() + ".offline_earnings", currentOffline + actualPrice);
+            RegionData.save();
         }
+        net.craftnepal.market.utils.TransactionLogUtils.log("BUY: " + player.getName() + " bought " + actualGiven + "x " + itemDisplayName + " from shop " + shopId + " (Owner: " + ownerUUID.toString() + ") for " + actualPrice);
 
         org.bukkit.Bukkit.getScheduler().runTask(net.craftnepal.market.Market.getPlugin(), () -> {
             DisplayUtils.getInstance().updateDisplay(shop);
@@ -527,6 +532,7 @@ public class ShopUtils {
         }
 
         SendMessage.sendPlayerMessage(player, "§aSuccessfully sold " + amount + " " + getShopDisplayName(shop) + " for " + EconomyUtils.format(totalPayout));
+        net.craftnepal.market.utils.TransactionLogUtils.log("SELL: " + player.getName() + " sold " + amount + "x " + getShopDisplayName(shop) + " to shop " + shopId + " (Owner: " + shop.getOwner().toString() + ") for " + totalPayout);
         
         org.bukkit.Bukkit.getScheduler().runTask(net.craftnepal.market.Market.getPlugin(), () -> {
             DisplayUtils.getInstance().updateDisplay(shop);

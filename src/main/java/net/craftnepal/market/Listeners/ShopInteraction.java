@@ -102,7 +102,7 @@ public class ShopInteraction implements Listener {
                 } else {
                     // Info message for non-owners.
                     String priceLabel = shop.isBuyingShop() ? "&eBuying for" : "&eSelling at";
-                    SendMessage.sendPlayerMessage(player, priceLabel + " &6" + shop.getPrice());
+                    SendMessage.sendPlayerMessage(player, priceLabel + " &6" + net.craftnepal.market.utils.EconomyUtils.format(shop.getPrice()));
                 }
             }
             return;

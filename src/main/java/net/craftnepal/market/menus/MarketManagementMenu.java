@@ -89,7 +89,7 @@ public class MarketManagementMenu extends Menu {
             meta.setDisplayName(ChatColor.RED + "Out of Stock: " + ShopUtils.getShopDisplayName(shop));
             
             List<String> lore = new ArrayList<>();
-            lore.add(ChatColor.GRAY + "Price: " + ChatColor.GOLD + shop.getPrice());
+            lore.add(ChatColor.GRAY + "Price: " + ChatColor.GOLD + net.craftnepal.market.utils.EconomyUtils.format(shop.getPrice()));
             lore.add("");
             lore.add(ChatColor.YELLOW + "Click to see location!");
             meta.setLore(lore);

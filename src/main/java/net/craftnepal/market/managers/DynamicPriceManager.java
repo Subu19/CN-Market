@@ -65,12 +65,31 @@ public class DynamicPriceManager {
         if (basePrice == null || basePrice <= 0) return 0;
 
         if (dynamicPricesConfig.contains(itemKey + ".price")) {
-            return dynamicPricesConfig.getDouble(itemKey + ".price");
+            double cachedPrice = dynamicPricesConfig.getDouble(itemKey + ".price");
+
+            // If the admin changed the base price, the cached dynamic price may now be
+            // completely out of range. Detect this by checking if the cached value is
+            // outside [0.1x, 5x] of the current base — if so, reset it to the new base.
+            double minSane = basePrice * 0.10;
+            double maxSane = basePrice * 5.0;
+            if (cachedPrice < minSane || cachedPrice > maxSane) {
+                dynamicPricesConfig.set(itemKey + ".price", basePrice.doubleValue());
+                dynamicPricesConfig.set(itemKey + ".trend", 0.0);
+                saveDynamicPrices();
+                return basePrice.doubleValue();
+            }
+
+            return cachedPrice;
         } else if (dynamicPricesConfig.contains(itemKey)) {
-            // Legacy support
-            return dynamicPricesConfig.getDouble(itemKey);
+            // Legacy support — migrate to new format
+            double legacyPrice = dynamicPricesConfig.getDouble(itemKey);
+            dynamicPricesConfig.set(itemKey, null);
+            dynamicPricesConfig.set(itemKey + ".price", legacyPrice);
+            dynamicPricesConfig.set(itemKey + ".trend", 0.0);
+            saveDynamicPrices();
+            return legacyPrice;
         } else {
-            // Initialize dynamic price to base price
+            // First time we see this item — seed with base price
             dynamicPricesConfig.set(itemKey + ".price", basePrice.doubleValue());
             dynamicPricesConfig.set(itemKey + ".trend", 0.0);
             saveDynamicPrices();
@@ -265,6 +284,19 @@ public class DynamicPriceManager {
             metricsConfig.save(metricsFile);
         } catch (IOException e) {
             Bukkit.getLogger().severe("Could not save market_metrics.yml");
+        }
+    }
+
+    /**
+     * Reloads both dynamic_prices.yml and market_metrics.yml from disk.
+     * Call this after an admin manually edits either file.
+     */
+    public static void reload() {
+        if (dynamicPricesFile != null) {
+            dynamicPricesConfig = YamlConfiguration.loadConfiguration(dynamicPricesFile);
+        }
+        if (metricsFile != null) {
+            metricsConfig = YamlConfiguration.loadConfiguration(metricsFile);
         }
     }
 }

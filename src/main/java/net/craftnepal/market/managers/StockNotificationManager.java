@@ -21,7 +21,7 @@ public class StockNotificationManager {
     private static final long CHECK_INTERVAL_TICKS = 18000L; // 15 minutes
 
     public static void startPeriodicChecks() {
-        Bukkit.getScheduler().runTaskTimerAsynchronously(Market.getPlugin(),
+        Bukkit.getScheduler().runTaskTimer(Market.getPlugin(),
                 StockNotificationManager::checkAndNotifyOnlinePlayers,
                 CHECK_INTERVAL_TICKS,
                 CHECK_INTERVAL_TICKS);
@@ -53,15 +53,11 @@ public class StockNotificationManager {
             }
 
             if (emptyShops > 0) {
-                int finalCount = emptyShops;
-                List<String> finalItems = outOfStockItems;
-                Bukkit.getScheduler().runTask(Market.getPlugin(), () -> {
-                    SendMessage.sendPlayerMessage(player,
-                            "§c[Reminder] You have " + finalCount + " shop(s) out of stock! Missing: "
-                                    + String.join(", ", finalItems));
-                    SendMessage.sendPlayerMessage(player,
-                            "§eUse §6/market manage §eto view your out of stock items.");
-                });
+                SendMessage.sendPlayerMessage(player,
+                        "§c[Reminder] You have " + emptyShops + " shop(s) out of stock! Missing: "
+                                + String.join(", ", outOfStockItems));
+                SendMessage.sendPlayerMessage(player,
+                        "§eUse §6/market plot manage §eto view your out of stock items.");
             }
         }
     }

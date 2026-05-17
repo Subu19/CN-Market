@@ -18,13 +18,16 @@ import java.util.UUID;
  */
 public class StockNotificationManager {
 
-    private static final long CHECK_INTERVAL_TICKS = 18000L; // 15 minutes
-
     public static void startPeriodicChecks() {
+        long intervalMinutes = Market.getMainConfig().getLong("notification_interval_minutes", 15L);
+        if (intervalMinutes <= 0) return; // Feature disabled
+
+        long intervalTicks = intervalMinutes * 60L * 20L;
+
         Bukkit.getScheduler().runTaskTimer(Market.getPlugin(),
                 StockNotificationManager::checkAndNotifyOnlinePlayers,
-                CHECK_INTERVAL_TICKS,
-                CHECK_INTERVAL_TICKS);
+                intervalTicks,
+                intervalTicks);
     }
 
     /**

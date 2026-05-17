@@ -70,7 +70,12 @@ public class DynamicPriceManager {
             // the dynamic price as a ".base" field. If it differs from the current
             // PriceData value, the admin edited price.yml — reset the dynamic price.
             int storedBase = dynamicPricesConfig.getInt(itemKey + ".base", -1);
-            if (storedBase != basePrice) {
+            if (storedBase == -1) {
+                // Migration: Existing config has .price but no .base. 
+                // Set .base to current basePrice to track future changes, but do NOT reset the economy.
+                dynamicPricesConfig.set(itemKey + ".base", basePrice);
+                saveDynamicPrices();
+            } else if (storedBase != basePrice) {
                 dynamicPricesConfig.set(itemKey + ".price", basePrice.doubleValue());
                 dynamicPricesConfig.set(itemKey + ".trend", 0.0);
                 dynamicPricesConfig.set(itemKey + ".base", basePrice);

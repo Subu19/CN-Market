@@ -2,6 +2,9 @@
 prefix: "&2&l[&a&lMarket&2&l] &a"
 join-message: "&eHello there! %player%"
 
+# How often (in minutes) to remind online players about empty shops. Set to 0 to disable.
+notification_interval_minutes: 15
+
 # Allow players to fly within the market world
 allow-flight: true
 

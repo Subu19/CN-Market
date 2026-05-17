@@ -35,5 +35,30 @@ public class PlayerJoinListener implements Listener {
             }, 60L); // 3 seconds after join
         }
 
+        // Notify low stock
+        Bukkit.getScheduler().runTaskLater(Market.getPlugin(), () -> {
+            Map<String, ChestShop> allShops = ShopUtils.getAllShops();
+            List<String> outOfStockItems = new ArrayList<>();
+            int emptyShops = 0;
+            
+            for (ChestShop shop : allShops.values()) {
+                if (shop.getOwner() != null && shop.getOwner().equals(uuid) && !shop.isAdmin() && !shop.isBuyingShop()) {
+                    int stock = ShopUtils.getShopStock(shop);
+                    if (stock == 0) {
+                        emptyShops++;
+                        String name = ShopUtils.getShopDisplayName(shop);
+                        if (!outOfStockItems.contains(name)) {
+                            outOfStockItems.add(name);
+                        }
+                    }
+                }
+            }
+            
+            if (emptyShops > 0) {
+                SendMessage.sendPlayerMessage(player, "§cYou have " + emptyShops + " shop(s) out of stock! Items missing: " + String.join(", ", outOfStockItems));
+                SendMessage.sendPlayerMessage(player, "§eUse §6/market plot manage §eto check your out of stock items.");
+            }
+        }, 100L);
+
     }
 }

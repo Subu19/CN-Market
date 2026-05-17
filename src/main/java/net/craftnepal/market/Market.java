@@ -8,7 +8,7 @@ import net.craftnepal.market.files.RegionData;
 import net.craftnepal.market.handlers.MarketCommandHandler;
 import net.craftnepal.market.managers.DynamicPriceManager;
 import net.craftnepal.market.managers.MarketWorldManager;
-import net.craftnepal.market.managers.StockNotificationManager;
+
 import net.craftnepal.market.subcommands.*;
 import net.craftnepal.market.subcommands.player.Back;
 import net.craftnepal.market.subcommands.player.Shops;
@@ -57,7 +57,7 @@ public final class Market extends JavaPlugin {
             if (getMarketWorld() != null) displayUtils.spawnMarketDisplays();
         }, 20L);
 
-        StockNotificationManager.startPeriodicChecks();
+
 
         Bukkit.getLogger().info("Market was loaded successfully!");
     }

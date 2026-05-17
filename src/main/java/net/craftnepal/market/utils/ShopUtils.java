@@ -463,6 +463,9 @@ public class ShopUtils {
             SendMessage.sendPlayerMessage(owner,
                     "§a" + player.getName() + " bought " + actualGiven + " " + itemDisplayName
                             + " from your shop for " + EconomyUtils.format(actualPrice) + ".");
+            if (!shop.isAdmin() && getShopStock(shop) == 0) {
+                SendMessage.sendPlayerMessage(owner, "§c[Reminder] Your shop selling " + itemDisplayName + " is now out of stock!");
+            }
         } else if (!shop.isAdmin()) {
             double currentOffline = RegionData.get().getDouble("market.players." + ownerUUID.toString() + ".offline_earnings", 0.0);
             RegionData.get().set("market.players." + ownerUUID.toString() + ".offline_earnings", currentOffline + actualPrice);

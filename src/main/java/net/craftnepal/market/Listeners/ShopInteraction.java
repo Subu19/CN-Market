@@ -71,9 +71,12 @@ public class ShopInteraction implements Listener {
 
         ChestShop shop = ShopUtils.getShopAt(block.getLocation());
 
-        boolean isOwner = shop != null && shop.getOwner() != null && shop.getOwner().equals(uuid);
         boolean isAdmin  = player.hasPermission("market.admin");
         boolean isBypass = net.craftnepal.market.subcommands.admin.Bypass.bypassPlayers.containsKey(uuid);
+        boolean isOwner = shop != null && shop.getOwner() != null && shop.getOwner().equals(uuid);
+        if (shop != null && shop.isAdmin() && !isBypass) {
+            isOwner = false;
+        }
         boolean isRight  = event.getAction() == Action.RIGHT_CLICK_BLOCK;
         boolean isLeft   = event.getAction() == Action.LEFT_CLICK_BLOCK;
 
@@ -170,6 +173,10 @@ public class ShopInteraction implements Listener {
         Player player = event.getPlayer();
         boolean isBypass = net.craftnepal.market.subcommands.admin.Bypass.bypassPlayers.containsKey(player.getUniqueId());
         boolean isOwner = shop.getOwner() != null && shop.getOwner().equals(player.getUniqueId());
+        
+        if (shop.isAdmin() && !isBypass) {
+            isOwner = false;
+        }
 
         if (!isOwner && !isBypass) {
             event.setCancelled(true);

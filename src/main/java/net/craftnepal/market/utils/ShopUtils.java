@@ -294,9 +294,9 @@ public class ShopUtils {
             EconomyUtils.deposit(player.getUniqueId(), actualPrice);
         }
 
-        // STEP 4: Update SQLite Database Stock Cache
+        // STEP 4: Update SQLite Database Stock Cache (arithmetic — no chunk load needed)
         if (!shop.isAdmin()) {
-            int newStock = getPhysicalBarrelStock(shop);
+            int newStock = Math.max(0, stock - actualGiven);
             DatabaseManager.updateShopStock(shop.getId(), newStock);
         }
 
@@ -370,9 +370,9 @@ public class ShopUtils {
                 Barrel barrel = (Barrel) loc.getBlock().getState();
                 barrel.getInventory().addItem(toRemove);
                 
-                // Update SQLite database stock cache
-                int newStock = getPhysicalBarrelStock(shop);
-                DatabaseManager.updateShopStock(shop.getId(), newStock);
+                // Update SQLite database stock cache (arithmetic — no chunk load needed)
+                int currentStock = getShopStock(shop);
+                DatabaseManager.updateShopStock(shop.getId(), currentStock + amount);
             }
         }
 

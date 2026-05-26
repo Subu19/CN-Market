@@ -137,6 +137,12 @@ public class ShopInteraction implements Listener {
                 SendMessage.sendPlayerMessage(player, "&cHold the item you want to sell/buy, then left-click the barrel.");
                 return;
             }
+
+            // Check if the item is blacklisted for player shops
+            if (!isBypass && ShopUtils.isItemBlacklisted(held.getType())) {
+                SendMessage.sendPlayerMessage(player, "&cThis item is blacklisted and cannot be traded in player shops.");
+                return;
+            }
             
             try {
                 PlayerMenuUtility pmu = MenuManager.getPlayerMenuUtility(player);

@@ -152,6 +152,19 @@ public class ShopUtils {
         DatabaseManager.updateShopStock(shop.getId(), physicalStock);
     }
 
+    public static boolean isItemBlacklisted(Material material) {
+        if (material == null) return false;
+        List<String> blacklist = Market.getMainConfig().getStringList("player-shop-blacklist");
+        if (blacklist == null) return false;
+        String matName = material.name();
+        for (String item : blacklist) {
+            if (item.equalsIgnoreCase(matName)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static boolean isMatchingItem(ChestShop shop, ItemStack item) {
         if (item == null) return false;
         return item.isSimilar(shop.getItem());
@@ -161,6 +174,11 @@ public class ShopUtils {
         ChestShop shop = DatabaseManager.getShop(shopId);
         if (shop == null) {
             SendMessage.sendPlayerMessage(player, "§cThis shop no longer exists.");
+            return;
+        }
+
+        if (!shop.isAdmin() && isItemBlacklisted(shop.getItem().getType())) {
+            SendMessage.sendPlayerMessage(player, "§cThis item is blacklisted and transactions for it are disabled.");
             return;
         }
 
@@ -304,6 +322,8 @@ public class ShopUtils {
         String itemKey = getItemKey(shop);
         if (!shop.isAdmin()) {
             DynamicPriceManager.recordPurchase(itemKey, actualGiven);
+        } else {
+            DynamicPriceManager.recordAdminPurchase(itemKey, actualGiven);
         }
         
         String itemDisplayName = getShopDisplayName(shop);
@@ -337,6 +357,11 @@ public class ShopUtils {
     public static void processPlayerSale(Player player, String plotId, String shopId, int amount) {
         ChestShop shop = DatabaseManager.getShop(shopId);
         if (shop == null || !shop.isBuyingShop()) return;
+
+        if (!shop.isAdmin() && isItemBlacklisted(shop.getItem().getType())) {
+            SendMessage.sendPlayerMessage(player, "§cThis item is blacklisted and transactions for it are disabled.");
+            return;
+        }
 
         double pricePerItem = shop.getPrice();
         double totalPayout = pricePerItem * amount;
@@ -386,6 +411,10 @@ public class ShopUtils {
                 SendMessage.sendPlayerMessage(player, "§cTransaction failed.");
                 return;
             }
+        }
+
+        if (shop.isAdmin()) {
+            DynamicPriceManager.recordAdminSale(getItemKey(shop), amount);
         }
 
         SendMessage.sendPlayerMessage(player, "§aSuccessfully sold " + amount + " " + getShopDisplayName(shop) + " for " + EconomyUtils.format(totalPayout));

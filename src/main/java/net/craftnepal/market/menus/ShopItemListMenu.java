@@ -24,7 +24,7 @@ public class ShopItemListMenu extends Menu {
         super(playerMenuUtility);
         this.plotId = plotId;
         this.itemCounts = ShopUtils.getAllShopItemKeysAndCountsByPlotID(plotId);
-        
+
         // Populate representative shops
         Map<String, ChestShop> allShops = ShopUtils.getAllShops();
         for (ChestShop shop : allShops.values()) {
@@ -82,10 +82,8 @@ public class ShopItemListMenu extends Menu {
             ItemStack itemStack = new ItemStack(representative.getItem());
             ItemMeta meta = itemStack.getItemMeta();
             meta.setDisplayName(ChatColor.YELLOW + ShopUtils.getShopDisplayName(representative));
-            meta.setLore(Arrays.asList(
-                    ChatColor.GRAY + "In Stock: " + ChatColor.GREEN + count,
-                    ChatColor.DARK_GRAY + "Click to teleport to shop"
-            ));
+            meta.setLore(Arrays.asList(ChatColor.GRAY + "In Stock: " + ChatColor.GREEN + count,
+                    ChatColor.DARK_GRAY + "Click to teleport to shop"));
             itemStack.setItemMeta(meta);
 
             inventory.addItem(itemStack);
@@ -103,8 +101,7 @@ public class ShopItemListMenu extends Menu {
         }
 
         // Add page info
-        ItemStack pageInfo = makeItem(Material.BOOK,
-                ChatColor.YELLOW + "Page Info",
+        ItemStack pageInfo = makeItem(Material.BOOK, ChatColor.YELLOW + "Page Info",
                 ChatColor.GRAY + "Current: " + ChatColor.YELLOW + (currentPage + 1),
                 ChatColor.GRAY + "Total: " + ChatColor.YELLOW + totalPages);
         inventory.setItem(49, pageInfo);
@@ -117,39 +114,38 @@ public class ShopItemListMenu extends Menu {
     @Override
     public void handleMenu(InventoryClickEvent event) {
         ItemStack clickedItem = event.getCurrentItem();
-        if (clickedItem == null || !clickedItem.hasItemMeta()) return;
+        if (clickedItem == null || !clickedItem.hasItemMeta())
+            return;
 
         String displayName = ChatColor.stripColor(clickedItem.getItemMeta().getDisplayName());
 
         if (displayName.equals("Previous Page")) {
             currentPage--;
             setMenuItems();
-        }
-        else if (displayName.equals("Next Page")) {
+        } else if (displayName.equals("Next Page")) {
             currentPage++;
             setMenuItems();
-        }
-        else if (displayName.equals("Close Menu")) {
+        } else if (displayName.equals("Close Menu")) {
             playerMenuUtility.getOwner().closeInventory();
-        }
-        else if (!clickedItem.getType().equals(Material.BLUE_STAINED_GLASS_PANE) &&
-                !clickedItem.getType().equals(Material.BOOK)) {
+        } else if (!clickedItem.getType().equals(Material.BLUE_STAINED_GLASS_PANE)
+                && !clickedItem.getType().equals(Material.BOOK)) {
             // Handle item click
             Material clickedMaterial = clickedItem.getType();
 
-            //Fetch location to teleport. Either Plot spawn or Plot center
+            // Fetch location to teleport. Either Plot spawn or Plot center
             Location shopLocation;
             Location shopSpawn = PlotUtils.getPlotSpawn(plotId);
-            if(shopSpawn != null){
+            if (shopSpawn != null) {
                 shopLocation = shopSpawn;
-            }else{
+            } else {
                 shopLocation = PlotUtils.getPlotCenter(plotId);
             }
 
             if (shopLocation != null) {
-                SendMessage.sendPlayerMessage(playerMenuUtility.getOwner(),"Teleporting to the shop in 5 seconds! Don't move..");
+                SendMessage.sendPlayerMessage(playerMenuUtility.getOwner(),
+                        "Teleporting to the shop in 5 seconds! Don't move..");
                 playerMenuUtility.getOwner().closeInventory();
-                
+
                 // Find the matched key from display name
                 String name = ChatColor.stripColor(clickedItem.getItemMeta().getDisplayName());
                 String matchedKey = null;
@@ -161,21 +157,26 @@ public class ShopItemListMenu extends Menu {
                 }
 
                 final String finalKey = matchedKey;
-                TeleportUtils.scheduleTeleport(playerMenuUtility.getOwner(),shopLocation,()->{
-                    SendMessage.sendPlayerMessage(playerMenuUtility.getOwner(), "Teleported to shop!");
-                    
+                TeleportUtils.scheduleTeleport(playerMenuUtility.getOwner(), shopLocation, () -> {
+                    SendMessage.sendPlayerMessage(playerMenuUtility.getOwner(),
+                            "Teleported to shop!");
+
                     if (finalKey != null) {
                         Map<String, ChestShop> plotShops = ShopUtils.getAllShops();
                         for (ChestShop shop : plotShops.values()) {
                             String shopPlot = PlotUtils.getPlotIdByLocation(shop.getLocation());
-                            if (plotId.equals(shopPlot) && ShopUtils.getItemKey(shop).equals(finalKey)) {
-                                RegionUtils.showVerticalParticleLine(playerMenuUtility.getOwner(), shop.getLocation().clone().add(0, 2, 0), null, Market.getPlugin());
+                            if (plotId.equals(shopPlot)
+                                    && ShopUtils.getItemKey(shop).equals(finalKey)) {
+                                RegionUtils.showVerticalParticleLine(playerMenuUtility.getOwner(),
+                                        shop.getLocation().clone().add(0, 2, 0), null,
+                                        Market.getPlugin());
                             }
                         }
                     }
                 });
             } else {
-                playerMenuUtility.getOwner().sendMessage(ChatColor.RED + "No shop found selling this item.");
+                playerMenuUtility.getOwner()
+                        .sendMessage(ChatColor.RED + "No shop found selling this item.");
             }
         }
     }

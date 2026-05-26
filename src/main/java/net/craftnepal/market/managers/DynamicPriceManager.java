@@ -166,16 +166,34 @@ public class DynamicPriceManager {
         saveMetrics();
     }
 
+    public static void recordAdminPurchase(String itemKey, int amount) {
+        String path = "admin_purchased_today." + itemKey;
+        int current = metricsConfig.getInt(path, 0);
+        metricsConfig.set(path, current + amount);
+        saveMetrics();
+    }
+
+    public static void recordAdminSale(String itemKey, int amount) {
+        String path = "admin_sold_today." + itemKey;
+        int current = metricsConfig.getInt(path, 0);
+        metricsConfig.set(path, current + amount);
+        saveMetrics();
+    }
+
     public static void triggerDailyUpdate() {
         Bukkit.getLogger().info("[Market] Running daily dynamic price update...");
         
-        // 1. Gather Total Supply (Stock) across all shops
+        // 1. Gather Total Supply (Stock) across all shops and partition keys
         Map<String, Integer> totalStockMap = new HashMap<>();
         Map<String, ChestShop> allShops = ShopUtils.getAllShops();
+        java.util.Set<String> adminShopKeys = new java.util.HashSet<>();
+
         for (ChestShop shop : allShops.values()) {
-            if (shop.isAdmin()) continue; // Admin shops have infinite supply, ignore for market balance
-            
             String key = ShopUtils.getItemKey(shop);
+            if (shop.isAdmin()) {
+                adminShopKeys.add(key);
+                continue; // Admin shops have infinite supply, ignore for market balance
+            }
             int stock = ShopUtils.getShopStock(shop);
             totalStockMap.put(key, totalStockMap.getOrDefault(key, 0) + stock);
         }
@@ -196,49 +214,99 @@ public class DynamicPriceManager {
             Integer basePrice = PriceData.getPrice(itemKey);
             if (basePrice == null || basePrice <= 0) continue;
 
-            int demand = 0;
-            if (purchasedSection != null && purchasedSection.contains(itemKey)) {
-                demand = purchasedSection.getInt(itemKey);
-            }
+            double currentPrice = getDynamicPrice(itemKey);
 
-            int supply = totalStockMap.getOrDefault(itemKey, 0);
+            if (adminShopKeys.contains(itemKey)) {
+                // Admin Shop Net-Flow pricing model
+                int bought = metricsConfig.getInt("admin_purchased_today." + itemKey, 0);
+                int sold = metricsConfig.getInt("admin_sold_today." + itemKey, 0);
+                int netFlow = bought - sold;
 
-            // If there's no supply and no demand, price stays same
-            if (supply == 0 && demand == 0) continue;
+                double maxChange = Market.getMainConfig().getDouble("admin-shops.max-price-change-percent", 0.03);
+                double percentChange;
+                if (netFlow > 10) {
+                    percentChange = maxChange;
+                } else if (netFlow > 0) {
+                    percentChange = maxChange / 3.0;
+                } else if (netFlow < -10) {
+                    percentChange = -maxChange;
+                } else if (netFlow < 0) {
+                    percentChange = -maxChange / 3.0;
+                } else {
+                    // Decay toward base price: moves 1% of the distance to the base price
+                    percentChange = (basePrice - currentPrice) / currentPrice * 0.01;
+                }
 
-            double ratio = (double) demand / (supply + 1.0); // Add 1 to avoid division by zero
-            
-            double percentChange = 0.0;
-            if (ratio >= 0.50) {
-                percentChange = 0.10; // +10%
-            } else if (ratio >= 0.25) {
-                percentChange = 0.05; // +5%
-            } else if (ratio < 0.10 && supply > 0) {
-                // Only drop price if there is supply but no one is buying
-                percentChange = -0.05; // -5%
-            }
+                if (percentChange != 0.0) {
+                    double newPrice = currentPrice * (1.0 + percentChange);
 
-            if (percentChange != 0.0) {
-                double currentPrice = getDynamicPrice(itemKey);
-                double newPrice = currentPrice * (1.0 + percentChange);
-
-                // Clamp to [0.5 * Base, 3.0 * Base]
-                double minPrice = basePrice * 0.5;
-                double maxPrice = basePrice * 3.0;
-                if (newPrice < minPrice) newPrice = minPrice;
-                if (newPrice > maxPrice) newPrice = maxPrice;
-
-                if (Math.abs(newPrice - currentPrice) > 0.01) {
-                    double actualMultiplier = newPrice / currentPrice;
-                    double trend = actualMultiplier - 1.0;
-                    dynamicPricesConfig.set(itemKey + ".price", newPrice);
-                    dynamicPricesConfig.set(itemKey + ".trend", trend);
-                    pricesChanged = true;
+                    // Tight clamp: [min-price-multiplier * base, max-price-multiplier * base]
+                    double minMult = Market.getMainConfig().getDouble("admin-shops.min-price-multiplier", 0.75);
+                    double maxMult = Market.getMainConfig().getDouble("admin-shops.max-price-multiplier", 1.50);
+                    double minPrice = basePrice * minMult;
+                    double maxPrice = basePrice * maxMult;
                     
-                    Bukkit.getLogger().info("[Market] " + itemKey + " price changed by " + String.format("%.1f%%", (actualMultiplier - 1.0) * 100) + " (New: " + newPrice + ")");
-                    
-                    // Auto-scale existing shops for this material
-                    autoScaleShops(itemKey, actualMultiplier);
+                    if (newPrice < minPrice) newPrice = minPrice;
+                    if (newPrice > maxPrice) newPrice = maxPrice;
+
+                    if (Math.abs(newPrice - currentPrice) > 0.01) {
+                        double actualMultiplier = newPrice / currentPrice;
+                        double trend = actualMultiplier - 1.0;
+                        dynamicPricesConfig.set(itemKey + ".price", newPrice);
+                        dynamicPricesConfig.set(itemKey + ".trend", trend);
+                        pricesChanged = true;
+
+                        Bukkit.getLogger().info("[Market] Admin item " + itemKey + " price changed by " + String.format("%.1f%%", trend * 100) + " (New: " + newPrice + ")");
+                        
+                        // Auto-scale existing player shops (if any exist)
+                        autoScaleShops(itemKey, actualMultiplier);
+                    }
+                }
+            } else {
+                // Normal supply/demand ratio model for player shops
+                int demand = 0;
+                if (purchasedSection != null && purchasedSection.contains(itemKey)) {
+                    demand = purchasedSection.getInt(itemKey);
+                }
+
+                int supply = totalStockMap.getOrDefault(itemKey, 0);
+
+                // If there's no supply and no demand, price stays same
+                if (supply == 0 && demand == 0) continue;
+
+                double ratio = (double) demand / (supply + 1.0); // Add 1 to avoid division by zero
+                
+                double percentChange = 0.0;
+                if (ratio >= 0.50) {
+                    percentChange = 0.10; // +10%
+                } else if (ratio >= 0.25) {
+                    percentChange = 0.05; // +5%
+                } else if (ratio < 0.10 && supply > 0) {
+                    // Only drop price if there is supply but no one is buying
+                    percentChange = -0.05; // -5%
+                }
+
+                if (percentChange != 0.0) {
+                    double newPrice = currentPrice * (1.0 + percentChange);
+
+                    // Clamp to [0.5 * Base, 3.0 * Base]
+                    double minPrice = basePrice * 0.5;
+                    double maxPrice = basePrice * 3.0;
+                    if (newPrice < minPrice) newPrice = minPrice;
+                    if (newPrice > maxPrice) newPrice = maxPrice;
+
+                    if (Math.abs(newPrice - currentPrice) > 0.01) {
+                        double actualMultiplier = newPrice / currentPrice;
+                        double trend = actualMultiplier - 1.0;
+                        dynamicPricesConfig.set(itemKey + ".price", newPrice);
+                        dynamicPricesConfig.set(itemKey + ".trend", trend);
+                        pricesChanged = true;
+                        
+                        Bukkit.getLogger().info("[Market] " + itemKey + " price changed by " + String.format("%.1f%%", trend * 100) + " (New: " + newPrice + ")");
+                        
+                        // Auto-scale existing shops for this material
+                        autoScaleShops(itemKey, actualMultiplier);
+                    }
                 }
             }
         }
@@ -251,6 +319,8 @@ public class DynamicPriceManager {
 
         // Reset metrics
         metricsConfig.set("purchased_today", null);
+        metricsConfig.set("admin_purchased_today", null);
+        metricsConfig.set("admin_sold_today", null);
         metricsConfig.set("last_update", System.currentTimeMillis());
         saveMetrics();
     }

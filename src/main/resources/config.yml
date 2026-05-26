@@ -29,3 +29,20 @@ market-world:
   allowed-interact-blocks:
     - ENDER_CHEST
     - CRAFTING_TABLE
+
+# List of items that cannot be created as shops or traded by player-owned shops.
+# (Item material names, case-insensitive)
+player-shop-blacklist:
+  - BEDROCK
+  - BARRIER
+  - COMMAND_BLOCK
+
+# Settings for Admin-owned shops
+admin-shops:
+  # The multiplier applied to the dynamic price when players sell to an admin shop (15% spread)
+  buy-price-multiplier: 0.85
+  # The maximum price fluctuation percentage per daily update cycle (0.03 = 3%)
+  max-price-change-percent: 0.03
+  # Min and max multipliers of the base price for admin shops
+  min-price-multiplier: 0.75
+  max-price-multiplier: 1.50

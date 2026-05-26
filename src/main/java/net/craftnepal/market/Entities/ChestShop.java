@@ -62,6 +62,14 @@ public class ChestShop {
     }
 
     public double getPrice() {
+        if (isAdmin) {
+            double dynamicPrice = net.craftnepal.market.managers.DynamicPriceManager.getDynamicPrice(item);
+            if (isBuyingShop) {
+                double multiplier = net.craftnepal.market.Market.getMainConfig().getDouble("admin-shops.buy-price-multiplier", 0.85);
+                return dynamicPrice * multiplier;
+            }
+            return dynamicPrice;
+        }
         return price;
     }
 

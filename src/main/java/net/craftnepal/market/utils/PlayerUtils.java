@@ -6,7 +6,7 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.SkullMeta;
-import net.craftnepal.market.files.LocationData;
+import net.craftnepal.market.managers.DatabaseManager;
 
 import java.util.UUID;
 
@@ -25,16 +25,14 @@ public class PlayerUtils {
     }
 
     public static void saveLastLocation(Player player, Location location) {
-        net.craftnepal.market.utils.LocationUtils.saveLocation(LocationData.get(), "players."+player.getUniqueId().toString(), location);
-        LocationData.save();
+        DatabaseManager.saveLastLocation(player.getUniqueId().toString(), location);
     }
 
     public static Location getLastLocation(Player player) {
-        return net.craftnepal.market.utils.LocationUtils.loadLocation(LocationData.get(), "players."+player.getUniqueId().toString());
+        return DatabaseManager.getLastLocation(player.getUniqueId().toString());
     }
 
     public static void clearLastLocation(Player player) {
-        LocationData.get().set("players."+player.getUniqueId().toString(), null);
-        LocationData.save();
+        DatabaseManager.clearLastLocation(player.getUniqueId().toString());
     }
 }

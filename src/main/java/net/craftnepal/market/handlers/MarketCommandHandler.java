@@ -36,7 +36,7 @@ public class MarketCommandHandler {
             return;
         }
 
-        Location location = RegionData.get().getLocation("market.spawn");
+        Location location = net.craftnepal.market.managers.DatabaseManager.getMarketSpawn();
         if (location == null) {
             location = marketWorld.getSpawnLocation();
         }

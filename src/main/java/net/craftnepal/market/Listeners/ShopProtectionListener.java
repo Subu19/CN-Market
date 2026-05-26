@@ -5,8 +5,6 @@ import net.craftnepal.market.utils.ShopUtils;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
-import org.bukkit.configuration.ConfigurationSection;
-import net.craftnepal.market.files.RegionData;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -68,17 +66,11 @@ public class ShopProtectionListener implements Listener {
         if (block.getType() != Material.BARREL) return;
 
         Location loc = block.getLocation();
-        String plotId = PlotUtils.getPlotIdByLocation(loc);
-        if (plotId == null) return;
-
-        ConfigurationSection shops = RegionData.get().getConfigurationSection("market.plots." + plotId + ".shops");
-        if (shops == null) return;
-
-        for (String shopId : shops.getKeys(false)) {
-            Location shopLoc = net.craftnepal.market.utils.LocationUtils.loadLocation(RegionData.get(), "market.plots." + plotId + ".shops." + shopId + ".location");
-            if (shopLoc != null && shopLoc.equals(loc)) {
-                ShopUtils.removeShop(plotId, shopId);
-                return;
+        net.craftnepal.market.Entities.ChestShop shop = ShopUtils.getShopAt(loc);
+        if (shop != null) {
+            String plotId = PlotUtils.getPlotIdByLocation(loc);
+            if (plotId != null) {
+                ShopUtils.removeShop(plotId, shop.getId());
             }
         }
     }

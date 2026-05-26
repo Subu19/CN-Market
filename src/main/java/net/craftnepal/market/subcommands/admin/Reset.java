@@ -123,14 +123,10 @@ public class Reset extends SubCommand {
                         "§7World folder not found at: " + worldFolder.getAbsolutePath());
             }
 
-            // 4. Clear Data Files
-            RegionData.get().set("market", null);
-            RegionData.save();
+            // 4. Clear SQLite Database Tables
+            net.craftnepal.market.managers.DatabaseManager.clearAllData();
 
-            LocationData.get().set("market", null);
-            LocationData.save();
-
-            SendMessage.sendPlayerMessage(player, "§7Cleared all region and location data.");
+            SendMessage.sendPlayerMessage(player, "§7Cleared all database records.");
 
             // 5. Update config
             Market.getMainConfig().set("market-world.name", null);

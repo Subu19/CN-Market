@@ -1,6 +1,5 @@
 package net.craftnepal.market.Listeners;
 
-import net.craftnepal.market.files.RegionData;
 import net.craftnepal.market.utils.DisplayUtils;
 import net.craftnepal.market.utils.SendMessage;
 import net.craftnepal.market.utils.ShopUtils;
@@ -34,13 +33,13 @@ public class InternalCommandListener implements Listener {
             if (args.length < 2) return;
             String plotId = args[0];
             String shopId = args[1];
-            String basePath = "market.plots." + plotId + ".shops." + shopId;
-            if (!RegionData.get().contains(basePath)) {
+            net.craftnepal.market.Entities.ChestShop shop = net.craftnepal.market.managers.DatabaseManager.getShop(shopId);
+            if (shop == null) {
                 SendMessage.sendPlayerMessage(player, "§cThis shop no longer exists.");
                 return;
             }
-            String owner = RegionData.get().getString(basePath + ".owner");
-            if (player.hasPermission("market.admin") || (owner != null && owner.equals(player.getUniqueId().toString()))) {
+            java.util.UUID owner = shop.getOwner();
+            if (player.hasPermission("market.admin") || (owner != null && owner.equals(player.getUniqueId()))) {
                 ShopUtils.removeShop(plotId, shopId);
                 SendMessage.sendPlayerMessage(player, "§aShop removed successfully.");
             } else {

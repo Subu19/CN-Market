@@ -47,7 +47,7 @@ public class SetOwner extends SubCommand {
         String plotId = args[1];
         String targetName = args[2];
 
-        if (!RegionData.get().contains("market.plots." + plotId)) {
+        if (!net.craftnepal.market.managers.DatabaseManager.getAllPlotIds().contains(plotId)) {
             SendMessage.sendPlayerMessage(player, "§cPlot " + plotId + " does not exist.");
             return;
         }
@@ -58,8 +58,7 @@ public class SetOwner extends SubCommand {
             return;
         }
 
-        RegionData.get().set("market.plots." + plotId + ".owner", target.getUniqueId().toString());
-        RegionData.save();
+        PlotUtils.setPlotOwner(plotId, target.getUniqueId().toString());
 
         SendMessage.sendPlayerMessage(player, "§aSuccessfully set " + target.getName() + " as the owner of plot " + plotId);
     }
@@ -67,7 +66,7 @@ public class SetOwner extends SubCommand {
     @Override
     public List<String> getSubcommandArguments(Player player, String[] args) {
         if (args.length == 2) {
-            return new ArrayList<>(RegionData.get().getConfigurationSection("market.plots").getKeys(false));
+            return net.craftnepal.market.managers.DatabaseManager.getAllPlotIds();
         } else if (args.length == 3) {
             List<String> names = new ArrayList<>();
             for (Player p : Bukkit.getOnlinePlayers()) {

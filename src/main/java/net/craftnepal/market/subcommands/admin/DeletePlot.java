@@ -44,18 +44,15 @@ public class DeletePlot extends SubCommand {
                 return;
             }
             String plot = strings[1];
-            if (RegionData.get().get("market.plots." + plot) != null) {
-                // Remove all shops in the plot
-                org.bukkit.configuration.ConfigurationSection shops = RegionData.get().getConfigurationSection("market.plots." + plot + ".shops");
-                if (shops != null) {
-                    for (String shopId : shops.getKeys(false)) {
-                        net.craftnepal.market.utils.ShopUtils.removeShop(plot, shopId);
-                    }
+            if (net.craftnepal.market.managers.DatabaseManager.getAllPlotIds().contains(plot)) {
+                // Remove all shop displays
+                List<net.craftnepal.market.Entities.ChestShop> shops = net.craftnepal.market.managers.DatabaseManager.getShopsByPlot(plot);
+                for (net.craftnepal.market.Entities.ChestShop shop : shops) {
+                    net.craftnepal.market.utils.DisplayUtils.getInstance().removeDisplayPair(plot, shop.getId());
                 }
 
-                // Remove the entire plot data from config
-                RegionData.get().set("market.plots." + plot, null);
-                RegionData.save();
+                // Delete the entire plot from SQLite database
+                net.craftnepal.market.managers.DatabaseManager.deletePlot(plot);
 
                 SendMessage.sendPlayerMessage(player, "&aDeleted plot: &b" + plot);
             } else {

@@ -205,24 +205,13 @@ public class ShopCreateMenu extends Menu {
         UUID uuid = playerMenuUtility.getOwner().getUniqueId();
         String shopId = UUID.randomUUID().toString();
 
-        // Define the base path in the YAML configuration
-        String basePath = "market.plots." + plotId + ".shops." + shopId;
-
-        // Serialize and save the ChestShop data
-        LocationUtils.saveLocation(RegionData.get(), basePath + ".location", chestLocation);
-        String base64Item =
-                java.util.Base64.getEncoder().encodeToString(ShopUtils.serializeItem(itemToSell));
-        RegionData.get().set(basePath + ".item_bytes", base64Item);
-        RegionData.get().set(basePath + ".item", itemToSell.getType().toString());
-        RegionData.get().set(basePath + ".owner", uuid.toString());
-        RegionData.get().set(basePath + ".price", currentPrice);
-        RegionData.get().set(basePath + ".is_buying_shop", isBuyingShop);
+        ChestShop chestShop = new ChestShop(shopId, chestLocation, itemToSell, uuid, currentPrice, isAdminShop, isBuyingShop);
         
-        if (isAdminShop) {
-            RegionData.get().set(basePath + ".is_admin", true);
-        }
-
-        RegionData.save();
+        // Count stock initially to cache it correctly in SQLite
+        int initialStock = ShopUtils.getPhysicalBarrelStock(chestShop);
+        
+        // Save to SQLite database
+        net.craftnepal.market.managers.DatabaseManager.saveShop(chestShop, plotId, initialStock);
 
         playerMenuUtility.getOwner().closeInventory();
         playerMenuUtility.getOwner()
@@ -231,7 +220,6 @@ public class ShopCreateMenu extends Menu {
                         + ChatColor.GOLD + String.format("%.2f", currentPrice));
 
         // Spawn display
-        ChestShop chestShop = new ChestShop(shopId, chestLocation, itemToSell, uuid, currentPrice, isAdminShop, isBuyingShop);
         DisplayUtils.getInstance().spawnDisplayPair(chestShop);
     }
 

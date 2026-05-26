@@ -1,7 +1,6 @@
 package net.craftnepal.market.Listeners;
 
 import net.craftnepal.market.Market;
-import net.craftnepal.market.files.RegionData;
 import net.craftnepal.market.utils.*;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;

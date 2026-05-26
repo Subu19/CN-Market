@@ -73,15 +73,13 @@ public class AddMember extends SubCommand {
             return;
         }
 
-        List<String> members = RegionData.get().getStringList("market.plots." + plotId + ".members");
+        List<String> members = net.craftnepal.market.managers.DatabaseManager.getPlotMembers(plotId);
         if (members.contains(targetUUID)) {
             SendMessage.sendPlayerMessage(player, "§cThat player is already a member of this plot.");
             return;
         }
 
-        members.add(targetUUID);
-        RegionData.get().set("market.plots." + plotId + ".members", members);
-        RegionData.save();
+        net.craftnepal.market.managers.DatabaseManager.addPlotMember(plotId, targetUUID);
 
         SendMessage.sendPlayerMessage(player, "§aSuccessfully added §b" + target.getName() + "§a as a trusted member of your plot.");
 

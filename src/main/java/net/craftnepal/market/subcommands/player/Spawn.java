@@ -46,7 +46,7 @@ public class Spawn extends SubCommand {
                 return;
             }
 
-            Location spawn = RegionData.get().getLocation("market.spawn");
+            Location spawn = net.craftnepal.market.managers.DatabaseManager.getMarketSpawn();
             if (spawn == null) {
                 spawn = marketWorld.getSpawnLocation();
             }

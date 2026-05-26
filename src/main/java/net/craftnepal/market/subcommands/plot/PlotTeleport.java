@@ -1,9 +1,9 @@
 package net.craftnepal.market.subcommands.plot;
 
-
 import me.kodysimpson.simpapi.command.SubCommand;
 import net.craftnepal.market.Market;
-import net.craftnepal.market.files.RegionData;
+import net.craftnepal.market.managers.DatabaseManager;
+import net.craftnepal.market.utils.PlotUtils;
 import net.craftnepal.market.utils.RegionUtils;
 import net.craftnepal.market.utils.SendMessage;
 import net.craftnepal.market.utils.TeleportUtils;
@@ -12,7 +12,6 @@ import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.CommandSender;
-import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
@@ -55,18 +54,18 @@ public class PlotTeleport extends SubCommand {
                 return;
             }
             String target = strings[1];
-            ConfigurationSection plots = RegionData.get().getConfigurationSection("market.plots");
+            List<String> plotIds = DatabaseManager.getAllPlotIds();
             
-            if(plots != null){
+            if(!plotIds.isEmpty()){
                 // First check if target is a plot ID
-                if (plots.contains(target)) {
+                if (plotIds.contains(target)) {
                     teleportToPlot(player, target);
                     return;
                 }
 
                 // Otherwise search by player name
-                for(String plot: plots.getKeys(false)){
-                    String ownerUUID = RegionData.get().getString("market.plots."+plot+".owner");
+                for(String plot: plotIds){
+                    String ownerUUID = PlotUtils.getPlotOwner(plot);
                     if (ownerUUID == null || ownerUUID.isEmpty()) continue;
 
                     OfflinePlayer plotOwner = Bukkit.getOfflinePlayer(UUID.fromString(ownerUUID));
@@ -87,14 +86,14 @@ public class PlotTeleport extends SubCommand {
     }
 
     private void teleportToPlot(Player player, String plotId) {
-        Location min = net.craftnepal.market.utils.LocationUtils.loadLocation(RegionData.get(), "market.plots." + plotId + ".posMin");
-        Location max = net.craftnepal.market.utils.LocationUtils.loadLocation(RegionData.get(), "market.plots." + plotId + ".posMax");
+        Location min = PlotUtils.getPlotPosMin(plotId);
+        Location max = PlotUtils.getPlotPosMax(plotId);
         if (min == null || max == null) {
             SendMessage.sendPlayerMessage(player, "&cError: Plot boundaries not found for " + plotId);
             return;
         }
 
-        Location plotSpawn = net.craftnepal.market.utils.LocationUtils.loadLocation(RegionData.get(), "market.plots." + plotId + ".spawn");
+        Location plotSpawn = PlotUtils.getPlotSpawn(plotId);
         Location tpLocation;
 
         if (plotSpawn != null) {
@@ -118,13 +117,12 @@ public class PlotTeleport extends SubCommand {
         });
     }
 
-
     @Override
     public List<String> getSubcommandArguments(Player player, String[] strings) {
         List<String> players = new ArrayList<>();
         for(Player p: Market.getPlugin().getServer().getOnlinePlayers()){
             players.add(p.getName());
         }
-        return  players;
+        return players;
     }
 }

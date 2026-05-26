@@ -57,6 +57,7 @@ public class ShopStockListener implements Listener {
     private void refreshShopDisplay(Location loc) {
         ChestShop shop = ShopUtils.getShopAt(loc);
         if (shop != null) {
+            ShopUtils.syncShopStockWithDatabase(shop);
             DisplayUtils.getInstance().updateDisplay(shop);
         }
     }

@@ -3,7 +3,7 @@ package net.craftnepal.market.managers;
 import net.craftnepal.market.Market;
 import net.craftnepal.market.Entities.ChestShop;
 import net.craftnepal.market.files.PriceData;
-import net.craftnepal.market.files.RegionData;
+
 import net.craftnepal.market.utils.DisplayUtils;
 import net.craftnepal.market.utils.LocationUtils;
 import net.craftnepal.market.utils.ShopUtils;
@@ -245,7 +245,6 @@ public class DynamicPriceManager {
 
         if (pricesChanged) {
             saveDynamicPrices();
-            RegionData.save();
             DisplayUtils.getInstance().updateAllDisplays();
             Bukkit.broadcastMessage(Market.getMainConfig().getString("prefix").replaceAll("&", "§") + "§aMarket prices have been updated based on daily supply and demand!");
         }
@@ -257,24 +256,12 @@ public class DynamicPriceManager {
     }
 
     private static void autoScaleShops(String itemKey, double multiplier) {
-        ConfigurationSection plots = RegionData.get().getConfigurationSection("market.plots");
-        if (plots == null) return;
-
-        for (String plotId : plots.getKeys(false)) {
-            ConfigurationSection shops = plots.getConfigurationSection(plotId + ".shops");
-            if (shops != null) {
-                for (String shopId : shops.getKeys(false)) {
-                    ChestShop shop = ShopUtils.getShop(plotId, shopId);
-                    if (shop != null) {
-                        if (ShopUtils.getItemKey(shop).equalsIgnoreCase(itemKey)) {
-                            double oldPrice = shop.getPrice();
-                            double newShopPrice = oldPrice * multiplier;
-                            shop.setPrice(newShopPrice);
-                            String path = plotId + ".shops." + shopId;
-                            RegionData.get().set("market.plots." + path + ".price", newShopPrice);
-                        }
-                    }
-                }
+        for (ChestShop shop : DatabaseManager.getAllShops()) {
+            if (ShopUtils.getItemKey(shop).equalsIgnoreCase(itemKey)) {
+                double oldPrice = shop.getPrice();
+                double newShopPrice = oldPrice * multiplier;
+                shop.setPrice(newShopPrice);
+                DatabaseManager.updateShopPrice(shop.getId(), newShopPrice);
             }
         }
     }

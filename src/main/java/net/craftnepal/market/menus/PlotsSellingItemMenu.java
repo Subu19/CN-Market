@@ -7,7 +7,7 @@ import me.kodysimpson.simpapi.menu.MenuManager;
 import me.kodysimpson.simpapi.menu.PlayerMenuUtility;
 import net.craftnepal.market.Entities.ChestShop;
 import net.craftnepal.market.Market;
-import net.craftnepal.market.files.RegionData;
+
 import net.craftnepal.market.utils.*;
 import org.bukkit.*;
 import org.bukkit.OfflinePlayer;
@@ -150,7 +150,7 @@ public class PlotsSellingItemMenu extends Menu {
     }
 
     private ItemStack createPlotItem(String plotId) {
-        String ownerUUID = RegionData.get().getString("market.plots." + plotId + ".owner");
+        String ownerUUID = PlotUtils.getPlotOwner(plotId);
         ItemStack plotItem = PlayerUtils.getPlayerHead(UUID.fromString(ownerUUID));
         ItemMeta meta = plotItem.getItemMeta();
 

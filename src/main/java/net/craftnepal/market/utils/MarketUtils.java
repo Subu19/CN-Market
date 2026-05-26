@@ -21,17 +21,7 @@ public class MarketUtils {
 
 
     public static int getAvailablePlotCount() {
-        ConfigurationSection plots = RegionData.get().getConfigurationSection("market.plots");
-        if (plots == null)
-            return 0;
-
-        int count = 0;
-        for (String plotId : plots.getKeys(false)) {
-            if (PlotUtils.getPlotOwner(plotId) == null) {
-                count++;
-            }
-        }
-        return count;
+        return net.craftnepal.market.managers.DatabaseManager.getAvailablePlotIds().size();
     }
 
     public static boolean isMarketRegionLoaded() {

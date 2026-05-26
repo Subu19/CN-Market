@@ -4,7 +4,7 @@ import me.kodysimpson.simpapi.exceptions.MenuManagerException;
 import me.kodysimpson.simpapi.exceptions.MenuManagerNotSetupException;
 import me.kodysimpson.simpapi.menu.Menu;
 import me.kodysimpson.simpapi.menu.PlayerMenuUtility;
-import net.craftnepal.market.files.RegionData;
+
 import net.craftnepal.market.utils.*;
 import org.bukkit.*;
 import org.bukkit.OfflinePlayer;
@@ -111,7 +111,7 @@ public class ShopListMenu extends Menu {
     }
 
     private ItemStack createPlotItem(String plotId) {
-        String ownerUUID = RegionData.get().getString("market.plots." + plotId + ".owner");
+        String ownerUUID = PlotUtils.getPlotOwner(plotId);
         ItemStack plotItem = PlayerUtils.getPlayerHead(UUID.fromString(ownerUUID));
         ItemMeta meta = plotItem.getItemMeta();
 
@@ -123,8 +123,7 @@ public class ShopListMenu extends Menu {
 
         meta.setDisplayName(ChatColor.GREEN + "Plot " + plotId);
 
-        ConfigurationSection shops = RegionData.get().getConfigurationSection("market.plots." + plotId + ".shops");
-        int shopCount = shops != null ? shops.getKeys(false).size() : 0;
+        int shopCount = net.craftnepal.market.managers.DatabaseManager.getShopsByPlot(plotId).size();
 
         List<String> lore = new ArrayList<>();
         lore.add(ChatColor.GRAY + "Owner: " + ChatColor.YELLOW + ownerName);

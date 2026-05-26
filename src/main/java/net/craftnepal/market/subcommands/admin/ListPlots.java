@@ -45,12 +45,12 @@ public class ListPlots extends SubCommand {
                 SendMessage.sendPlayerMessage(player, "§cYou don't have permission to use this command.");
                 return;
             }
-            ConfigurationSection plots = RegionData.get().getConfigurationSection("market.plots");
-            if(plots != null){
+            List<String> plotIds = net.craftnepal.market.managers.DatabaseManager.getAllPlotIds();
+            if(!plotIds.isEmpty()){
                 SendMessage.sendPlayerMessage(player, "Plots are listed below:");
-                for(String plot: plots.getKeys(false)){
-                    String owner = RegionData.get().getString("market.plots."+plot+".owner");
-                    if(owner == null){
+                for(String plot: plotIds){
+                    String owner = net.craftnepal.market.utils.PlotUtils.getPlotOwner(plot);
+                    if(owner == null || owner.isEmpty()){
                         owner = "Unclaimed";
                     }else{
                         OfflinePlayer p = Bukkit.getOfflinePlayer(UUID.fromString(owner));

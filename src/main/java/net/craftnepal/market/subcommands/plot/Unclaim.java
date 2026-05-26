@@ -1,14 +1,14 @@
 package net.craftnepal.market.subcommands.plot;
 
 import me.kodysimpson.simpapi.command.SubCommand;
-import net.craftnepal.market.files.RegionData;
+import net.craftnepal.market.managers.DatabaseManager;
+import net.craftnepal.market.utils.DisplayUtils;
 import net.craftnepal.market.utils.PlotUtils;
 import net.craftnepal.market.utils.SendMessage;
-import net.craftnepal.market.utils.ShopUtils;
+import net.craftnepal.market.Entities.ChestShop;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.command.CommandSender;
-import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 
 import java.util.List;
@@ -40,8 +40,7 @@ public class Unclaim extends SubCommand {
             Player player = (Player) commandSender;
 
             if (!player.hasPermission("market.plot.unclaim")) {
-                SendMessage.sendPlayerMessage(player,
-                        "&cYou do not have permission to unclaim plots.");
+                SendMessage.sendPlayerMessage(player, "&cYou do not have permission to unclaim plots.");
                 return;
             }
 
@@ -57,21 +56,16 @@ public class Unclaim extends SubCommand {
                 return;
             }
 
-            // Remove all shops in the plot
-            org.bukkit.configuration.ConfigurationSection shops =
-                    RegionData.get().getConfigurationSection("market.plots." + plotId + ".shops");
-            if (shops != null) {
-                for (String shopId : shops.getKeys(false)) {
-                    net.craftnepal.market.utils.ShopUtils.removeShop(plotId, shopId);
-                }
+            // Remove all shop displays then delete shops from database
+            List<ChestShop> shops = DatabaseManager.getShopsByPlot(plotId);
+            for (ChestShop shop : shops) {
+                DisplayUtils.getInstance().removeDisplayPair(plotId, shop.getId());
             }
 
-            // Remove the entire plot data from config
-            RegionData.get().set("market.plots." + plotId, null);
-            RegionData.save();
+            // Delete the entire plot (cascades to shops + members via FK)
+            DatabaseManager.deletePlot(plotId);
 
-            SendMessage.sendPlayerMessage(player,
-                    "&aYou have successfully unclaimed plot: " + plotId);
+            SendMessage.sendPlayerMessage(player, "&aYou have successfully unclaimed plot: " + plotId);
             player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1, 1);
 
         } else {

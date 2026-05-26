@@ -4,7 +4,6 @@ import me.kodysimpson.simpapi.menu.Menu;
 import me.kodysimpson.simpapi.menu.PlayerMenuUtility;
 import net.craftnepal.market.Entities.ChestShop;
 import net.craftnepal.market.Market;
-import net.craftnepal.market.files.RegionData;
 import net.craftnepal.market.utils.*;
 import org.bukkit.*;
 import org.bukkit.event.inventory.InventoryClickEvent;

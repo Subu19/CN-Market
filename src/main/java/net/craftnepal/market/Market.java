@@ -65,6 +65,7 @@ public final class Market extends JavaPlugin {
     @Override
     public void onDisable() {
         if (displayUtils != null) displayUtils.clearAllDisplays();
+        net.craftnepal.market.managers.DatabaseManager.close();
         Bukkit.getLogger().info("Market is shutting down!");
     }
 
@@ -78,9 +79,11 @@ public final class Market extends JavaPlugin {
     }
 
     private void setupDataFiles() {
-        RegionData.setup();
         PriceData.setup();
-        LocationData.setup();
+        
+        // Initialize SQLite database and trigger any necessary automatic migration
+        net.craftnepal.market.managers.DatabaseManager.initialize(new File(getDataFolder(), "market.db"));
+        
         DynamicPriceManager.setup();
         TransactionLogUtils.setup();
     }

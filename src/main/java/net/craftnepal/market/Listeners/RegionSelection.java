@@ -1,11 +1,10 @@
 package net.craftnepal.market.Listeners;
 
 import net.craftnepal.market.utils.MarketUtils;
-import net.craftnepal.market.files.RegionData;
+import net.craftnepal.market.managers.DatabaseManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
-import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -13,6 +12,7 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -92,35 +92,30 @@ public class RegionSelection implements Listener {
         cleanupSelection(uuid);
     }
 
-
     private void saveMarketPlot(RegionBounds bounds, Player player) {
-        ConfigurationSection plotsSection = RegionData.get().getConfigurationSection("market.plots");
+        List<String> plotIds = DatabaseManager.getAllPlotIds();
         
         // Generate a unique ID for the manual plot
         String newPlotId = "manual_" + System.currentTimeMillis();
 
-        if (plotsSection != null) {
-            // Check for overlaps
-            for (String plotId : plotsSection.getKeys(false)) {
-                RegionBounds existingPlot = getPlotBounds(plotId);
-                if (bounds.intersects(existingPlot)) {
-                    player.sendMessage("Error: The selected area overlaps with existing plot " + plotId);
-                    return;
-                }
+        // Check for overlaps
+        for (String plotId : plotIds) {
+            RegionBounds existingPlot = getPlotBounds(plotId);
+            if (existingPlot.getMin() != null && bounds.intersects(existingPlot)) {
+                player.sendMessage("Error: The selected area overlaps with existing plot " + plotId);
+                return;
             }
         }
 
-        // Save the new plot
-        net.craftnepal.market.utils.LocationUtils.saveLocation(RegionData.get(), "market.plots." + newPlotId + ".posMin", bounds.getMin());
-        net.craftnepal.market.utils.LocationUtils.saveLocation(RegionData.get(), "market.plots." + newPlotId + ".posMax", bounds.getMax());
-        RegionData.save();
+        // Save the new plot to SQLite
+        DatabaseManager.savePlot(newPlotId, null, bounds.getMin(), bounds.getMax(), null);
 
         player.sendMessage("Created new manual plot: " + newPlotId);
     }
 
     private RegionBounds getPlotBounds(String plotId) {
-        Location min = net.craftnepal.market.utils.LocationUtils.loadLocation(RegionData.get(), "market.plots." + plotId + ".posMin");
-        Location max = net.craftnepal.market.utils.LocationUtils.loadLocation(RegionData.get(), "market.plots." + plotId + ".posMax");
+        Location min = DatabaseManager.getPlotPosMin(plotId);
+        Location max = DatabaseManager.getPlotPosMax(plotId);
         return new RegionBounds(min, max);
     }
 
@@ -158,12 +153,18 @@ public class RegionSelection implements Listener {
         }
 
         public boolean intersects(RegionBounds other) {
+            if (min == null || max == null || other.min == null || other.max == null) {
+                return false;
+            }
             return (min.getX() <= other.max.getX() && max.getX() >= other.min.getX()) &&
                     (min.getY() <= other.max.getY() && max.getY() >= other.min.getY()) &&
                     (min.getZ() <= other.max.getZ() && max.getZ() >= other.min.getZ());
         }
 
         public boolean contains(RegionBounds other) {
+            if (min == null || max == null || other.min == null || other.max == null) {
+                return false;
+            }
             return min.getX() <= other.min.getX() && max.getX() >= other.max.getX() &&
                     min.getY() <= other.min.getY() && max.getY() >= other.max.getY() &&
                     min.getZ() <= other.min.getZ() && max.getZ() >= other.max.getZ();

@@ -36,7 +36,7 @@ public class MarketWorldManager {
         }
 
         if (marketWorld != null) {
-            Location savedSpawn = RegionData.get().getLocation("market.spawn");
+            Location savedSpawn = net.craftnepal.market.managers.DatabaseManager.getMarketSpawn();
             if (savedSpawn != null) {
                 marketWorld.setSpawnLocation(
                         savedSpawn.getBlockX(),

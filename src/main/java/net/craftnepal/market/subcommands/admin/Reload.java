@@ -2,9 +2,7 @@ package net.craftnepal.market.subcommands.admin;
 
 import me.kodysimpson.simpapi.command.SubCommand;
 import net.craftnepal.market.Market;
-import net.craftnepal.market.files.LocationData;
 import net.craftnepal.market.files.PriceData;
-import net.craftnepal.market.files.RegionData;
 import net.craftnepal.market.managers.DynamicPriceManager;
 import net.craftnepal.market.managers.MarketWorldManager;
 import net.craftnepal.market.utils.DisplayUtils;
@@ -50,12 +48,6 @@ public class Reload extends SubCommand {
 
         // 2. price.yml — admin-editable base item prices
         PriceData.reload();
-
-        // 3. RegionData.yml — plot boundaries, owners, shop data
-        RegionData.reload();
-
-        // 4. LocationData.yml — saved last-locations for /market back
-        LocationData.reload();
 
         // 5. dynamic_prices.yml + market_metrics.yml — market economy state
         DynamicPriceManager.reload();

@@ -68,15 +68,13 @@ public class RemoveMember extends SubCommand {
 
         String targetUUID = target.getUniqueId().toString();
 
-        List<String> members = RegionData.get().getStringList("market.plots." + plotId + ".members");
+        List<String> members = net.craftnepal.market.managers.DatabaseManager.getPlotMembers(plotId);
         if (!members.contains(targetUUID)) {
             SendMessage.sendPlayerMessage(player, "§cThat player is not a member of this plot.");
             return;
         }
 
-        members.remove(targetUUID);
-        RegionData.get().set("market.plots." + plotId + ".members", members);
-        RegionData.save();
+        net.craftnepal.market.managers.DatabaseManager.removePlotMember(plotId, targetUUID);
 
         SendMessage.sendPlayerMessage(player, "§aSuccessfully removed " + target.getName() + " from your plot.");
     }
@@ -87,7 +85,7 @@ public class RemoveMember extends SubCommand {
             String plotId = PlotUtils.getPlotIdByLocation(player.getLocation());
             if (plotId != null) {
                 List<String> memberNames = new ArrayList<>();
-                List<String> members = RegionData.get().getStringList("market.plots." + plotId + ".members");
+                List<String> members = net.craftnepal.market.managers.DatabaseManager.getPlotMembers(plotId);
                 for (String uuidStr : members) {
                     OfflinePlayer p = Bukkit.getOfflinePlayer(UUID.fromString(uuidStr));
                     if (p.getName() != null) {

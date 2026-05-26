@@ -49,8 +49,8 @@ public class ToggleBorder extends SubCommand {
                 }
 
                 if (plotId != null) {
-                    Location min = net.craftnepal.market.utils.LocationUtils.loadLocation(RegionData.get(), "market.plots." + plotId + ".posMin");
-                    Location max = net.craftnepal.market.utils.LocationUtils.loadLocation(RegionData.get(), "market.plots." + plotId + ".posMax");
+                    Location min = PlotUtils.getPlotPosMin(plotId);
+                    Location max = PlotUtils.getPlotPosMax(plotId);
                     if(max !=null && min !=null){
                         RegionUtils.visibleRegionBorders(player,min,max,Market.getPlugin(), Color.LIME,100);
                         player.sendMessage("Toggled border for plot: " + plotId);

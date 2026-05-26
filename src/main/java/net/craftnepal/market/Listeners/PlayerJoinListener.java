@@ -2,7 +2,6 @@ package net.craftnepal.market.Listeners;
 
 import net.craftnepal.market.Entities.ChestShop;
 import net.craftnepal.market.Market;
-import net.craftnepal.market.files.RegionData;
 import net.craftnepal.market.utils.EconomyUtils;
 import net.craftnepal.market.utils.SendMessage;
 import net.craftnepal.market.utils.ShopUtils;
@@ -25,13 +24,12 @@ public class PlayerJoinListener implements Listener {
         UUID uuid = player.getUniqueId();
         
         // Notify offline earnings
-        double offlineEarnings = RegionData.get().getDouble("market.players." + uuid.toString() + ".offline_earnings", 0.0);
+        double offlineEarnings = net.craftnepal.market.managers.DatabaseManager.getOfflineEarnings(uuid.toString());
         if (offlineEarnings > 0) {
             Bukkit.getScheduler().runTaskLater(Market.getPlugin(), () -> {
                 SendMessage.sendPlayerMessage(player, "§aWhile you were offline, your market shops earned you " + EconomyUtils.format(offlineEarnings) + "!");
                 // Clear offline earnings
-                RegionData.get().set("market.players." + uuid.toString() + ".offline_earnings", 0.0);
-                RegionData.save();
+                net.craftnepal.market.managers.DatabaseManager.setOfflineEarnings(uuid.toString(), 0.0);
             }, 60L); // 3 seconds after join
         }
 

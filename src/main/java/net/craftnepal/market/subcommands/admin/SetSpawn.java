@@ -35,9 +35,8 @@ public class SetSpawn extends SubCommand {
             Player p = (Player) commandSender;
             Location location = p.getLocation();
             
-            // Save to config
-            RegionData.get().set("market.spawn", location);
-            RegionData.save();
+            // Save to SQLite database
+            net.craftnepal.market.managers.DatabaseManager.setMarketSpawn(location);
             
             // Update actual world spawn immediately
             if (location.getWorld() != null) {

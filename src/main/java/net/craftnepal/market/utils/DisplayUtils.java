@@ -1,17 +1,14 @@
 package net.craftnepal.market.utils;
 
+import net.craftnepal.market.Market;
 import net.craftnepal.market.Entities.ChestShop;
 import net.craftnepal.market.Entities.DisplayPair;
-import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
-import org.bukkit.Material;
-import org.bukkit.enchantments.Enchantment;
 
 import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.TextDisplay;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.util.Transformation;
 import org.joml.AxisAngle4f;
 import org.joml.Vector3f;
@@ -64,10 +61,13 @@ public class DisplayUtils {
                 new Transformation(new Vector3f(0, 0, 0), new AxisAngle4f(0, 0, 0, 0),
                         new Vector3f(0.5f, 0.5f, 0.5f), new AxisAngle4f(0, 0, 0, 0));
 
+        float viewRange = (float) Market.getMainConfig().getDouble("display-view-range", 1.0);
+
         ItemDisplay itemDisplay = shopLoc.getWorld().spawn(itemLoc, ItemDisplay.class, d -> {
             d.setItemStack(itemStack);
             d.setTransformation(itemTransform);
             d.setBillboard(TextDisplay.Billboard.CENTER);
+            d.setViewRange(viewRange);
             d.setPersistent(false);
         });
 
@@ -78,6 +78,7 @@ public class DisplayUtils {
             Transformation t = d.getTransformation();
             t.getScale().set(0.5f);
             d.setTransformation(t);
+            d.setViewRange(viewRange);
             d.setPersistent(false);
         });
 
@@ -137,6 +138,14 @@ public class DisplayUtils {
             return;
 
         pair.update(buildDisplayItem(shop), buildDisplayText(shop));
+
+        float viewRange = (float) Market.getMainConfig().getDouble("display-view-range", 1.0);
+        if (pair.getItemDisplay() != null) {
+            pair.getItemDisplay().setViewRange(viewRange);
+        }
+        if (pair.getTextDisplay() != null) {
+            pair.getTextDisplay().setViewRange(viewRange);
+        }
     }
 
     // ── Chunk Events ──────────────────────────────────────────────────

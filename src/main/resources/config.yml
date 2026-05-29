@@ -6,6 +6,12 @@ join-message: "&eHello there! %player%"
 # Allow players to fly within the market world
 allow-flight: true
 
+# The rendering/view range distance multiplier for the Display entities (item and text displays).
+# 1.0 is default (normally up to 64 blocks depending on server settings).
+# Lowering this (e.g. to 0.25) is highly recommended if player clients experience FPS drops or lag
+# in the market world, as it stops rendering displays that are far away.
+display-view-range: 0.25
+
 # Note: Player protection (damage, hunger, mob spawning) is now handled by WorldGuard and Paper.
 
 market-world:

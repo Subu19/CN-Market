@@ -28,7 +28,7 @@ public class ShopItemListMenu extends Menu {
         // Populate representative shops
         Map<String, ChestShop> allShops = ShopUtils.getAllShops();
         for (ChestShop shop : allShops.values()) {
-            String shopPlot = PlotUtils.getPlotIdByLocation(shop.getLocation());
+            String shopPlot = shop.getPlotId();
             if (plotId.equals(shopPlot)) {
                 String key = ShopUtils.getItemKey(shop);
                 if (itemCounts.containsKey(key)) {
@@ -164,7 +164,7 @@ public class ShopItemListMenu extends Menu {
                     if (finalKey != null) {
                         Map<String, ChestShop> plotShops = ShopUtils.getAllShops();
                         for (ChestShop shop : plotShops.values()) {
-                            String shopPlot = PlotUtils.getPlotIdByLocation(shop.getLocation());
+                            String shopPlot = shop.getPlotId();
                             if (plotId.equals(shopPlot)
                                     && ShopUtils.getItemKey(shop).equals(finalKey)) {
                                 RegionUtils.showVerticalParticleLine(playerMenuUtility.getOwner(),

@@ -13,6 +13,8 @@ public class ChestShop {
     private double price;
     private boolean isAdmin;
     private boolean isBuyingShop; // true if the shop BUYS items from players (Player sells to shop)
+    private String plotId;
+    private int stock;
 
     public ChestShop(String id, Location location, ItemStack item, UUID owner, double price) {
         this(id, location, item, owner, price, false, false);
@@ -26,6 +28,22 @@ public class ChestShop {
         this.price = price;
         this.isAdmin = isAdmin;
         this.isBuyingShop = isBuyingShop;
+    }
+
+    public String getPlotId() {
+        return plotId;
+    }
+
+    public void setPlotId(String plotId) {
+        this.plotId = plotId;
+    }
+
+    public int getStock() {
+        return stock;
+    }
+
+    public void setStock(int stock) {
+        this.stock = stock;
     }
 
     // Getters and Setters

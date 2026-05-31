@@ -120,7 +120,7 @@ public class ShopUtils {
      */
     public static int getShopStock(ChestShop shop) {
         if (shop.isAdmin()) return 9999;
-        return DatabaseManager.getShopStock(shop.getId());
+        return shop.getStock();
     }
 
     /**
@@ -315,6 +315,7 @@ public class ShopUtils {
         // STEP 4: Update SQLite Database Stock Cache (arithmetic — no chunk load needed)
         if (!shop.isAdmin()) {
             int newStock = Math.max(0, stock - actualGiven);
+            shop.setStock(newStock);
             DatabaseManager.updateShopStock(shop.getId(), newStock);
         }
 
@@ -397,7 +398,9 @@ public class ShopUtils {
                 
                 // Update SQLite database stock cache (arithmetic — no chunk load needed)
                 int currentStock = getShopStock(shop);
-                DatabaseManager.updateShopStock(shop.getId(), currentStock + amount);
+                int newStock = currentStock + amount;
+                shop.setStock(newStock);
+                DatabaseManager.updateShopStock(shop.getId(), newStock);
             }
         }
 

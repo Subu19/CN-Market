@@ -124,7 +124,7 @@ public class MarketManagementMenu extends Menu {
         int slot = event.getSlot();
         if (slotToShopMap.containsKey(slot)) {
             ChestShop shop = slotToShopMap.get(slot);
-            String plotId = net.craftnepal.market.utils.PlotUtils.getPlotIdByLocation(shop.getLocation());
+            String plotId = shop.getPlotId();
             if (plotId != null) {
                 org.bukkit.entity.Player player = playerMenuUtility.getOwner();
                 org.bukkit.Location origin = player.getLocation();

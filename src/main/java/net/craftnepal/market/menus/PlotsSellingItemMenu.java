@@ -34,8 +34,8 @@ public class PlotsSellingItemMenu extends Menu {
         Map<String, ChestShop> allShops = ShopUtils.getAllShops();
         for (ChestShop shop : allShops.values()) {
             if (ShopUtils.getItemKey(shop).equals(productKey) && ShopUtils.getShopStock(shop) > 0) {
-                // Find plot ID from shop location
-                String plotId = PlotUtils.getPlotIdByLocation(shop.getLocation());
+                // Find plot ID from shop
+                String plotId = shop.getPlotId();
                 if (plotId != null) {
                     plotSet.add(plotId);
                 }
@@ -139,7 +139,7 @@ public class PlotsSellingItemMenu extends Menu {
                     // Highlight only the shops matching the specific product
                     Map<String, ChestShop> plotShops = ShopUtils.getAllShops();
                     for (ChestShop shop : plotShops.values()) {
-                        String plotOfShop = PlotUtils.getPlotIdByLocation(shop.getLocation());
+                        String plotOfShop = shop.getPlotId();
                         if (plotId.equals(plotOfShop) && ShopUtils.getItemKey(shop).equals(targetProductKey)) {
                             RegionUtils.showVerticalParticleLine(playerMenuUtility.getOwner(), shop.getLocation().clone().add(0, 2, 0), null, Market.getPlugin());
                         }
@@ -167,7 +167,7 @@ public class PlotsSellingItemMenu extends Menu {
         int totalStock = 0;
         Map<String, ChestShop> allShops = ShopUtils.getAllShops();
         for (ChestShop shop : allShops.values()) {
-            String plotOfShop = PlotUtils.getPlotIdByLocation(shop.getLocation());
+            String plotOfShop = shop.getPlotId();
             if (plotId.equals(plotOfShop) && ShopUtils.getItemKey(shop).equals(targetProductKey)) {
                 int stock = ShopUtils.getShopStock(shop);
                 if (stock > 0) {

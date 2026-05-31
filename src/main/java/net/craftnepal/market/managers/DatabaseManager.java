@@ -551,6 +551,10 @@ public class DatabaseManager {
             pstmt.setInt(9, shop.isAdmin() ? 1 : 0);
             pstmt.setInt(10, stock);
             pstmt.executeUpdate();
+            
+            // Set the cache on the ChestShop object
+            shop.setPlotId(plotId);
+            shop.setStock(stock);
         } catch (SQLException e) {
             Bukkit.getLogger().severe("Failed to save shop " + shop.getId() + ": " + e.getMessage());
         }
@@ -794,7 +798,10 @@ public class DatabaseManager {
         boolean isAdmin = rs.getInt("is_admin") == 1;
 
         if (loc != null && item != null) {
-            return new ChestShop(id, loc, item, owner, price, isAdmin, isBuyingShop);
+            ChestShop shop = new ChestShop(id, loc, item, owner, price, isAdmin, isBuyingShop);
+            shop.setPlotId(rs.getString("plot_id"));
+            shop.setStock(rs.getInt("stock"));
+            return shop;
         }
         return null;
     }

@@ -24,14 +24,20 @@ public class PlayerJoinListener implements Listener {
         UUID uuid = player.getUniqueId();
         
         // Notify offline earnings
-        double offlineEarnings = net.craftnepal.market.managers.DatabaseManager.getOfflineEarnings(uuid.toString());
-        if (offlineEarnings > 0) {
-            Bukkit.getScheduler().runTaskLater(Market.getPlugin(), () -> {
-                SendMessage.sendPlayerMessage(player, "§aWhile you were offline, your market shops earned you " + EconomyUtils.format(offlineEarnings) + "!");
-                // Clear offline earnings
-                net.craftnepal.market.managers.DatabaseManager.setOfflineEarnings(uuid.toString(), 0.0);
-            }, 60L); // 3 seconds after join
-        }
+        Bukkit.getScheduler().runTaskAsynchronously(Market.getPlugin(), () -> {
+            double offlineEarnings = net.craftnepal.market.managers.DatabaseManager.getOfflineEarnings(uuid.toString());
+            if (offlineEarnings > 0) {
+                Bukkit.getScheduler().runTaskLater(Market.getPlugin(), () -> {
+                    if (player.isOnline()) {
+                        SendMessage.sendPlayerMessage(player, "§aWhile you were offline, your market shops earned you " + EconomyUtils.format(offlineEarnings) + "!");
+                        // Clear offline earnings asynchronously
+                        Bukkit.getScheduler().runTaskAsynchronously(Market.getPlugin(), () -> {
+                            net.craftnepal.market.managers.DatabaseManager.setOfflineEarnings(uuid.toString(), 0.0);
+                        });
+                    }
+                }, 60L); // 3 seconds after join
+            }
+        });
 
         // Notify low stock
         Bukkit.getScheduler().runTaskLater(Market.getPlugin(), () -> {

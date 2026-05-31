@@ -17,6 +17,7 @@ public class DatabaseManager {
 
     private static Connection connection;
     private static File databaseFile;
+    private static final java.util.Map<String, ChestShop> shopCache = new java.util.concurrent.ConcurrentHashMap<>();
 
     public static void initialize(File dbFile) {
         databaseFile = dbFile;
@@ -24,8 +25,11 @@ public class DatabaseManager {
             // Ensure connection is established and tables exist
             Connection conn = getConnection();
             try (Statement stmt = conn.createStatement()) {
-                // Enable foreign keys
+                // Enable foreign keys and optimize database settings
                 stmt.execute("PRAGMA foreign_keys = ON;");
+                stmt.execute("PRAGMA journal_mode = WAL;");
+                stmt.execute("PRAGMA synchronous = NORMAL;");
+                stmt.execute("PRAGMA busy_timeout = 5000;");
 
                 // Plots table
                 stmt.execute("CREATE TABLE IF NOT EXISTS plots (" +
@@ -80,8 +84,27 @@ public class DatabaseManager {
             
             // Perform automatic one-time migration if legacy YAML data files exist
             migrateFromYaml();
+            // Load shops into in-memory cache
+            loadShopsIntoCache();
         } catch (SQLException e) {
             Bukkit.getLogger().severe("Could not initialize SQLite database: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    public static void loadShopsIntoCache() {
+        shopCache.clear();
+        String sql = "SELECT * FROM shops";
+        try (PreparedStatement pstmt = getConnection().prepareStatement(sql);
+             ResultSet rs = pstmt.executeQuery()) {
+            while (rs.next()) {
+                ChestShop shop = mapRowToShop(rs);
+                if (shop != null) {
+                    shopCache.put(shop.getId(), shop);
+                }
+            }
+            Bukkit.getLogger().info("[Market] Loaded " + shopCache.size() + " shops into memory cache.");
+        } catch (SQLException e) {
             e.printStackTrace();
         }
     }
@@ -555,6 +578,8 @@ public class DatabaseManager {
             // Set the cache on the ChestShop object
             shop.setPlotId(plotId);
             shop.setStock(stock);
+            // Update in-memory cache
+            shopCache.put(shop.getId(), shop);
         } catch (SQLException e) {
             Bukkit.getLogger().severe("Failed to save shop " + shop.getId() + ": " + e.getMessage());
         }
@@ -565,6 +590,8 @@ public class DatabaseManager {
         try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
             pstmt.setString(1, id);
             pstmt.executeUpdate();
+            // Remove from in-memory cache
+            shopCache.remove(id);
         } catch (SQLException e) {
             Bukkit.getLogger().severe("Failed to remove shop " + id + ": " + e.getMessage());
         }
@@ -576,124 +603,65 @@ public class DatabaseManager {
             pstmt.setDouble(1, price);
             pstmt.setString(2, id);
             pstmt.executeUpdate();
+            // Update in-memory cache
+            ChestShop shop = shopCache.get(id);
+            if (shop != null) {
+                shop.setPrice(price);
+            }
         } catch (SQLException e) {
             Bukkit.getLogger().severe("Failed to update shop price " + id + ": " + e.getMessage());
         }
     }
 
     public static ChestShop getShop(String id) {
-        String sql = "SELECT * FROM shops WHERE id = ?";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
-            pstmt.setString(1, id);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    return mapRowToShop(rs);
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return null;
+        return shopCache.get(id);
     }
 
     public static ChestShop getShopAt(Location location) {
-        String sql = "SELECT * FROM shops WHERE location = ?";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
-            pstmt.setString(1, serializeLocation(location));
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    return mapRowToShop(rs);
-                }
+        if (location == null) return null;
+        String targetSerialized = serializeLocation(location);
+        for (ChestShop shop : shopCache.values()) {
+            if (targetSerialized.equals(serializeLocation(shop.getLocation()))) {
+                return shop;
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
         }
         return null;
     }
 
     public static List<ChestShop> getAllShops() {
-        List<ChestShop> shops = new ArrayList<>();
-        String sql = "SELECT * FROM shops";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql);
-             ResultSet rs = pstmt.executeQuery()) {
-            while (rs.next()) {
-                ChestShop shop = mapRowToShop(rs);
-                if (shop != null) {
-                    shops.add(shop);
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return shops;
+        return new ArrayList<>(shopCache.values());
     }
 
     public static List<ChestShop> getShopsByPlot(String plotId) {
         List<ChestShop> shops = new ArrayList<>();
-        String sql = "SELECT * FROM shops WHERE plot_id = ?";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
-            pstmt.setString(1, plotId);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                while (rs.next()) {
-                    ChestShop shop = mapRowToShop(rs);
-                    if (shop != null) {
-                        shops.add(shop);
-                    }
-                }
+        if (plotId == null) return shops;
+        for (ChestShop shop : shopCache.values()) {
+            if (plotId.equals(shop.getPlotId())) {
+                shops.add(shop);
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
         }
         return shops;
     }
 
     public static List<ChestShop> getShopsByOwner(String ownerUuid) {
         List<ChestShop> shops = new ArrayList<>();
-        String sql = "SELECT * FROM shops WHERE owner = ?";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
-            pstmt.setString(1, ownerUuid);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                while (rs.next()) {
-                    ChestShop shop = mapRowToShop(rs);
-                    if (shop != null) {
-                        shops.add(shop);
-                    }
-                }
+        if (ownerUuid == null) return shops;
+        for (ChestShop shop : shopCache.values()) {
+            if (shop.getOwner() != null && ownerUuid.equals(shop.getOwner().toString())) {
+                shops.add(shop);
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
         }
         return shops;
     }
 
     public static String getPlotIdOfShop(String shopId) {
-        String sql = "SELECT plot_id FROM shops WHERE id = ?";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
-            pstmt.setString(1, shopId);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getString("plot_id");
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return null;
+        ChestShop shop = shopCache.get(shopId);
+        return shop != null ? shop.getPlotId() : null;
     }
 
     public static int getShopStock(String id) {
-        String sql = "SELECT stock FROM shops WHERE id = ?";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
-            pstmt.setString(1, id);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getInt("stock");
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return 0;
+        ChestShop shop = shopCache.get(id);
+        return shop != null ? shop.getStock() : 0;
     }
 
     public static void updateShopStock(String id, int stock) {
@@ -702,6 +670,11 @@ public class DatabaseManager {
             pstmt.setInt(1, stock);
             pstmt.setString(2, id);
             pstmt.executeUpdate();
+            // Update in-memory cache
+            ChestShop shop = shopCache.get(id);
+            if (shop != null) {
+                shop.setStock(stock);
+            }
         } catch (SQLException e) {
             Bukkit.getLogger().severe("Failed to update shop stock for " + id + ": " + e.getMessage());
         }

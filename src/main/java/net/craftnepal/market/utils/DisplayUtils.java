@@ -44,7 +44,11 @@ public class DisplayUtils {
             return null;
 
         Location shopLoc = shop.getLocation();
-        String plotId = PlotUtils.getPlotIdByLocation(shopLoc);
+        String plotId = shop.getPlotId();
+        if (plotId == null) {
+            plotId = PlotUtils.getPlotIdByLocation(shopLoc);
+            shop.setPlotId(plotId);
+        }
         if (plotId == null)
             return null;
 
@@ -125,7 +129,11 @@ public class DisplayUtils {
     }
 
     public void updateDisplay(ChestShop shop) {
-        String plotId = PlotUtils.getPlotIdByLocation(shop.getLocation());
+        String plotId = shop.getPlotId();
+        if (plotId == null) {
+            plotId = PlotUtils.getPlotIdByLocation(shop.getLocation());
+            shop.setPlotId(plotId);
+        }
         if (plotId == null)
             return;
 

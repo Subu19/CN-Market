@@ -52,3 +52,30 @@ admin-shops:
   # Min and max multipliers of the base price for admin shops
   min-price-multiplier: 0.75
   max-price-multiplier: 1.50
+
+# Configuration for the Currency Exchange System (e.g. Diamond-to-Money Exchange)
+currency-exchange:
+  # Enable the custom pricing algorithm for currency exchange items
+  enabled: true
+  
+  # The material name of the currency item (case-insensitive)
+  currency-item: "DIAMOND"
+  
+  # Pricing model to use: CPI_PEG (Consumer Price Index) or TRANSACTION_FLOW (default)
+  pricing-model: "CPI_PEG"
+  
+  # Min and max multipliers of the base price for the currency item.
+  # Overrides the default admin-shops min/max multipliers if set.
+  min-price-multiplier: 0.50
+  max-price-multiplier: 3.00
+  
+  # Settings for the CPI_PEG pricing model
+  cpi-settings:
+    # A basket of core items used to measure inflation and health of player-to-player shops.
+    # The currency item price will adjust based on the median price fluctuations of these items.
+    basket-items:
+      - IRON_INGOT
+      - GOLD_INGOT
+      - NETHERITE_INGOT
+      - OAK_LOG
+      - GUNPOWDER

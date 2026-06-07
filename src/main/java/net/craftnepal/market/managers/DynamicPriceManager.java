@@ -16,7 +16,10 @@ import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class DynamicPriceManager {
@@ -217,50 +220,65 @@ public class DynamicPriceManager {
             double currentPrice = getDynamicPrice(itemKey);
 
             if (adminShopKeys.contains(itemKey)) {
-                // Admin Shop Net-Flow pricing model
-                int bought = metricsConfig.getInt("admin_purchased_today." + itemKey, 0);
-                int sold = metricsConfig.getInt("admin_sold_today." + itemKey, 0);
-                int netFlow = bought - sold;
+                double newPrice = currentPrice;
+                boolean isCurrencyExchange = false;
 
-                double maxChange = Market.getMainConfig().getDouble("admin-shops.max-price-change-percent", 0.03);
-                double percentChange;
-                if (netFlow > 10) {
-                    percentChange = maxChange;
-                } else if (netFlow > 0) {
-                    percentChange = maxChange / 3.0;
-                } else if (netFlow < -10) {
-                    percentChange = -maxChange;
-                } else if (netFlow < 0) {
-                    percentChange = -maxChange / 3.0;
-                } else {
-                    // Decay toward base price: moves 1% of the distance to the base price
-                    percentChange = (basePrice - currentPrice) / currentPrice * 0.01;
+                if (Market.getMainConfig().getBoolean("currency-exchange.enabled", false)
+                        && itemKey.equalsIgnoreCase(Market.getMainConfig().getString("currency-exchange.currency-item"))) {
+                    
+                    String model = Market.getMainConfig().getString("currency-exchange.pricing-model", "CPI_PEG");
+                    if (model.equalsIgnoreCase("CPI_PEG")) {
+                        newPrice = calculateCPIPrice(itemKey, basePrice);
+                        isCurrencyExchange = true;
+                    }
                 }
 
-                if (percentChange != 0.0) {
-                    double newPrice = currentPrice * (1.0 + percentChange);
+                if (!isCurrencyExchange) {
+                    // Admin Shop Net-Flow pricing model
+                    int bought = metricsConfig.getInt("admin_purchased_today." + itemKey, 0);
+                    int sold = metricsConfig.getInt("admin_sold_today." + itemKey, 0);
+                    int netFlow = bought - sold;
 
-                    // Tight clamp: [min-price-multiplier * base, max-price-multiplier * base]
-                    double minMult = Market.getMainConfig().getDouble("admin-shops.min-price-multiplier", 0.75);
-                    double maxMult = Market.getMainConfig().getDouble("admin-shops.max-price-multiplier", 1.50);
-                    double minPrice = basePrice * minMult;
-                    double maxPrice = basePrice * maxMult;
-                    
-                    if (newPrice < minPrice) newPrice = minPrice;
-                    if (newPrice > maxPrice) newPrice = maxPrice;
-
-                    if (Math.abs(newPrice - currentPrice) > 0.01) {
-                        double actualMultiplier = newPrice / currentPrice;
-                        double trend = actualMultiplier - 1.0;
-                        dynamicPricesConfig.set(itemKey + ".price", newPrice);
-                        dynamicPricesConfig.set(itemKey + ".trend", trend);
-                        pricesChanged = true;
-
-                        Bukkit.getLogger().info("[Market] Admin item " + itemKey + " price changed by " + String.format("%.1f%%", trend * 100) + " (New: " + newPrice + ")");
-                        
-                        // Auto-scale existing player shops (if any exist)
-                        autoScaleShops(itemKey, actualMultiplier);
+                    double maxChange = Market.getMainConfig().getDouble("admin-shops.max-price-change-percent", 0.03);
+                    double percentChange;
+                    if (netFlow > 10) {
+                        percentChange = maxChange;
+                    } else if (netFlow > 0) {
+                        percentChange = maxChange / 3.0;
+                    } else if (netFlow < -10) {
+                        percentChange = -maxChange;
+                    } else if (netFlow < 0) {
+                        percentChange = -maxChange / 3.0;
+                    } else {
+                        // Decay toward base price: moves 1% of the distance to the base price
+                        percentChange = (basePrice - currentPrice) / currentPrice * 0.01;
                     }
+
+                    if (percentChange != 0.0) {
+                        newPrice = currentPrice * (1.0 + percentChange);
+
+                        // Tight clamp: [min-price-multiplier * base, max-price-multiplier * base]
+                        double minMult = Market.getMainConfig().getDouble("admin-shops.min-price-multiplier", 0.75);
+                        double maxMult = Market.getMainConfig().getDouble("admin-shops.max-price-multiplier", 1.50);
+                        double minPrice = basePrice * minMult;
+                        double maxPrice = basePrice * maxMult;
+                        
+                        if (newPrice < minPrice) newPrice = minPrice;
+                        if (newPrice > maxPrice) newPrice = maxPrice;
+                    }
+                }
+
+                if (Math.abs(newPrice - currentPrice) > 0.01) {
+                    double actualMultiplier = newPrice / currentPrice;
+                    double trend = actualMultiplier - 1.0;
+                    dynamicPricesConfig.set(itemKey + ".price", newPrice);
+                    dynamicPricesConfig.set(itemKey + ".trend", trend);
+                    pricesChanged = true;
+
+                    Bukkit.getLogger().info("[Market] Admin item " + itemKey + " price changed by " + String.format("%.1f%%", trend * 100) + " (New: " + newPrice + ")");
+                    
+                    // Auto-scale existing player shops (if any exist)
+                    autoScaleShops(itemKey, actualMultiplier);
                 }
             } else {
                 // Normal supply/demand ratio model for player shops
@@ -350,6 +368,79 @@ public class DynamicPriceManager {
         } catch (IOException e) {
             Bukkit.getLogger().severe("Could not save market_metrics.yml");
         }
+    }
+
+    private static double calculateCPIPrice(String itemKey, double basePrice) {
+        FileConfiguration mainConfig = Market.getMainConfig();
+        if (mainConfig == null) return basePrice;
+
+        List<String> basketItems = mainConfig.getStringList("currency-exchange.cpi-settings.basket-items");
+        if (basketItems == null || basketItems.isEmpty()) {
+            return basePrice;
+        }
+
+        double baselineIndex = 0;
+        double currentIndex = 0;
+
+        // Fetch all active shops
+        Map<String, ChestShop> allShops = ShopUtils.getAllShops();
+
+        for (String basketItem : basketItems) {
+            Integer itemBase = PriceData.getPrice(basketItem);
+            if (itemBase == null || itemBase <= 0) continue;
+
+            baselineIndex += itemBase;
+
+            // Get median price in player shops with stock > 0
+            List<Double> prices = new ArrayList<>();
+            for (ChestShop shop : allShops.values()) {
+                if (!shop.isAdmin() && !shop.isBuyingShop() && ShopUtils.getItemKey(shop).equalsIgnoreCase(basketItem)) {
+                    int stock = ShopUtils.getShopStock(shop);
+                    if (stock > 0) {
+                        prices.add(shop.getPrice());
+                    }
+                }
+            }
+
+            double itemMarketPrice;
+            if (prices.isEmpty()) {
+                // Fallback to current dynamic price of the item if no player shops exist
+                itemMarketPrice = getDynamicPrice(basketItem);
+                if (itemMarketPrice <= 0) {
+                    itemMarketPrice = itemBase;
+                }
+            } else {
+                // Compute median to avoid manipulation by outlier shops
+                Collections.sort(prices);
+                int size = prices.size();
+                if (size % 2 == 0) {
+                    itemMarketPrice = (prices.get(size / 2 - 1) + prices.get(size / 2)) / 2.0;
+                } else {
+                    itemMarketPrice = prices.get(size / 2);
+                }
+            }
+
+            currentIndex += itemMarketPrice;
+        }
+
+        if (baselineIndex <= 0) return basePrice;
+
+        double cpiRatio = currentIndex / baselineIndex;
+        double newPrice = basePrice * cpiRatio;
+
+        // Clamping based on currency-exchange multipliers, falling back to admin-shops
+        double minMult = mainConfig.getDouble("currency-exchange.min-price-multiplier", 
+                mainConfig.getDouble("admin-shops.min-price-multiplier", 0.75));
+        double maxMult = mainConfig.getDouble("currency-exchange.max-price-multiplier", 
+                mainConfig.getDouble("admin-shops.max-price-multiplier", 1.50));
+        
+        double minPrice = basePrice * minMult;
+        double maxPrice = basePrice * maxMult;
+
+        if (newPrice < minPrice) newPrice = minPrice;
+        if (newPrice > maxPrice) newPrice = maxPrice;
+
+        return newPrice;
     }
 
     /**

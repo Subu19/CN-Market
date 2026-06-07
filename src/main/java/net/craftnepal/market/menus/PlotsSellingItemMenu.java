@@ -151,14 +151,17 @@ public class PlotsSellingItemMenu extends Menu {
 
     private ItemStack createPlotItem(String plotId) {
         String ownerUUID = PlotUtils.getPlotOwner(plotId);
-        ItemStack plotItem = PlayerUtils.getPlayerHead(UUID.fromString(ownerUUID));
-        ItemMeta meta = plotItem.getItemMeta();
 
         String ownerName = "Unknown";
+        ItemStack plotItem;
         if (ownerUUID != null) {
+            plotItem = PlayerUtils.getPlayerHead(UUID.fromString(ownerUUID));
             OfflinePlayer owner = Bukkit.getOfflinePlayer(UUID.fromString(ownerUUID));
             ownerName = owner.getName() != null ? owner.getName() : "Unknown";
+        } else {
+            plotItem = new ItemStack(Material.SKELETON_SKULL);
         }
+        ItemMeta meta = plotItem.getItemMeta();
 
         meta.setDisplayName(ChatColor.GREEN + "Plot " + plotId);
 

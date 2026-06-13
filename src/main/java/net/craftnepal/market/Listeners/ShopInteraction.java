@@ -54,10 +54,6 @@ public class ShopInteraction implements Listener {
             return;
 
         Player player = event.getPlayer();
-
-        // Sneaking always bypasses our handling – let Minecraft do its normal thing.
-        if (player.isSneaking()) return;
-
         UUID uuid = player.getUniqueId();
         String plotId = PlotUtils.getPlotIdByLocation(block.getLocation());
 
@@ -77,6 +73,25 @@ public class ShopInteraction implements Listener {
         if (shop != null && shop.isAdmin() && !isBypass) {
             isOwner = false;
         }
+
+        // Handle sneaking logic:
+        // We only allow sneaking to bypass (letting Minecraft do block placement or opening)
+        // if the player actually has permission to interact with the container.
+        if (player.isSneaking()) {
+            if (shop != null) {
+                // For a shop barrel, only the shop owner or an admin in bypass mode can sneak-interact.
+                if (isOwner || isBypass) {
+                    return;
+                }
+            } else {
+                // For a non-shop barrel, only players with plot interaction permissions can sneak-interact.
+                if (PlotUtils.canPlayerInteract(player, block.getLocation())) {
+                    return;
+                }
+            }
+            // Otherwise, do not return early; cancel or handle the interaction.
+        }
+
         boolean isRight  = event.getAction() == Action.RIGHT_CLICK_BLOCK;
         boolean isLeft   = event.getAction() == Action.LEFT_CLICK_BLOCK;
 

@@ -15,11 +15,18 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.*;
 import org.bukkit.event.entity.EntityExplodeEvent;
+import org.bukkit.entity.ArmorStand;
+import org.bukkit.entity.Hanging;
 import org.bukkit.event.entity.EntityChangeBlockEvent;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
+import org.bukkit.event.entity.ProjectileLaunchEvent;
+import org.bukkit.event.hanging.HangingBreakByEntityEvent;
+import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.world.StructureGrowEvent;
 import org.bukkit.block.BlockFace;
+import org.bukkit.inventory.ItemStack;
 
 import java.util.List;
 import java.util.Objects;
@@ -58,6 +65,7 @@ public class MarketRegionProtection implements Listener {
         return MarketUtils.isInMarketArea(location);
     }
 
+
     /**
      * Returns true when {@code block} is in the same plot as {@code referencePlotId}, or when both
      * are null (both in a pathway / unowned zone).
@@ -73,6 +81,22 @@ public class MarketRegionProtection implements Listener {
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onPlayerInteract(PlayerInteractEvent e) {
         Player player = e.getPlayer();
+
+        // Block wind charge's use (item wont me used tei bhayera)
+        if (e.getAction() == Action.RIGHT_CLICK_AIR || e.getAction() == Action.RIGHT_CLICK_BLOCK) {
+            if (isMarketWorld(player.getLocation())
+                    && !net.craftnepal.market.subcommands.admin.Bypass.bypassPlayers
+                            .containsKey(player.getUniqueId())) {
+                ItemStack item = e.getItem();
+                if (item != null && item.getType() == Material.WIND_CHARGE) {
+                    e.setCancelled(true);
+                    SendMessage.sendPlayerMessage(player,
+                            "&cYou are not allowed to use Wind Charges here.");
+                    return;
+                }
+            }
+        }
+
         Block clickedBlock = e.getClickedBlock();
 
         if (clickedBlock == null)
@@ -96,6 +120,68 @@ public class MarketRegionProtection implements Listener {
         if (!PlotUtils.canPlayerInteract(player, clickedBlock.getLocation())) {
             e.setCancelled(true);
             SendMessage.sendPlayerMessage(player, "&cYou are not allowed to interact here.");
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onPlayerInteractEntity(PlayerInteractEntityEvent e) {
+        org.bukkit.entity.Entity entity = e.getRightClicked();
+        if (entity instanceof Hanging || entity instanceof ArmorStand) {
+            if (!isMarketWorld(entity.getLocation()))
+                return;
+
+            if (!PlotUtils.canPlayerInteract(e.getPlayer(), entity.getLocation())) {
+                e.setCancelled(true);
+                SendMessage.sendPlayerMessage(e.getPlayer(),
+                        "&cYou are not allowed to interact here.");
+            }
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onEntityDamageByEntity(EntityDamageByEntityEvent e) {
+        org.bukkit.entity.Entity entity = e.getEntity();
+        if (entity instanceof Hanging || entity instanceof ArmorStand) {
+            if (!isMarketWorld(entity.getLocation()))
+                return;
+
+            Player damager = null;
+            if (e.getDamager() instanceof Player p) {
+                damager = p;
+            } else if (e.getDamager() instanceof Projectile proj
+                    && proj.getShooter() instanceof Player p) {
+                damager = p;
+            }
+
+            if (damager != null) {
+                if (!PlotUtils.canPlayerInteract(damager, entity.getLocation())) {
+                    e.setCancelled(true);
+                    SendMessage.sendPlayerMessage(damager,
+                            "&cYou are not allowed to interact here.");
+                }
+            }
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onHangingBreakByEntity(HangingBreakByEntityEvent e) {
+        org.bukkit.entity.Entity entity = e.getEntity();
+        if (!isMarketWorld(entity.getLocation()))
+            return;
+
+        Player remover = null;
+        if (e.getRemover() instanceof Player p) {
+            remover = p;
+        } else if (e.getRemover() instanceof Projectile proj
+                && proj.getShooter() instanceof Player p) {
+            remover = p;
+        }
+
+        if (remover != null) {
+            if (!PlotUtils.canPlayerInteract(remover, entity.getLocation())) {
+                e.setCancelled(true);
+                SendMessage.sendPlayerMessage(remover, "&cYou are not allowed to interact here.");
+            }
         }
     }
 
@@ -356,27 +442,21 @@ public class MarketRegionProtection implements Listener {
      * entity is in a different plot from where the burst originated. This catches the knockback
      * side-effect even if the explosion event passed.
      * 
-     * NOTE: Commented out because the project compiles against spigot-api, not paper-api.
-     * If you need this, you must switch your pom.xml dependency to paper-api, or use reflection.
-     * However, Layer 1 (windCharge.remove()) already fully prevents the burst from happening.
+     * NOTE: Commented out because the project compiles against spigot-api, not paper-api. If you
+     * need this, you must switch your pom.xml dependency to paper-api, or use reflection. However,
+     * Layer 1 (windCharge.remove()) already fully prevents the burst from happening.
      */
     /*
-    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
-    public void onWindChargeKnockback(
-            io.papermc.paper.event.entity.EntityKnockbackByEntityEvent e) {
-        if (!isMarketWorld(e.getEntity().getLocation()))
-            return;
-        if (!(e.getHitBy() instanceof WindCharge windCharge))
-            return;
-
-        String burstPlot = PlotUtils.getPlotIdByLocation(windCharge.getLocation());
-        String victimPlot = PlotUtils.getPlotIdByLocation(e.getEntity().getLocation());
-
-        if (!Objects.equals(burstPlot, victimPlot)) {
-            e.setCancelled(true);
-        }
-    }
-    */
+     * @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true) public void
+     * onWindChargeKnockback( io.papermc.paper.event.entity.EntityKnockbackByEntityEvent e) { if
+     * (!isMarketWorld(e.getEntity().getLocation())) return; if (!(e.getHitBy() instanceof
+     * WindCharge windCharge)) return;
+     * 
+     * String burstPlot = PlotUtils.getPlotIdByLocation(windCharge.getLocation()); String victimPlot
+     * = PlotUtils.getPlotIdByLocation(e.getEntity().getLocation());
+     * 
+     * if (!Objects.equals(burstPlot, victimPlot)) { e.setCancelled(true); } }
+     */
 
 
 
@@ -593,6 +673,25 @@ public class MarketRegionProtection implements Listener {
         // Player-aimed trident strikes are handled separately via EntityChangeBlock.
         if (e.getCause() == org.bukkit.event.weather.LightningStrikeEvent.Cause.WEATHER) {
             e.setCancelled(true);
+        }
+    }
+
+    /**
+     * Fallback: cancel a WindCharge launch in case it slips past the interact check (e.g.
+     * dispensers are handled separately; this only targets player-shot charges).
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onWindChargeLaunch(ProjectileLaunchEvent e) {
+        if (!(e.getEntity() instanceof WindCharge))
+            return;
+        if (e.getEntity().getShooter() instanceof Player player) {
+            if (isMarketWorld(player.getLocation())
+                    && !net.craftnepal.market.subcommands.admin.Bypass.bypassPlayers
+                            .containsKey(player.getUniqueId())) {
+                e.setCancelled(true);
+                SendMessage.sendPlayerMessage(player,
+                        "&cYou are not allowed to use Wind Charges here.");
+            }
         }
     }
 }

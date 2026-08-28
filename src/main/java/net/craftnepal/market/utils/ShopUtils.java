@@ -347,6 +347,7 @@ public class ShopUtils {
         } else if (!shop.isAdmin()) {
             double currentOffline = DatabaseManager.getOfflineEarnings(ownerUUID.toString());
             DatabaseManager.setOfflineEarnings(ownerUUID.toString(), currentOffline + actualPrice);
+            DatabaseManager.addOfflineSale(ownerUUID.toString(), itemDisplayName, actualGiven, actualPrice);
         }
         TransactionLogUtils.log("BUY: " + player.getName() + " bought " + actualGiven + "x " + itemDisplayName + " from shop " + shopId + " (Owner: " + ownerUUID.toString() + ") for " + actualPrice);
 

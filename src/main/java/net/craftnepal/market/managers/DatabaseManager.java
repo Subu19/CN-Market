@@ -80,6 +80,15 @@ public class DatabaseManager {
                         "key TEXT PRIMARY KEY," +
                         "value TEXT" +
                         ");");
+
+                // Offline detailed sales table
+                stmt.execute("CREATE TABLE IF NOT EXISTS offline_sales (" +
+                        "uuid TEXT," +
+                        "item_display_name TEXT," +
+                        "quantity INTEGER NOT NULL DEFAULT 0," +
+                        "earnings REAL NOT NULL DEFAULT 0.0," +
+                        "PRIMARY KEY (uuid, item_display_name)" +
+                        ");");
             }
             
             // Perform automatic one-time migration if legacy YAML data files exist
@@ -705,6 +714,76 @@ public class DatabaseManager {
             pstmt.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();
+        }
+    }
+
+    public static void addOfflineSale(String uuid, String itemDisplayName, int quantity, double earnings) {
+        String sql = "INSERT INTO offline_sales (uuid, item_display_name, quantity, earnings) VALUES (?, ?, ?, ?) " +
+                     "ON CONFLICT(uuid, item_display_name) DO UPDATE SET " +
+                     "quantity = quantity + excluded.quantity, " +
+                     "earnings = earnings + excluded.earnings";
+        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
+            pstmt.setString(1, uuid);
+            pstmt.setString(2, itemDisplayName);
+            pstmt.setInt(3, quantity);
+            pstmt.setDouble(4, earnings);
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static List<OfflineSale> getOfflineSales(String uuid) {
+        List<OfflineSale> sales = new ArrayList<>();
+        String sql = "SELECT item_display_name, quantity, earnings FROM offline_sales WHERE uuid = ?";
+        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
+            pstmt.setString(1, uuid);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    sales.add(new OfflineSale(
+                            rs.getString("item_display_name"),
+                            rs.getInt("quantity"),
+                            rs.getDouble("earnings")
+                    ));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return sales;
+    }
+
+    public static void clearOfflineSales(String uuid) {
+        String sql = "DELETE FROM offline_sales WHERE uuid = ?";
+        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
+            pstmt.setString(1, uuid);
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static class OfflineSale {
+        private final String itemDisplayName;
+        private final int quantity;
+        private final double earnings;
+
+        public OfflineSale(String itemDisplayName, int quantity, double earnings) {
+            this.itemDisplayName = itemDisplayName;
+            this.quantity = quantity;
+            this.earnings = earnings;
+        }
+
+        public String getItemDisplayName() {
+            return itemDisplayName;
+        }
+
+        public int getQuantity() {
+            return quantity;
+        }
+
+        public double getEarnings() {
+            return earnings;
         }
     }
 

@@ -10,4 +10,15 @@ public class SendMessage {
         player.sendMessage(ColorTranslator.translateColorCodes(Market.getMainConfig().getString("prefix")+message));
 
     }
+
+    public static void sendPlayerComponent(Player player, net.md_5.bungee.api.chat.BaseComponent component) {
+        String prefix = Market.getMainConfig().getString("prefix");
+        if (prefix == null) prefix = "";
+        
+        net.md_5.bungee.api.chat.TextComponent finalComponent = new net.md_5.bungee.api.chat.TextComponent(
+                ColorTranslator.translateColorCodes(prefix)
+        );
+        finalComponent.addExtra(component);
+        player.spigot().sendMessage(finalComponent);
+    }
 }

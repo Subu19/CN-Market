@@ -345,8 +345,7 @@ public class ShopUtils {
                 SendMessage.sendPlayerMessage(owner, "§c[Reminder] Your shop selling " + itemDisplayName + " is now out of stock!");
             }
         } else if (!shop.isAdmin()) {
-            double currentOffline = DatabaseManager.getOfflineEarnings(ownerUUID.toString());
-            DatabaseManager.setOfflineEarnings(ownerUUID.toString(), currentOffline + actualPrice);
+            DatabaseManager.addOfflineSale(ownerUUID.toString(), itemKey, itemDisplayName, actualGiven, actualPrice);
         }
         TransactionLogUtils.log("BUY: " + player.getName() + " bought " + actualGiven + "x " + itemDisplayName + " from shop " + shopId + " (Owner: " + ownerUUID.toString() + ") for " + actualPrice);
 

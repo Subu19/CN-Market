@@ -83,11 +83,12 @@ public class DatabaseManager {
 
                 // Offline detailed sales table
                 stmt.execute("CREATE TABLE IF NOT EXISTS offline_sales (" +
-                        "uuid TEXT," +
-                        "item_display_name TEXT," +
+                        "uuid TEXT NOT NULL," +
+                        "item_key TEXT NOT NULL," +
+                        "item_display_name TEXT NOT NULL," +
                         "quantity INTEGER NOT NULL DEFAULT 0," +
                         "earnings REAL NOT NULL DEFAULT 0.0," +
-                        "PRIMARY KEY (uuid, item_display_name)" +
+                        "PRIMARY KEY (uuid, item_key)" +
                         ");");
             }
             
@@ -717,16 +718,18 @@ public class DatabaseManager {
         }
     }
 
-    public static void addOfflineSale(String uuid, String itemDisplayName, int quantity, double earnings) {
-        String sql = "INSERT INTO offline_sales (uuid, item_display_name, quantity, earnings) VALUES (?, ?, ?, ?) " +
-                     "ON CONFLICT(uuid, item_display_name) DO UPDATE SET " +
+    public static void addOfflineSale(String uuid, String itemKey, String itemDisplayName, int quantity, double earnings) {
+        String sql = "INSERT INTO offline_sales (uuid, item_key, item_display_name, quantity, earnings) VALUES (?, ?, ?, ?, ?) " +
+                     "ON CONFLICT(uuid, item_key) DO UPDATE SET " +
                      "quantity = quantity + excluded.quantity, " +
-                     "earnings = earnings + excluded.earnings";
+                     "earnings = earnings + excluded.earnings, " +
+                     "item_display_name = excluded.item_display_name";
         try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
             pstmt.setString(1, uuid);
-            pstmt.setString(2, itemDisplayName);
-            pstmt.setInt(3, quantity);
-            pstmt.setDouble(4, earnings);
+            pstmt.setString(2, itemKey);
+            pstmt.setString(3, itemDisplayName);
+            pstmt.setInt(4, quantity);
+            pstmt.setDouble(5, earnings);
             pstmt.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();
@@ -735,12 +738,13 @@ public class DatabaseManager {
 
     public static List<OfflineSale> getOfflineSales(String uuid) {
         List<OfflineSale> sales = new ArrayList<>();
-        String sql = "SELECT item_display_name, quantity, earnings FROM offline_sales WHERE uuid = ?";
+        String sql = "SELECT item_key, item_display_name, quantity, earnings FROM offline_sales WHERE uuid = ?";
         try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
             pstmt.setString(1, uuid);
             try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {
                     sales.add(new OfflineSale(
+                            rs.getString("item_key"),
                             rs.getString("item_display_name"),
                             rs.getInt("quantity"),
                             rs.getDouble("earnings")
@@ -764,14 +768,20 @@ public class DatabaseManager {
     }
 
     public static class OfflineSale {
+        private final String itemKey;
         private final String itemDisplayName;
         private final int quantity;
         private final double earnings;
 
-        public OfflineSale(String itemDisplayName, int quantity, double earnings) {
+        public OfflineSale(String itemKey, String itemDisplayName, int quantity, double earnings) {
+            this.itemKey = itemKey;
             this.itemDisplayName = itemDisplayName;
             this.quantity = quantity;
             this.earnings = earnings;
+        }
+
+        public String getItemKey() {
+            return itemKey;
         }
 
         public String getItemDisplayName() {

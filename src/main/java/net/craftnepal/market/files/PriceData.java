@@ -84,6 +84,53 @@ public class PriceData {
         return priceMap.get(normalizeKey(key));
     }
 
+    /**
+     * Returns the price for a single enchantment at a given level, reusing the
+     * ENCHANTED_BOOK:<ENCHANT>:<LEVEL> entries already in price.yml.
+     * Returns 0 if the enchantment price is not defined.
+     */
+    public static int getEnchantmentPrice(String enchantKey, int level) {
+        String lookupKey = normalizeKey("ENCHANTED_BOOK:" + enchantKey + ":" + level);
+        Integer price = priceMap.get(lookupKey);
+        return price != null ? price : 0;
+    }
+
+    /**
+     * Returns the total price for an ItemStack, including its base item price
+     * plus the price of every enchantment it carries.
+     * For plain ENCHANTED_BOOKs the stored enchants are already part of the key
+     * and handled by the existing getPrice() flow, so we skip them here.
+     *
+     * @return total price, or 0 if the base item has no price entry.
+     */
+    public static int getTotalItemPrice(org.bukkit.inventory.ItemStack item) {
+        if (item == null) return 0;
+
+        // Enchanted books are handled via their own composite key; no double-counting.
+        if (item.getType() == org.bukkit.Material.ENCHANTED_BOOK) {
+            Integer price = getPrice(net.craftnepal.market.utils.ShopUtils.getItemKey(item));
+            return price != null ? price : 0;
+        }
+
+        Integer basePrice = getPrice(item.getType().name());
+        if (basePrice == null || basePrice <= 0) return 0;
+
+        int total = basePrice;
+
+        // Add a price contribution for every enchantment on the item
+        org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
+        if (meta != null && meta.hasEnchants()) {
+            for (java.util.Map.Entry<org.bukkit.enchantments.Enchantment, Integer> entry
+                    : meta.getEnchants().entrySet()) {
+                String enchantName = entry.getKey().getKey().getKey().toUpperCase();
+                int enchantLevel = entry.getValue();
+                total += getEnchantmentPrice(enchantName, enchantLevel);
+            }
+        }
+
+        return total;
+    }
+
     public static void setPrice(String key, int price) {
         if (key == null)
             return;

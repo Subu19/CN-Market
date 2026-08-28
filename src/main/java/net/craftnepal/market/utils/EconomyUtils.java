@@ -52,7 +52,8 @@ public class EconomyUtils {
     }
 
     public static String format(double amount) {
-        if (econ == null) return "$" + amount;
-        return econ.format(amount);
+        double rounded = Math.round(amount * 100.0) / 100.0;
+        if (econ == null) return "$" + String.format("%.2f", rounded);
+        return econ.format(rounded);
     }
 }

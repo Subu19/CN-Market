@@ -2,21 +2,80 @@
 prefix: "&2&l[&a&lMarket&2&l] &a"
 join-message: "&eHello there! %player%"
 
+
 # Allow players to fly within the market world
 allow-flight: true
 
-# Market world protection settings
-protection:
-  # Prevent all player damage (fall, mobs, void, etc.)
-  prevent-damage: true
-  # Prevent hunger loss
-  prevent-hunger: true
-  # Prevent natural mob spawning
-  prevent-mob-spawn: true
+# The rendering/view range distance multiplier for the Display entities (item and text displays).
+# 1.0 is default (normally up to 64 blocks depending on server settings).
+# Lowering this (e.g. to 0.25) is highly recommended if player clients experience FPS drops or lag
+# in the market world, as it stops rendering displays that are far away.
+display-view-range: 0.25
+
+# Note: Player protection (damage, hunger, mob spawning) is now handled by WorldGuard and Paper.
 
 market-world:
   # Maximum height players can build in their plots
-  max-height: 100
+  # Optional: WorldEdit schematic for pathways (relative to plugin folder)
+  # If provided, the generator will skip material-based pathway generation
+  # and paste this schematic instead.
+  pathway-schematic: "schematics/pathway.schem"
+  # The Y-level where the schematic will be pasted. 
+  # Increase this if the road is buried, decrease if it's floating.
+  pathway-y-level: 65
   floor-material: "GRASS_BLOCK"
   pathway-material: "STONE_BRICKS"
   border-material: "SMOOTH_STONE_SLAB"
+  # Maximum number of plots a player can claim.
+  # You can also use permissions: market.plots.limit.<number> to override this.
+  max-plots-per-player: 1
+
+  # Blocks that anyone can interact with anywhere in the market world
+  # (e.g. Ender Chests, Crafting Tables)
+  allowed-interact-blocks:
+    - ENDER_CHEST
+    - CRAFTING_TABLE
+
+# List of items that cannot be created as shops or traded by player-owned shops.
+# (Item material names, case-insensitive)
+player-shop-blacklist:
+  - BEDROCK
+  - BARRIER
+  - COMMAND_BLOCK
+
+# Settings for Admin-owned shops
+admin-shops:
+  # The multiplier applied to the dynamic price when players sell to an admin shop (15% spread)
+  buy-price-multiplier: 0.85
+  # The maximum price fluctuation percentage per daily update cycle (0.03 = 3%)
+  max-price-change-percent: 0.03
+  # Min and max multipliers of the base price for admin shops
+  min-price-multiplier: 0.75
+  max-price-multiplier: 1.50
+
+# Configuration for the Currency Exchange System (e.g. Diamond-to-Money Exchange)
+currency-exchange:
+  # Enable the custom pricing algorithm for currency exchange items
+  enabled: true
+  
+  # The material name of the currency item (case-insensitive)
+  currency-item: "DIAMOND"
+  
+  # Pricing model to use: CPI_PEG (Consumer Price Index) or TRANSACTION_FLOW (default)
+  pricing-model: "CPI_PEG"
+  
+  # Min and max multipliers of the base price for the currency item.
+  # Overrides the default admin-shops min/max multipliers if set.
+  min-price-multiplier: 0.50
+  max-price-multiplier: 3.00
+  
+  # Settings for the CPI_PEG pricing model
+  cpi-settings:
+    # A basket of core items used to measure inflation and health of player-to-player shops.
+    # The currency item price will adjust based on the median price fluctuations of these items.
+    basket-items:
+      - IRON_INGOT
+      - GOLD_INGOT
+      - NETHERITE_INGOT
+      - OAK_LOG
+      - GUNPOWDER

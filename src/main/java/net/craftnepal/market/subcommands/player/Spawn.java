@@ -46,7 +46,10 @@ public class Spawn extends SubCommand {
                 return;
             }
 
-            Location spawn = marketWorld.getSpawnLocation();
+            Location spawn = net.craftnepal.market.managers.DatabaseManager.getMarketSpawn();
+            if (spawn == null) {
+                spawn = marketWorld.getSpawnLocation();
+            }
 
             if(Movement.getPlayersInMarket().containsKey(player.getUniqueId()) && player.getWorld().equals(marketWorld)){
                 SendMessage.sendPlayerMessage(player,"You are already in market!");

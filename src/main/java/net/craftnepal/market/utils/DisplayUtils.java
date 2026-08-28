@@ -1,17 +1,14 @@
 package net.craftnepal.market.utils;
 
+import net.craftnepal.market.Market;
 import net.craftnepal.market.Entities.ChestShop;
 import net.craftnepal.market.Entities.DisplayPair;
-import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
-import org.bukkit.Material;
-import org.bukkit.enchantments.Enchantment;
 
 import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.TextDisplay;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.util.Transformation;
 import org.joml.AxisAngle4f;
 import org.joml.Vector3f;
@@ -47,7 +44,11 @@ public class DisplayUtils {
             return null;
 
         Location shopLoc = shop.getLocation();
-        String plotId = PlotUtils.getPlotIdByLocation(shopLoc);
+        String plotId = shop.getPlotId();
+        if (plotId == null) {
+            plotId = PlotUtils.getPlotIdByLocation(shopLoc);
+            shop.setPlotId(plotId);
+        }
         if (plotId == null)
             return null;
 
@@ -64,10 +65,13 @@ public class DisplayUtils {
                 new Transformation(new Vector3f(0, 0, 0), new AxisAngle4f(0, 0, 0, 0),
                         new Vector3f(0.5f, 0.5f, 0.5f), new AxisAngle4f(0, 0, 0, 0));
 
+        float viewRange = (float) Market.getMainConfig().getDouble("display-view-range", 1.0);
+
         ItemDisplay itemDisplay = shopLoc.getWorld().spawn(itemLoc, ItemDisplay.class, d -> {
             d.setItemStack(itemStack);
             d.setTransformation(itemTransform);
             d.setBillboard(TextDisplay.Billboard.CENTER);
+            d.setViewRange(viewRange);
             d.setPersistent(false);
         });
 
@@ -78,12 +82,12 @@ public class DisplayUtils {
             Transformation t = d.getTransformation();
             t.getScale().set(0.5f);
             d.setTransformation(t);
+            d.setViewRange(viewRange);
             d.setPersistent(false);
         });
 
         DisplayPair pair = new DisplayPair(itemDisplay, textDisplay, shopLoc);
         marketDisplays.computeIfAbsent(plotId, k -> new HashMap<>()).put(shop.getId(), pair);
-        Bukkit.getLogger().info("Created display for " + shop.getId());
         return pair;
     }
 
@@ -125,7 +129,11 @@ public class DisplayUtils {
     }
 
     public void updateDisplay(ChestShop shop) {
-        String plotId = PlotUtils.getPlotIdByLocation(shop.getLocation());
+        String plotId = shop.getPlotId();
+        if (plotId == null) {
+            plotId = PlotUtils.getPlotIdByLocation(shop.getLocation());
+            shop.setPlotId(plotId);
+        }
         if (plotId == null)
             return;
 
@@ -138,6 +146,14 @@ public class DisplayUtils {
             return;
 
         pair.update(buildDisplayItem(shop), buildDisplayText(shop));
+
+        float viewRange = (float) Market.getMainConfig().getDouble("display-view-range", 1.0);
+        if (pair.getItemDisplay() != null) {
+            pair.getItemDisplay().setViewRange(viewRange);
+        }
+        if (pair.getTextDisplay() != null) {
+            pair.getTextDisplay().setViewRange(viewRange);
+        }
     }
 
     // ── Chunk Events ──────────────────────────────────────────────────
@@ -176,13 +192,35 @@ public class DisplayUtils {
 
     /** Builds the display text without String.format for speed. */
     private String buildDisplayText(ChestShop shop) {
-        int stock = ShopUtils.getShopStock(shop);
-        String color = stock > 0 ? "§a" : "§c";
+        StringBuilder sb = new StringBuilder();
+
+        // 1. Admin Icon/Prefix
+        if (shop.isAdmin()) {
+            sb.append("§d§l⭐ "); // Star icon for admin shops
+        }
+
+        // 2. Name and Color based on type
+        if (shop.isBuyingShop()) {
+            sb.append("§b"); // Aqua for Buying shops
+        } else {
+            int stock = ShopUtils.getShopStock(shop);
+            sb.append(stock > 0 ? "§a" : "§c"); // Green/Red for Selling shops
+        }
+        sb.append(getDisplayName(shop)).append("\n");
+
+        // 3. Action Label and Price
+        if (shop.isBuyingShop()) {
+            sb.append("§bBuying at: §f");
+        } else {
+            sb.append("§6Selling at: §f");
+        }
+
         String itemKey = ShopUtils.getItemKey(shop);
         String trend = net.craftnepal.market.managers.DynamicPriceManager.getTrendString(itemKey);
-        // StringBuilder is faster than String.format in a hot update loop
-        return color + getDisplayName(shop) + "\n§6Price: §f$"
-                + String.format("%.2f", shop.getPrice()) + " " + trend;
+
+        sb.append(EconomyUtils.format(shop.getPrice())).append(" ").append(trend);
+
+        return sb.toString();
     }
 
     private ItemStack buildDisplayItem(ChestShop shop) {

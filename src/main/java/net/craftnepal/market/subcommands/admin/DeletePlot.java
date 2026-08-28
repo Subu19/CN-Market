@@ -28,7 +28,7 @@ public class DeletePlot extends SubCommand {
 
     @Override
     public String getSyntax() {
-        return "/amarket deleteplot <plot>";
+        return "/market admin deleteplot <plotId>";
     }
 
     @Override
@@ -36,17 +36,25 @@ public class DeletePlot extends SubCommand {
         if (commandSender instanceof Player) {
             Player player = (Player) commandSender;
             if (!player.hasPermission("market.admin")) {
-                SendMessage.sendPlayerMessage(player, "§cYou don't have permission to use this command.");
+                SendMessage.sendPlayerMessage(player, "&cYou do not have permission to use this command.");
                 return;
             }
             if (strings.length < 2) {
-                SendMessage.sendPlayerMessage(player, "§cUsage: /market admin deleteplot <plotId>");
+                SendMessage.sendPlayerMessage(player, "&cUsage: /market admin deleteplot <plotId>");
                 return;
             }
             String plot = strings[1];
-            if (RegionData.get().get("market.plots." + plot) != null) {
-                PlotUtils.setPlotOwner(plot, null);
-                SendMessage.sendPlayerMessage(player, "§aDeleted plot: §b" + plot);
+            if (net.craftnepal.market.managers.DatabaseManager.getAllPlotIds().contains(plot)) {
+                // Remove all shop displays
+                List<net.craftnepal.market.Entities.ChestShop> shops = net.craftnepal.market.managers.DatabaseManager.getShopsByPlot(plot);
+                for (net.craftnepal.market.Entities.ChestShop shop : shops) {
+                    net.craftnepal.market.utils.DisplayUtils.getInstance().removeDisplayPair(plot, shop.getId());
+                }
+
+                // Delete the entire plot from SQLite database
+                net.craftnepal.market.managers.DatabaseManager.deletePlot(plot);
+
+                SendMessage.sendPlayerMessage(player, "&aDeleted plot: &b" + plot);
             } else {
                 SendMessage.sendPlayerMessage(player, "§cPlot not found: " + plot);
             }

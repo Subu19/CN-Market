@@ -38,6 +38,10 @@ public class Back extends SubCommand {
     public void perform(CommandSender commandSender, String[] strings) {
         if(commandSender instanceof Player){
             Player player = (Player) commandSender;
+            if (!player.hasPermission("market.back")) {
+                SendMessage.sendPlayerMessage(player, "§cYou do not have permission to use this command.");
+                return;
+            }
             //Check if the player is inside market
             if(net.craftnepal.market.utils.MarketUtils.isInMarketArea(player.getLocation())){
                 Bukkit.getLogger().info("player is in market");

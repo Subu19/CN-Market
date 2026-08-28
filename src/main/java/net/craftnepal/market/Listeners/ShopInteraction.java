@@ -1,470 +1,245 @@
 package net.craftnepal.market.Listeners;
 
+import me.kodysimpson.simpapi.exceptions.MenuManagerNotSetupException;
+import me.kodysimpson.simpapi.menu.MenuManager;
+import me.kodysimpson.simpapi.menu.PlayerMenuUtility;
 import net.craftnepal.market.Entities.ChestShop;
-import net.craftnepal.market.Market;
-import net.craftnepal.market.files.PriceData;
-import net.craftnepal.market.files.RegionData;
-import net.craftnepal.market.utils.*;
-import net.md_5.bungee.api.chat.ClickEvent;
-import net.md_5.bungee.api.chat.ComponentBuilder;
-import net.md_5.bungee.api.chat.HoverEvent;
-import net.md_5.bungee.api.chat.TextComponent;
-import org.bukkit.*;
+import net.craftnepal.market.menus.ShopAdminMenu;
+import net.craftnepal.market.menus.ShopBuyerMenu;
+import net.craftnepal.market.menus.ShopCreateMenu;
+import net.craftnepal.market.utils.PlotUtils;
+import net.craftnepal.market.utils.SendMessage;
+import net.craftnepal.market.utils.ShopUtils;
+import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.block.Block;
-import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
-import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.EnchantmentStorageMeta;
-import org.bukkit.block.Barrel;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
-import java.util.function.Consumer;
 
 public class ShopInteraction implements Listener {
-    private final Map<UUID, Consumer<String>> awaitingInput = new HashMap<>();
-    private final DisplayUtils displayUtils;
 
-    public ShopInteraction() {
-        this.displayUtils = DisplayUtils.getInstance();
-    }
-
-    @EventHandler
+    /**
+     * Interaction matrix for BARREL blocks in a market plot:
+     *
+     * SNEAKING                  → pass-through always (normal MC behavior)
+     * NOT SNEAKING:
+     *   Barrel == Shop:
+     *     Right-click:
+     *       Owner / Admin      → open barrel inventory (restock)
+     *       Others             → open ShopBuyerMenu (buy/sell)
+     *     Left-click:
+     *       Owner / Admin      → open ShopAdminMenu (stats, remove)
+     *       Others             → info message in chat
+     *   Barrel != Shop (empty):
+     *     Right-click          → open barrel inventory normally + hint message
+     *     Left-click:
+     *       Plot owner / admin → open ShopCreateMenu
+     *       Others             → "no permission" message
+     */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onChestInteraction(PlayerInteractEvent event) {
+        if (event.getAction() != Action.LEFT_CLICK_BLOCK && event.getAction() != Action.RIGHT_CLICK_BLOCK)
+            return;
+
+        Block block = event.getClickedBlock();
+        if (block == null || block.getType() != Material.BARREL)
+            return;
+
         Player player = event.getPlayer();
         UUID uuid = player.getUniqueId();
+        String plotId = PlotUtils.getPlotIdByLocation(block.getLocation());
 
-        // Check if the player is not in survival mode.
-        if (player.getGameMode() != GameMode.SURVIVAL)
-            return;
+        // Outside any market plot – ignore entirely.
+        if (plotId == null) return;
 
-        // Check for block and click
-        if (event.getAction() != Action.LEFT_CLICK_BLOCK || event.getClickedBlock() == null)
-            return;
+        // If the event was cancelled by another plugin (like protection), 
+        // we might still want to handle it if it's a market shop interaction.
+        // However, if we are in a plot, the market plugin should be the authority.
+        // We'll proceed even if cancelled, but we'll be careful.
 
-        Block clickedBlock = event.getClickedBlock();
-        Material blockType = clickedBlock.getType();
+        ChestShop shop = ShopUtils.getShopAt(block.getLocation());
 
-        if (blockType != Material.BARREL) {
-            return;
+        boolean isAdmin  = player.hasPermission("market.admin");
+        boolean isBypass = net.craftnepal.market.subcommands.admin.Bypass.bypassPlayers.containsKey(uuid);
+        boolean isOwner = shop != null && shop.getOwner() != null && shop.getOwner().equals(uuid);
+        if (shop != null && shop.isAdmin() && !isBypass) {
+            isOwner = false;
         }
 
-        Location chestLocation = clickedBlock.getLocation();
-
-        // First check if this is inside market area
-        if (!MarketUtils.isInMarketArea(chestLocation)) {
-            return; // Do nothing if not in market area
-        }
-
-        // Check if chest is inside a plot
-        String plot = PlotUtils.getPlotIdByLocation(chestLocation);
-        if (plot == null) {
-            SendMessage.sendPlayerMessage(player, "§cThis barrel is not inside a market plot.");
-            event.setCancelled(true);
-            return;
-        }
-
-        // Members can also see their own shop stats (treated as co-owners)
-        String owner = PlotUtils.getPlotOwner(plot);
-        if (owner == null || !owner.equals(uuid.toString())) {
-            // check members
-            java.util.List<String> members = RegionData.get().getStringList("market.plots." + plot + ".members");
-            if (!player.hasPermission("market.admin") && !members.contains(uuid.toString())) {
-                SendMessage.sendPlayerMessage(player, "§cYou can only create shops in your own plot.");
-                event.setCancelled(true);
-                return;
+        // Handle sneaking logic:
+        // We only allow sneaking to bypass (letting Minecraft do block placement or opening)
+        // if the player actually has permission to interact with the container.
+        if (player.isSneaking()) {
+            if (shop != null) {
+                // For a shop barrel, only the shop owner or an admin in bypass mode can sneak-interact.
+                if (isOwner || isBypass) {
+                    return;
+                }
+            } else {
+                // For a non-shop barrel, only players with plot interaction permissions can sneak-interact.
+                if (PlotUtils.canPlayerInteract(player, block.getLocation())) {
+                    return;
+                }
             }
+            // Otherwise, do not return early; cancel or handle the interaction.
         }
 
-        String playerPlot = plot;
+        boolean isRight  = event.getAction() == Action.RIGHT_CLICK_BLOCK;
+        boolean isLeft   = event.getAction() == Action.LEFT_CLICK_BLOCK;
 
-        // Check if this chest is already a shop
-        ConfigurationSection shops = RegionData.get().getConfigurationSection("market.plots." + playerPlot + ".shops");
-        if (shops != null) {
-            for (String shopId : shops.getKeys(false)) {
-                Location shopLoc = LocationUtils.loadLocation(RegionData.get(),
-                        "market.plots." + playerPlot + ".shops." + shopId + ".location");
-                if (shopLoc != null && shopLoc.equals(chestLocation)) {
-                    String shopOwner = RegionData.get().getString("market.plots." + playerPlot + ".shops." + shopId + ".owner");
-                    java.util.List<String> members = RegionData.get().getStringList("market.plots." + playerPlot + ".members");
-                    if (player.hasPermission("market.admin") || (shopOwner != null && shopOwner.equals(player.getUniqueId().toString())) || members.contains(player.getUniqueId().toString())) {
-                        showShopStats(player, playerPlot, shopId);
-                    } else {
-                        SendMessage.sendPlayerMessage(player, "§cThis chest is already a shop!");
-                    }
+        // ── SHOP EXISTS ────────────────────────────────────────────────────────────
+        if (shop != null) {
+            if (isRight) {
+                if (isOwner || isBypass) {
+                    // Owner/Admin right-click → open the actual barrel inventory to restock.
+                    // Do NOT cancel – Minecraft will open the barrel normally.
+                    SendMessage.sendPlayerMessage(player, "&7Restocking your shop…");
+                    event.setCancelled(false); // Ensure it's not cancelled so they can open it
+                    return; // Let the event proceed normally.
+                } else {
+                    // Customer right-click → open buyer menu.
                     event.setCancelled(true);
-                    return;
+                    openGui(player, plotId, shop.getId(), false);
                 }
-            }
-        }
-
-        // Check the item in hand
-        ItemStack item = player.getInventory().getItemInMainHand();
-        if (item == null || item.getType() == Material.AIR) {
-            SendMessage.sendPlayerMessage(player, "§cYou must be holding an item to create a shop.");
-            event.setCancelled(true);
-            return;
-        }
-
-        // Retrieve the item in hand
-        Material itemType = item.getType();
-        String itemName = net.craftnepal.market.utils.ShopUtils.getShopDisplayName(item);
-
-        // Get the base price to check if item is sellable
-        String itemKey = net.craftnepal.market.utils.ShopUtils.getItemKey(item);
-        Integer basePriceValue = PriceData.getPrice(itemKey);
-        if (basePriceValue == null || basePriceValue <= 0) {
-            SendMessage.sendPlayerMessage(player, "§cThis item cannot be sold in shops as it has no base price set.");
-            event.setCancelled(true);
-            return;
-        }
-        double fairPrice = net.craftnepal.market.managers.DynamicPriceManager.getDynamicPrice(itemKey);
-
-        double minPrice = fairPrice * 0.85; // 15% below base price
-        double maxPrice = fairPrice * 1.50; // 50% above base price
-        String priceDisplay = String.format("§e%.2f", fairPrice);
-
-        // Send detailed messages to the player
-        String trendStr = net.craftnepal.market.managers.DynamicPriceManager.getTrendString(itemKey);
-        SendMessage.sendPlayerMessage(player, "§7=============================");
-        
-        net.md_5.bungee.api.chat.TextComponent msg = new net.md_5.bungee.api.chat.TextComponent("§aYou're creating a shop for: ");
-        net.md_5.bungee.api.chat.TextComponent itemCmp = new net.md_5.bungee.api.chat.TextComponent("§b[" + itemName + "]");
-
-        StringBuilder hoverText = new StringBuilder();
-        hoverText.append("§e").append(itemName);
-        if (item.hasItemMeta() && item.getItemMeta().hasLore()) {
-            for (String line : item.getItemMeta().getLore()) {
-                hoverText.append("\n").append(line);
-            }
-        }
-        if (item.hasItemMeta() && item.getItemMeta() instanceof org.bukkit.inventory.meta.EnchantmentStorageMeta) {
-            org.bukkit.inventory.meta.EnchantmentStorageMeta meta = (org.bukkit.inventory.meta.EnchantmentStorageMeta) item.getItemMeta();
-            for (java.util.Map.Entry<org.bukkit.enchantments.Enchantment, Integer> entry : meta.getStoredEnchants().entrySet()) {
-                hoverText.append("\n§7").append(net.craftnepal.market.utils.ShopUtils.formatKey(entry.getKey().getKey().getKey())).append(" ").append(entry.getValue());
-            }
-        }
-        itemCmp.setHoverEvent(new net.md_5.bungee.api.chat.HoverEvent(
-                net.md_5.bungee.api.chat.HoverEvent.Action.SHOW_TEXT,
-                new net.md_5.bungee.api.chat.ComponentBuilder(hoverText.toString()).create()
-        ));
-        msg.addExtra(itemCmp);
-        player.spigot().sendMessage(msg);
-        SendMessage.sendPlayerMessage(player, "§7Market price: " + priceDisplay + " " + trendStr);
-        SendMessage.sendPlayerMessage(player, String.format("§7Price range: §c%.2f §7to §a%.2f", minPrice, maxPrice));
-        SendMessage.sendPlayerMessage(player, "§7----------------------------------------");
-        SendMessage.sendPlayerMessage(player, "   ");
-
-        // Create interactive buttons in multiple components
-        TextComponent spacer = new TextComponent("    ");
-
-        // Create price adjustment buttons
-        TextComponent decrease10 = new TextComponent("§6[<< 10%]");
-        decrease10.setClickEvent(
-                new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, String.format("%.2f", fairPrice * 0.90)));
-        decrease10.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                new ComponentBuilder("§7Set price to: §6" + String.format("%.2f", fairPrice * 0.90)).create()));
-
-        TextComponent decrease5 = new TextComponent("§e[< 5%]");
-        decrease5.setClickEvent(
-                new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, String.format("%.2f", fairPrice * 0.95)));
-        decrease5.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                new ComponentBuilder("§7Set price to: §e" + String.format("%.2f", fairPrice * 0.95)).create()));
-
-        TextComponent basePrice = new TextComponent("§2[" + String.format("%.2f", fairPrice) + "]");
-        basePrice.setClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, String.format("%.2f", fairPrice)));
-        basePrice.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                new ComponentBuilder("§7Click to use base price").create()));
-
-        TextComponent increase5 = new TextComponent("§e[5% >]");
-        increase5.setClickEvent(
-                new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, String.format("%.2f", fairPrice * 1.05)));
-        increase5.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                new ComponentBuilder("§7Set price to: §e" + String.format("%.2f", fairPrice * 1.05)).create()));
-
-        TextComponent increase10 = new TextComponent("§6[10% >>]");
-        increase10.setClickEvent(
-                new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, String.format("%.2f", fairPrice * 1.10)));
-        increase10.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                new ComponentBuilder("§7Set price to: §6" + String.format("%.2f", fairPrice * 1.10)).create()));
-
-        // Create the bottom row with all buttons
-        TextComponent buttonsRow = new TextComponent(
-                Objects.requireNonNull(Market.getMainConfig().getString("prefix")).replaceAll("&", "§"));
-        buttonsRow.addExtra(decrease10);
-        buttonsRow.addExtra(spacer);
-        buttonsRow.addExtra(decrease5);
-        buttonsRow.addExtra(spacer);
-        buttonsRow.addExtra(basePrice);
-        buttonsRow.addExtra(spacer);
-        buttonsRow.addExtra(increase5);
-        buttonsRow.addExtra(spacer);
-        buttonsRow.addExtra(increase10);
-
-        player.spigot().sendMessage(buttonsRow);
-        SendMessage.sendPlayerMessage(player, "   ");
-        SendMessage.sendPlayerMessage(player, "§7----------------------------------------");
-        // Additional instruction
-        SendMessage.sendPlayerMessage(player, "§aType a custom price in chat");
-        SendMessage.sendPlayerMessage(player, "§7(Type §fcancel §7in chat to exit)");
-
-        awaitingInput.put(uuid, (input) -> {
-            if (input.equalsIgnoreCase("cancel")) {
-                SendMessage.sendPlayerMessage(player, "§cShop creation cancelled.");
-                return;
-            }
-            try {
-                // Parse the input price
-                double price = Double.parseDouble(input);
-
-                // Validate the price
-                if (price < minPrice) {
-                    player.sendMessage(ChatColor.RED + "Price cannot be less than " + String.format("%.2f", minPrice)
-                            + " (15% below base price).");
-                    return;
-                }
-                if (price > maxPrice) {
-                    player.sendMessage(ChatColor.RED + "Price cannot be more than " + String.format("%.2f", maxPrice)
-                            + " (50% above base price).");
-                    return;
-                }
-
-                // Generate a new shop ID
-                String shopId = UUID.randomUUID().toString();
-
-                ItemStack shopItem = item.clone();
-                shopItem.setAmount(1);
-
-                // Create a new ChestShop instance
-                ChestShop chestShop = new ChestShop(
-                        shopId,
-                        chestLocation,
-                        shopItem,
-                        uuid,
-                        price);
-
-                // Define the base path in the YAML configuration
-                String basePath = "market.plots." + playerPlot + ".shops." + shopId;
-
-                // Serialize and save the ChestShop data to the YAML configuration
-                LocationUtils.saveLocation(RegionData.get(), basePath + ".location", chestShop.getLocation());
-                String base64Item = java.util.Base64.getEncoder().encodeToString(net.craftnepal.market.utils.ShopUtils.serializeItem(shopItem));
-                RegionData.get().set(basePath + ".item_bytes", base64Item);
-                RegionData.get().set(basePath + ".item", chestShop.getItem().getType().toString()); // Fallback / reference
-                RegionData.get().set(basePath + ".owner", chestShop.getOwner().toString());
-                RegionData.get().set(basePath + ".price", chestShop.getPrice());
-
-                // Save the configuration to persist the data
-                RegionData.save();
-
-                // Notify the player
-                player.sendMessage(
-                        ChatColor.GREEN + "Shop created successfully with price: " + ChatColor.GOLD + price);
-
-                // Spawn display after creation
-                displayUtils.spawnDisplayPair(chestShop);
-
-            } catch (NumberFormatException e) {
-                player.sendMessage(ChatColor.RED + "Invalid price entered. Please enter a valid number.");
-            }
-        });
-
-        // Add timeout to remove awaitingInput after 30 seconds
-        Bukkit.getScheduler().runTaskLater(Market.getPlugin(), () -> {
-            if (awaitingInput.remove(uuid) != null) {
-                SendMessage.sendPlayerMessage(player, "§cShop creation timed out after 30 seconds.");
-            }
-        }, 20L * 30); // 30 seconds * 20 ticks per second
-
-    }
-
-    @EventHandler
-    public void onPlayerChat(AsyncPlayerChatEvent event) {
-        Player player = event.getPlayer();
-        UUID uuid = player.getUniqueId();
-
-        if (awaitingInput.containsKey(uuid)) {
-            event.setCancelled(true);
-            Consumer<String> consumer = awaitingInput.remove(uuid);
-            Bukkit.getScheduler().runTask(Market.getPlugin(), () -> {
-                consumer.accept(event.getMessage());
-            });
-        }
-    }
-
-    @EventHandler
-    public void onVisitorShopClick(PlayerInteractEvent event) {
-        Player player = event.getPlayer();
-
-        if (event.getAction() != Action.RIGHT_CLICK_BLOCK || event.getClickedBlock() == null)
-            return;
-
-        Block clickedBlock = event.getClickedBlock();
-        if (clickedBlock.getType() != Material.BARREL)
-            return;
-
-        Location chestLocation = clickedBlock.getLocation();
-
-        if (!MarketUtils.isInMarketArea(chestLocation)) {
-            return;
-        }
-
-        String plot = PlotUtils.getPlotIdByLocation(chestLocation);
-        if (plot == null) return;
-
-        ConfigurationSection shops = RegionData.get().getConfigurationSection("market.plots." + plot + ".shops");
-        if (shops == null) return;
-
-        for (String shopId : shops.getKeys(false)) {
-            Location shopLoc = LocationUtils.loadLocation(RegionData.get(), "market.plots." + plot + ".shops." + shopId + ".location");
-            if (shopLoc != null && shopLoc.equals(chestLocation)) {
-                String owner = RegionData.get().getString("market.plots." + plot + ".shops." + shopId + ".owner");
-                
-                // Owner and members can open the barrel freely
-                java.util.List<String> members = RegionData.get().getStringList("market.plots." + plot + ".members");
-                if (owner != null && (owner.equals(player.getUniqueId().toString()) || members.contains(player.getUniqueId().toString()))) {
-                    return;
-                }
-
-                // It's a visitor! Cancel opening the barrel.
+            } else { // LEFT CLICK
+                // Always cancel left-click on a shop barrel to avoid block damage.
                 event.setCancelled(true);
-
-                // Fetch shop data
-                String itemNameStr = RegionData.get().getString("market.plots." + plot + ".shops." + shopId + ".item");
-                Material itemType = Material.matchMaterial(itemNameStr);
-                if (itemType == null) return;
-                
-                double price = RegionData.get().getDouble("market.plots." + plot + ".shops." + shopId + ".price");
-                
-                // Count stock & Build Interactive Chat Menu
-                ChestShop shop = net.craftnepal.market.utils.ShopUtils.getShop(plot, shopId);
-                int stock = net.craftnepal.market.utils.ShopUtils.getShopStock(shop);
-
-                // Build Interactive Chat Menu
-                String itemKey = net.craftnepal.market.utils.ShopUtils.getItemKey(shop);
-                String itemName = net.craftnepal.market.utils.ShopUtils.getShopDisplayName(shop);
-                String trendStr = net.craftnepal.market.managers.DynamicPriceManager.getTrendString(itemKey);
-                SendMessage.sendPlayerMessage(player, "§7=============================");
-                SendMessage.sendPlayerMessage(player, "§aShop Item: §b" + itemName);
-                SendMessage.sendPlayerMessage(player, "§7Price per item: §e" + EconomyUtils.format(price) + " " + trendStr);
-                SendMessage.sendPlayerMessage(player, "§7In Stock: §a" + stock);
-                SendMessage.sendPlayerMessage(player, "§7----------------------------------------");
-                
-                TextComponent spacer = new TextComponent("   ");
-                TextComponent buttonsRow = new TextComponent(
-                        Objects.requireNonNull(Market.getMainConfig().getString("prefix")).replaceAll("&", "§"));
-                
-                int[] buyAmounts = {1, 16, 64};
-                for (int amount : buyAmounts) {
-                    String color = (stock >= amount) ? "§a" : "§c";
-                    TextComponent buyBtn = new TextComponent(color + "[Buy " + amount + "]");
-                    buyBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/market _buy " + plot + " " + shopId + " " + amount));
-                    buyBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                            new ComponentBuilder("§7Buy " + amount + " for §e" + EconomyUtils.format(price * amount) + 
-                                    (stock < amount ? " §c(Not enough stock)" : "")).create()));
-                    buttonsRow.addExtra(buyBtn);
-                    buttonsRow.addExtra(spacer);
+                if (isOwner || isBypass) {
+                    openGui(player, plotId, shop.getId(), true);
+                } else {
+                    // Info message for non-owners.
+                    String priceLabel = shop.isBuyingShop() ? "&eBuying for" : "&eSelling at";
+                    SendMessage.sendPlayerMessage(player, priceLabel + " &6" + net.craftnepal.market.utils.EconomyUtils.format(shop.getPrice()));
                 }
+            }
+            return;
+        }
 
-                player.spigot().sendMessage(buttonsRow);
-                SendMessage.sendPlayerMessage(player, "§7=============================");
+        // ── EMPTY BARREL (NOT A SHOP) ──────────────────────────────────────────────
+        if (isRight) {
+            if (PlotUtils.canPlayerInteract(player, block.getLocation())) {
+                // Let owner/member/admin open the barrel inventory normally.
+                SendMessage.sendPlayerMessage(player, "&7This barrel is not a shop. Left-click with an item to create one.");
+                event.setCancelled(false); // Ensure it's not cancelled for the owner
+            } else {
+                // Deny for everyone else
+                event.setCancelled(true);
+                SendMessage.sendPlayerMessage(player, "&cYou are not allowed to open barrels in this plot.");
+            }
+            return;
+        }
 
+        // LEFT CLICK on empty barrel → shop creation flow.
+        // Cancel to prevent the block-break animation while not sneaking.
+        event.setCancelled(true);
+
+        String plotOwner = PlotUtils.getPlotOwner(plotId);
+        boolean isPlotOwner   = plotOwner != null && plotOwner.equals(uuid.toString());
+        boolean isAdminInMode  = isBypass;
+        boolean isAdminInSpawn = isAdmin && PlotUtils.isSpawnPlot(plotId);
+
+        if (isPlotOwner || isAdminInMode || isAdminInSpawn) {
+            ItemStack held = player.getInventory().getItemInMainHand();
+            if (held == null || held.getType() == Material.AIR) {
+                SendMessage.sendPlayerMessage(player, "&cHold the item you want to sell/buy, then left-click the barrel.");
                 return;
             }
+
+            // Check if the item is blacklisted for player shops
+            if (!isBypass && ShopUtils.isItemBlacklisted(held.getType())) {
+                SendMessage.sendPlayerMessage(player, "&cThis item is blacklisted and cannot be traded in player shops.");
+                return;
+            }
+            
+            try {
+                PlayerMenuUtility pmu = MenuManager.getPlayerMenuUtility(player);
+                if (pmu == null) {
+                    SendMessage.sendPlayerMessage(player, "&cError: Menu data not found. Please rejoin.");
+                    Bukkit.getLogger().warning("[Market] PlayerMenuUtility is null for " + player.getName());
+                    return;
+                }
+                new ShopCreateMenu(pmu, plotId, block.getLocation(), held).open();
+            } catch (MenuManagerNotSetupException e) {
+                SendMessage.sendPlayerMessage(player, "&cMenu system error. Please rejoin and try again.");
+                Bukkit.getLogger().severe("[Market] MenuManagerNotSetupException for " + player.getName());
+            } catch (Exception e) {
+                SendMessage.sendPlayerMessage(player, "&cUnexpected error opening menu.");
+                e.printStackTrace();
+            }
+        } else {
+            SendMessage.sendPlayerMessage(player, "&cYou do not own this plot and cannot create shops here.");
         }
     }
 
-    private void showShopStats(Player player, String plotId, String shopId) {
-        ConfigurationSection shopSection = RegionData.get().getConfigurationSection("market.plots." + plotId + ".shops." + shopId);
-        if (shopSection == null) return;
-
-        String itemNameStr = shopSection.getString("item");
-        Material itemType = Material.matchMaterial(itemNameStr);
-        if (itemType == null) return;
-
-        double price = shopSection.getDouble("price");
-        String ownerUUID = shopSection.getString("owner");
-        Location loc = LocationUtils.loadLocation(RegionData.get(), "market.plots." + plotId + ".shops." + shopId + ".location");
-
-        ChestShop shop = net.craftnepal.market.utils.ShopUtils.getShop(plotId, shopId);
-        int stock = net.craftnepal.market.utils.ShopUtils.getShopStock(shop);
-        String itemKey = net.craftnepal.market.utils.ShopUtils.getItemKey(shop);
-        String itemName = net.craftnepal.market.utils.ShopUtils.getShopDisplayName(shop);
-        String trendStr = net.craftnepal.market.managers.DynamicPriceManager.getTrendString(itemKey);
-        SendMessage.sendPlayerMessage(player, "§7=============================");
-        SendMessage.sendPlayerMessage(player, "§6§lSHOP STATS");
-        SendMessage.sendPlayerMessage(player, "§aItem: §b" + itemName);
-        SendMessage.sendPlayerMessage(player, "§7Price: §e" + EconomyUtils.format(price) + " " + trendStr);
-        SendMessage.sendPlayerMessage(player, "§7Stock: §a" + stock);
-        
-        if (player.hasPermission("market.admin")) {
-            String ownerName = ownerUUID != null ? Bukkit.getOfflinePlayer(UUID.fromString(ownerUUID)).getName() : "Unknown";
-            SendMessage.sendPlayerMessage(player, "§7Owner: §f" + ownerName);
-        }
-        
-        SendMessage.sendPlayerMessage(player, "§7----------------------------------------");
-
-        TextComponent removeBtn = new TextComponent("§c§l[REMOVE SHOP]");
-        removeBtn.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/market _removeshop " + plotId + " " + shopId));
-        removeBtn.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                new ComponentBuilder("§7Click to remove this shop permanently").create()));
-
-        TextComponent row = new TextComponent(Objects.requireNonNull(Market.getMainConfig().getString("prefix")).replaceAll("&", "§"));
-        row.addExtra(removeBtn);
-
-        player.spigot().sendMessage(row);
-        SendMessage.sendPlayerMessage(player, "§7=============================");
-    }
-
-    @EventHandler
+    /**
+     * Crouch + break = remove shop barrel (owner or admin only).
+     * Normal breaks (non-sneaking) on shop barrels are blocked with guidance.
+     */
+    @EventHandler(priority = EventPriority.LOWEST)
     public void onChestBreak(BlockBreakEvent event) {
         Block block = event.getBlock();
-        Material blockType = block.getType();
+        if (block.getType() != Material.BARREL) return;
 
-        if (blockType != Material.BARREL)
+        ChestShop shop = ShopUtils.getShopAt(block.getLocation());
+        if (shop == null) return; // Not a registered shop barrel – leave alone.
+
+        Player player = event.getPlayer();
+        boolean isBypass = net.craftnepal.market.subcommands.admin.Bypass.bypassPlayers.containsKey(player.getUniqueId());
+        boolean isOwner = shop.getOwner() != null && shop.getOwner().equals(player.getUniqueId());
+        
+        if (shop.isAdmin() && !isBypass) {
+            isOwner = false;
+        }
+
+        if (!isOwner && !isBypass) {
+            event.setCancelled(true);
+            SendMessage.sendPlayerMessage(player, "&cYou cannot break a shop you don't own.");
             return;
-
-        Location chestLocation = block.getLocation();
-
-        // First check if this is inside market area
-        if (!MarketUtils.isInMarketArea(chestLocation)) {
-            return; // Do nothing if not in market area
         }
 
-        // Get plot at chest location
-        String plot = PlotUtils.getPlotIdByLocation(chestLocation);
-        if (plot == null) return;
-
-        ConfigurationSection shops = RegionData.get().getConfigurationSection("market.plots." + plot + ".shops");
-        if (shops == null) return;
-
-        for (String shopId : shops.getKeys(false)) {
-            Location shopLoc = LocationUtils.loadLocation(RegionData.get(), "market.plots." + plot + ".shops." + shopId + ".location");
-            if (shopLoc != null && shopLoc.equals(chestLocation)) {
-                Player player = event.getPlayer();
-                String owner = RegionData.get().getString("market.plots." + plot + ".shops." + shopId + ".owner");
-
-                if (player.hasPermission("market.admin") || (owner != null && owner.equals(player.getUniqueId().toString()))) {
-                    RegionData.get().set("market.plots." + plot + ".shops." + shopId, null);
-                    RegionData.save();
-                    SendMessage.sendPlayerMessage(player, "§aShop removed successfully.");
-                    displayUtils.removeDisplayPair(plot, shopId);
-                } else {
-                    SendMessage.sendPlayerMessage(player, "§cYou cannot break someone else's shop!");
-                    event.setCancelled(true);
-                }
-                return;
-            }
+        if (!player.isSneaking()) {
+            event.setCancelled(true);
+            SendMessage.sendPlayerMessage(player, "&eSneak and break to remove your shop barrel.");
+            return;
         }
+
+        // Sneak + break → remove shop data, then let the block break normally.
+        String plotId = PlotUtils.getPlotIdByLocation(block.getLocation());
+        ShopUtils.removeShop(plotId, shop.getId());
+        SendMessage.sendPlayerMessage(player, "&aShop removed. The barrel has been dropped.");
     }
 
+    // ── Helper ────────────────────────────────────────────────────────────────────
+
+    /** Opens an admin or buyer menu, handling the MenuManager checked exception. */
+    private void openGui(Player player, String plotId, String shopId, boolean admin) {
+        try {
+            PlayerMenuUtility pmu = MenuManager.getPlayerMenuUtility(player);
+            if (pmu == null) {
+                SendMessage.sendPlayerMessage(player, "&cError: Menu data not found. Please rejoin.");
+                Bukkit.getLogger().warning("[Market] PlayerMenuUtility is null for " + player.getName());
+                return;
+            }
+            
+            if (admin) {
+                new ShopAdminMenu(pmu, plotId, shopId).open();
+            } else {
+                new ShopBuyerMenu(pmu, plotId, shopId).open();
+            }
+        } catch (MenuManagerNotSetupException e) {
+            SendMessage.sendPlayerMessage(player, "&cMenu system error. Please rejoin and try again.");
+            org.bukkit.Bukkit.getLogger().severe("[Market] MenuManagerNotSetupException for " + player.getName());
+        } catch (Exception e) {
+            SendMessage.sendPlayerMessage(player, "&cUnexpected error opening menu.");
+            e.printStackTrace();
+        }
+    }
 }

@@ -17,7 +17,7 @@ import java.util.*;
 
 public class AllItemsMenu extends Menu {
     private int currentPage = 0;
-    private static final int ITEMS_PER_PAGE = 45;
+    private static final int ITEMS_PER_PAGE = 36;
     private String searchQuery = null;
     private Map<String, Integer> itemStocks = new HashMap<>();
     private Map<String, ChestShop> representativeShops = new HashMap<>();
@@ -152,7 +152,7 @@ public class AllItemsMenu extends Menu {
                 e.printStackTrace();
             }
         } else if (!clickedItem.getType().equals(Material.BLUE_STAINED_GLASS_PANE) &&
-                !clickedItem.getType().equals(Material.BOOK)) {
+                event.getSlot() != 49) {
             
             // Get the display name to match back to our keys (a bit hacky but works with SimpAPI)
             String name = ChatColor.stripColor(clickedItem.getItemMeta().getDisplayName());

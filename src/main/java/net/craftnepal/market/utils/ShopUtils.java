@@ -1,46 +1,40 @@
 package net.craftnepal.market.utils;
 
 import org.bukkit.Location;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.block.Barrel;
 import org.bukkit.block.Block;
-import org.bukkit.block.Chest;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.EnchantmentStorageMeta;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.configuration.ConfigurationSection;
-import net.craftnepal.market.files.RegionData;
 import net.craftnepal.market.Entities.ChestShop;
+import net.craftnepal.market.Market;
+import net.craftnepal.market.managers.DatabaseManager;
+import net.craftnepal.market.managers.DynamicPriceManager;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.NamespacedKey;
+import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.AbstractMap;
 import java.util.stream.Collectors;
 
 public class ShopUtils {
 
     public static Map<String, Integer> getAllShopItemKeysAndCountsByPlotID(String plotId) {
         Map<String, Integer> itemCounts = new HashMap<>();
-        ConfigurationSection shops =
-                RegionData.get().getConfigurationSection("market.plots." + plotId + ".shops");
+        List<ChestShop> shops = DatabaseManager.getShopsByPlot(plotId);
 
-        if (shops != null) {
-            for (String shopId : shops.getKeys(false)) {
-                String path = "market.plots." + plotId + ".shops." + shopId;
-                ChestShop shop = createShopFromConfig(shopId, path);
-                if (shop == null) continue;
+        for (ChestShop shop : shops) {
+            String key = getItemKey(shop);
+            int stock = getShopStock(shop); // Uses the database stock cache — fast!
 
-                String key = getItemKey(shop);
-                int stock = getShopStock(shop);
-
-                if (stock > 0) {
-                    itemCounts.put(key, itemCounts.getOrDefault(key, 0) + stock);
-                }
+            if (stock > 0) {
+                itemCounts.put(key, itemCounts.getOrDefault(key, 0) + stock);
             }
         }
         return itemCounts;
@@ -53,79 +47,27 @@ public class ShopUtils {
         for (Map.Entry<String, Integer> entry : keyCounts.entrySet()) {
             Material mat = Material.matchMaterial(entry.getKey().split(":")[0]);
             if (mat != null) {
-                itemCounts.put(mat, itemCounts.getOrDefault(mat, 0) + entry.getValue());
+                itemCounts.put(mat, mat.getMaxStackSize() > 0 ? itemCounts.getOrDefault(mat, 0) + entry.getValue() : 0);
             }
         }
         return itemCounts;
     }
 
-    private static ChestShop createShopFromConfig(String shopId, String path) {
-        Location location = LocationUtils.loadLocation(RegionData.get(), path + ".location");
-        String ownerString = RegionData.get().getString(path + ".owner");
-        UUID owner = ownerString != null ? UUID.fromString(ownerString) : null;
-        double price = RegionData.get().getDouble(path + ".price");
-
-        ItemStack itemStack = null;
-
-        // Try to load from Base64 bytes first
-        if (RegionData.get().contains(path + ".item_bytes")) {
-            String b64 = RegionData.get().getString(path + ".item_bytes");
-            if (b64 != null) {
-                try {
-                    byte[] bytes = java.util.Base64.getDecoder().decode(b64);
-                    itemStack = deserializeItem(bytes);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        } else {
-            // Legacy loading fallback
-            String materialName = RegionData.get().getString(path + ".item");
-            if (materialName != null) {
-                Material material = Material.matchMaterial(materialName);
-                if (material != null) {
-                    itemStack = new ItemStack(material);
-                    if (material == Material.ENCHANTED_BOOK) {
-                        String enchantKey = RegionData.get().getString(path + ".enchantment.key");
-                        int level = RegionData.get().getInt(path + ".enchantment.level");
-                        if (enchantKey != null) {
-                            enchantKey = enchantKey.toLowerCase();
-                            Enchantment enchantment = Enchantment.getByKey(NamespacedKey.minecraft(enchantKey));
-                            if (enchantment != null) {
-                                EnchantmentStorageMeta meta = (EnchantmentStorageMeta) itemStack.getItemMeta();
-                                if (meta != null) {
-                                    meta.addStoredEnchant(enchantment, level, true);
-                                    itemStack.setItemMeta(meta);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        if (itemStack != null && location != null && owner != null) {
-            return new ChestShop(shopId, location, itemStack, owner, price);
-        }
-        return null;
-    }
-
     public static Map<String, ChestShop> getAllShops() {
         Map<String, ChestShop> shops = new HashMap<>();
-        ConfigurationSection plots = RegionData.get().getConfigurationSection("market.plots");
+        List<ChestShop> list = DatabaseManager.getAllShops();
+        for (ChestShop shop : list) {
+            shops.put(shop.getId(), shop);
+        }
+        return shops;
+    }
 
-        if (plots != null) {
-            for (String plotId : plots.getKeys(false)) {
-                ConfigurationSection plotShops = plots.getConfigurationSection(plotId + ".shops");
-                if (plotShops != null) {
-                    for (String shopId : plotShops.getKeys(false)) {
-                        String path = "market.plots." + plotId + ".shops." + shopId;
-                        ChestShop shop = createShopFromConfig(shopId, path);
-                        if (shop != null) {
-                            shops.put(shopId, shop);
-                        }
-                    }
-                }
+    public static List<ChestShop> getPlayerSellingShops(UUID ownerUUID) {
+        List<ChestShop> shops = new ArrayList<>();
+        List<ChestShop> allOwnerShops = DatabaseManager.getShopsByOwner(ownerUUID.toString());
+        for (ChestShop shop : allOwnerShops) {
+            if (!shop.isAdmin() && !shop.isBuyingShop()) {
+                shops.add(shop);
             }
         }
         return shops;
@@ -133,23 +75,11 @@ public class ShopUtils {
 
     public static List<ChestShop> getPlotShopsByItemName(String plotId, String itemName) {
         List<ChestShop> matchingShops = new ArrayList<>();
-        ConfigurationSection shops =
-                RegionData.get().getConfigurationSection("market.plots." + plotId + ".shops");
-
-        if (shops != null) {
-            for (String shopId : shops.getKeys(false)) {
-                String path = "market.plots." + plotId + ".shops." + shopId;
-                String materialName = RegionData.get().getString(path + ".item");
-
-                // Case insensitive comparison and support for both UPPER_CASE and normal names
-                if (materialName != null && (materialName.equalsIgnoreCase(itemName)
-                        || materialName.replace("_", " ").equalsIgnoreCase(itemName))) {
-
-                    ChestShop shop = createShopFromConfig(shopId, path);
-                    if (shop != null) {
-                        matchingShops.add(shop);
-                    }
-                }
+        List<ChestShop> plotShops = DatabaseManager.getShopsByPlot(plotId);
+        for (ChestShop shop : plotShops) {
+            String materialName = shop.getItem().getType().toString();
+            if (materialName.equalsIgnoreCase(itemName) || materialName.replace("_", " ").equalsIgnoreCase(itemName)) {
+                matchingShops.add(shop);
             }
         }
         return matchingShops;
@@ -157,63 +87,48 @@ public class ShopUtils {
 
     public static List<ChestShop> getAllShopsByItemName(String itemName) {
         List<ChestShop> matchingShops = new ArrayList<>();
-        ConfigurationSection plots = RegionData.get().getConfigurationSection("market.plots");
-
-        if (plots != null) {
-            for (String plotId : plots.getKeys(false)) {
-                matchingShops.addAll(getPlotShopsByItemName(plotId, itemName));
+        List<ChestShop> allShops = DatabaseManager.getAllShops();
+        for (ChestShop shop : allShops) {
+            String materialName = shop.getItem().getType().toString();
+            if (materialName.equalsIgnoreCase(itemName) || materialName.replace("_", " ").equalsIgnoreCase(itemName)) {
+                matchingShops.add(shop);
             }
         }
         return matchingShops;
     }
 
     public static ChestShop getShopAt(Location location) {
-        String plotId = PlotUtils.getPlotIdByLocation(location);
-        if (plotId == null)
-            return null;
-
-        ConfigurationSection shops =
-                RegionData.get().getConfigurationSection("market.plots." + plotId + ".shops");
-        if (shops == null)
-            return null;
-
-        for (String shopId : shops.getKeys(false)) {
-            Location shopLoc = LocationUtils.loadLocation(RegionData.get(),
-                    "market.plots." + plotId + ".shops." + shopId + ".location");
-            if (shopLoc != null && shopLoc.equals(location)) {
-                String path = "market.plots." + plotId + ".shops." + shopId;
-                return createShopFromConfig(shopId, path);
-            }
-        }
-        return null;
+        return DatabaseManager.getShopAt(location);
     }
 
     public static ChestShop getShop(String plotId, String shopId) {
-        String path = "market.plots." + plotId + ".shops." + shopId;
-        return createShopFromConfig(shopId, path);
+        return DatabaseManager.getShop(shopId);
     }
 
     public static boolean isShopLocation(Location location) {
-        String plotId = PlotUtils.getPlotIdByLocation(location);
-        if (plotId == null)
-            return false;
-
-        ConfigurationSection shops =
-                RegionData.get().getConfigurationSection("market.plots." + plotId + ".shops");
-        if (shops == null)
-            return false;
-
-        for (String shopId : shops.getKeys(false)) {
-            Location shopLoc = LocationUtils.loadLocation(RegionData.get(),
-                    "market.plots." + plotId + ".shops." + shopId + ".location");
-            if (shopLoc != null && shopLoc.equals(location)) {
-                return true;
-            }
-        }
-        return false;
+        return DatabaseManager.getShopAt(location) != null;
     }
 
+    public static void removeShop(String plotId, String shopId) {
+        DatabaseManager.removeShop(shopId);
+        DisplayUtils.getInstance().removeDisplayPair(plotId, shopId);
+    }
+
+    /**
+     * Get stock from SQLite cache rather than loading chunk and counting barrel.
+     * Prevents server lag entirely.
+     */
     public static int getShopStock(ChestShop shop) {
+        if (shop.isAdmin()) return 9999;
+        return shop.getStock();
+    }
+
+    /**
+     * Physically count items inside the barrel. Only used when updating cache or processing purchases.
+     */
+    public static int getPhysicalBarrelStock(ChestShop shop) {
+        if (shop.isAdmin()) return 9999;
+        
         Location loc = shop.getLocation();
         if (loc == null || loc.getBlock().getType() != Material.BARREL)
             return 0;
@@ -228,90 +143,79 @@ public class ShopUtils {
         return stock;
     }
 
+    /**
+     * Sync physical barrel stock with the SQLite database.
+     */
+    public static void syncShopStockWithDatabase(ChestShop shop) {
+        if (shop.isAdmin()) return;
+        int physicalStock = getPhysicalBarrelStock(shop);
+        DatabaseManager.updateShopStock(shop.getId(), physicalStock);
+    }
+
+    public static boolean isItemBlacklisted(Material material) {
+        if (material == null) return false;
+        List<String> blacklist = Market.getMainConfig().getStringList("player-shop-blacklist");
+        if (blacklist == null) return false;
+        String matName = material.name();
+        for (String item : blacklist) {
+            if (item.equalsIgnoreCase(matName)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static boolean isMatchingItem(ChestShop shop, ItemStack item) {
         if (item == null) return false;
-        
-        // Deep compare using Bukkit's isSimilar (compares type, durability, and ItemMeta)
         return item.isSimilar(shop.getItem());
     }
 
-    public static void processPurchase(org.bukkit.entity.Player player, String plotId,
-            String shopId, int amount) {
-        String basePath = "market.plots." + plotId + ".shops." + shopId;
-
-        // --- Validate shop config ---
-        if (!RegionData.get().contains(basePath)) {
+    public static void processPurchase(Player player, String plotId, String shopId, int amount) {
+        ChestShop shop = DatabaseManager.getShop(shopId);
+        if (shop == null) {
             SendMessage.sendPlayerMessage(player, "§cThis shop no longer exists.");
             return;
         }
 
-        String ownerStr = RegionData.get().getString(basePath + ".owner");
-        if (ownerStr == null) {
-            SendMessage.sendPlayerMessage(player, "§cShop owner data is missing.");
+        if (!shop.isAdmin() && isItemBlacklisted(shop.getItem().getType())) {
+            SendMessage.sendPlayerMessage(player, "§cThis item is blacklisted and transactions for it are disabled.");
             return;
         }
 
-        UUID ownerUUID;
-        try {
-            ownerUUID = UUID.fromString(ownerStr);
-        } catch (IllegalArgumentException e) {
-            SendMessage.sendPlayerMessage(player, "§cShop owner data is corrupted.");
+        if (shop.isBuyingShop()) {
+            processPlayerSale(player, plotId, shopId, amount);
             return;
         }
 
-        if (player.getUniqueId().equals(ownerUUID)) {
+        UUID ownerUUID = shop.getOwner();
+        if (!shop.isAdmin() && player.getUniqueId().equals(ownerUUID)) {
             SendMessage.sendPlayerMessage(player, "§cYou cannot buy from your own shop.");
             return;
         }
 
-        // --- Validate barrel ---
-        Location shopLoc = LocationUtils.loadLocation(RegionData.get(), basePath + ".location");
-        if (shopLoc == null || shopLoc.getBlock().getType() != Material.BARREL) {
+        Location shopLoc = shop.getLocation();
+        if (!shop.isAdmin() && (shopLoc == null || shopLoc.getBlock().getType() != Material.BARREL)) {
             SendMessage.sendPlayerMessage(player, "§cShop barrel is missing or corrupted.");
             return;
         }
 
-        ChestShop shop = getShopAt(shopLoc);
-        if (shop == null) {
-            SendMessage.sendPlayerMessage(player, "§cShop data not found.");
-            return;
-        }
         Material itemType = shop.getItem().getType();
-
-        double pricePerItem = RegionData.get().getDouble(basePath + ".price");
+        double pricePerItem = shop.getPrice();
         double totalPrice = pricePerItem * amount;
 
         if (!EconomyUtils.hasBalance(player.getUniqueId(), totalPrice)) {
-            SendMessage.sendPlayerMessage(player,
-                    "§cYou do not have enough money. You need " + EconomyUtils.format(totalPrice));
+            SendMessage.sendPlayerMessage(player, "§cYou do not have enough money. You need " + EconomyUtils.format(totalPrice));
             return;
         }
 
-
-        // Always re-fetch block state fresh to get live inventory
-        org.bukkit.block.BlockState blockState = shopLoc.getBlock().getState();
-        if (!(blockState instanceof Barrel)) {
-            SendMessage.sendPlayerMessage(player, "§cShop barrel is missing or corrupted.");
-            return;
-        }
-        Barrel barrel = (Barrel) blockState;
-        org.bukkit.inventory.Inventory barrelInv = barrel.getInventory();
-
-        // --- Count matching stock ---
-        int stock = 0;
-        for (ItemStack item : barrelInv.getContents()) {
-            if (item != null && isMatchingItem(shop, item)) {
-                stock += item.getAmount();
-            }
-        }
-
+        // Query stock using SQLite cache
+        int stock = getShopStock(shop);
         if (stock < amount) {
-            SendMessage.sendPlayerMessage(player,
-                    "§cNot enough stock! Only " + stock + " available.");
+            SendMessage.sendPlayerMessage(player, "§cNot enough stock! Only " + stock + " available.");
             return;
         }
 
-        // --- Check player inventory space ---
+        // Check player inventory space
         int freeSpace = 0;
         for (ItemStack item : player.getInventory().getStorageContents()) {
             if (item == null || item.getType() == Material.AIR) {
@@ -326,55 +230,50 @@ public class ShopUtils {
             return;
         }
 
-        // =========================================================
-        // STEP 1: Remove items from barrel FIRST.
-        // The barrel is the source of truth. Nothing is given to the
-        // player until items are physically removed from the chest.
-        // =========================================================
-        java.util.List<ItemStack> removedItems = new java.util.ArrayList<>();
-        int remaining = amount;
+        // STEP 1: Remove items from barrel FIRST. (SKIP FOR ADMIN)
+        List<ItemStack> removedItems = new ArrayList<>();
+        
+        if (shop.isAdmin()) {
+            ItemStack itemToGive = shop.getItem().clone();
+            itemToGive.setAmount(amount);
+            removedItems.add(itemToGive);
+        } else {
+            Barrel barrel = (Barrel) shopLoc.getBlock().getState();
+            org.bukkit.inventory.Inventory barrelInv = barrel.getInventory();
+            
+            int remaining = amount;
+            for (int i = 0; i < barrelInv.getSize() && remaining > 0; i++) {
+                ItemStack slotItem = barrelInv.getItem(i);
+                if (slotItem == null || !isMatchingItem(shop, slotItem))
+                    continue;
 
-        for (int i = 0; i < barrelInv.getSize() && remaining > 0; i++) {
-            ItemStack slotItem = barrelInv.getItem(i);
-            if (slotItem == null || !isMatchingItem(shop, slotItem))
-                continue;
+                int slotAmount = slotItem.getAmount();
 
-            int slotAmount = slotItem.getAmount();
+                if (slotAmount <= remaining) {
+                    removedItems.add(slotItem.clone());
+                    barrelInv.setItem(i, null);
+                    remaining -= slotAmount;
+                } else {
+                    ItemStack taken = slotItem.clone();
+                    taken.setAmount(remaining);
+                    removedItems.add(taken);
+                    slotItem.setAmount(slotAmount - remaining);
+                    barrelInv.setItem(i, slotItem);
+                    remaining = 0;
+                }
+            }
 
-            if (slotAmount <= remaining) {
-                removedItems.add(slotItem.clone());
-                barrelInv.setItem(i, null);
-                remaining -= slotAmount;
-            } else {
-                ItemStack taken = slotItem.clone();
-                taken.setAmount(remaining);
-                removedItems.add(taken);
-                slotItem.setAmount(slotAmount - remaining);
-                barrelInv.setItem(i, slotItem);
-                remaining = 0;
+            int totalRemoved = removedItems.stream().mapToInt(ItemStack::getAmount).sum();
+            if (totalRemoved != amount) {
+                for (ItemStack item : removedItems)
+                    barrelInv.addItem(item);
+                SendMessage.sendPlayerMessage(player, "§cTransaction failed: could not remove items from shop.");
+                return;
             }
         }
 
-        // Sanity check: confirm we actually removed the right amount
-        int totalRemoved = removedItems.stream().mapToInt(ItemStack::getAmount).sum();
-        if (totalRemoved != amount) {
-            // Mismatch — return everything to barrel and abort
-            for (ItemStack item : removedItems)
-                barrelInv.addItem(item);
-            SendMessage.sendPlayerMessage(player,
-                    "§cTransaction failed: could not remove items from shop.");
-            return;
-        }
-
-        // Commit barrel removal to the world
-        // barrel.update(true, false); // Removed: update() overwrites live inventory with snapshot
-
-        // =========================================================
         // STEP 2: Give items to player.
-        // addItem() returns a map of items it FAILED to add (overflow).
-        // If overflow exists, those items go back into the barrel.
-        // =========================================================
-        java.util.HashMap<Integer, ItemStack> overflow = new java.util.HashMap<>();
+        HashMap<Integer, ItemStack> overflow = new HashMap<>();
         for (ItemStack item : removedItems) {
             overflow.putAll(player.getInventory().addItem(item));
         }
@@ -382,77 +281,153 @@ public class ShopUtils {
         int overflowAmount = overflow.values().stream().mapToInt(ItemStack::getAmount).sum();
         int actualGiven = amount - overflowAmount;
 
-        // Return any overflow items to the barrel immediately
-        if (!overflow.isEmpty()) {
+        if (!overflow.isEmpty() && !shop.isAdmin()) {
+            Barrel barrel = (Barrel) shopLoc.getBlock().getState();
             for (ItemStack leftover : overflow.values())
-                barrelInv.addItem(leftover);
+                barrel.getInventory().addItem(leftover);
         }
 
         if (actualGiven <= 0) {
-            // Gave the player nothing — cancel entirely, no economy charge
-            SendMessage.sendPlayerMessage(player,
-                    "§cTransaction failed: your inventory is full. No items were taken.");
+            SendMessage.sendPlayerMessage(player, "§cTransaction failed: your inventory is full. No items were taken.");
             return;
         }
 
-        // =========================================================
-        // STEP 3: Economy — only charge for what was actually given.
-        // =========================================================
+        // STEP 3: Economy
         double actualPrice = pricePerItem * actualGiven;
 
         if (!EconomyUtils.withdraw(player.getUniqueId(), actualPrice)) {
-            // Can't charge — roll back items from player to barrel
             for (ItemStack item : removedItems) {
-                java.util.Map<Integer, ItemStack> notRemoved =
-                        player.getInventory().removeItem(item.clone());
-                // If removeItem couldn't take it all back, still return what we can to barrel
-                // (edge case, but better than items vanishing)
-                for (ItemStack rb : notRemoved.values())
-                    barrelInv.addItem(rb);
+                Map<Integer, ItemStack> notRemoved = player.getInventory().removeItem(item.clone());
+                if (!shop.isAdmin()) {
+                    Barrel barrel = (Barrel) shopLoc.getBlock().getState();
+                    for (ItemStack rb : notRemoved.values())
+                        barrel.getInventory().addItem(rb);
+                }
             }
-            SendMessage.sendPlayerMessage(player,
-                    "§cCould not process payment. Transaction cancelled.");
+            SendMessage.sendPlayerMessage(player, "§cCould not process payment. Transaction cancelled.");
             return;
         }
 
-        if (!EconomyUtils.deposit(ownerUUID, actualPrice)) {
-            // Deposit failed — refund buyer but keep item state (owner loses out, not the buyer)
+        if (!shop.isAdmin() && !EconomyUtils.deposit(ownerUUID, actualPrice)) {
             EconomyUtils.deposit(player.getUniqueId(), actualPrice);
         }
 
-        // =========================================================
-        // STEP 4: Notify and update display.
-        // =========================================================
+        // STEP 4: Update SQLite Database Stock Cache (arithmetic — no chunk load needed)
+        if (!shop.isAdmin()) {
+            int newStock = Math.max(0, stock - actualGiven);
+            shop.setStock(newStock);
+            DatabaseManager.updateShopStock(shop.getId(), newStock);
+        }
+
+        // STEP 5: Notify and update display.
         String itemKey = getItemKey(shop);
-        net.craftnepal.market.managers.DynamicPriceManager.recordPurchase(itemKey, actualGiven);
+        if (!shop.isAdmin()) {
+            DynamicPriceManager.recordPurchase(itemKey, actualGiven);
+        } else {
+            DynamicPriceManager.recordAdminPurchase(itemKey, actualGiven);
+        }
         
         String itemDisplayName = getShopDisplayName(shop);
 
         if (overflowAmount > 0) {
-            SendMessage.sendPlayerMessage(player,
-                    "§eOnly " + actualGiven + " fit in your inventory. Bought " + actualGiven + " "
+            SendMessage.sendPlayerMessage(player, "§eOnly " + actualGiven + " fit in your inventory. Bought " + actualGiven + " "
                             + itemDisplayName + " for " + EconomyUtils.format(actualPrice) + ".");
         } else {
             SendMessage.sendPlayerMessage(player, "§aBought " + amount + " " + itemDisplayName
                     + " for " + EconomyUtils.format(actualPrice) + ".");
         }
 
-        org.bukkit.entity.Player owner = org.bukkit.Bukkit.getPlayer(ownerUUID);
+        Player owner = Bukkit.getPlayer(ownerUUID);
         if (owner != null && owner.isOnline()) {
-            SendMessage.sendPlayerMessage(owner,
-                    "§a" + player.getName() + " bought " + actualGiven + " " + itemDisplayName
+            SendMessage.sendPlayerMessage(owner, "§a" + player.getName() + " bought " + actualGiven + " " + itemDisplayName
                             + " from your shop for " + EconomyUtils.format(actualPrice) + ".");
+            if (!shop.isAdmin() && getShopStock(shop) == 0) {
+                SendMessage.sendPlayerMessage(owner, "§c[Reminder] Your shop selling " + itemDisplayName + " is now out of stock!");
+            }
+        } else if (!shop.isAdmin()) {
+            double currentOffline = DatabaseManager.getOfflineEarnings(ownerUUID.toString());
+            DatabaseManager.setOfflineEarnings(ownerUUID.toString(), currentOffline + actualPrice);
         }
+        TransactionLogUtils.log("BUY: " + player.getName() + " bought " + actualGiven + "x " + itemDisplayName + " from shop " + shopId + " (Owner: " + ownerUUID.toString() + ") for " + actualPrice);
 
-        org.bukkit.Bukkit.getScheduler().runTask(net.craftnepal.market.Market.getPlugin(), () -> {
+        Bukkit.getScheduler().runTask(Market.getPlugin(), () -> {
             DisplayUtils.getInstance().updateDisplay(shop);
         });
     }
 
-    /**
-     * Generates a unique key for an item sold in a shop.
-     * For enchanted books, includes enchantment type and level.
-     */
+    public static void processPlayerSale(Player player, String plotId, String shopId, int amount) {
+        ChestShop shop = DatabaseManager.getShop(shopId);
+        if (shop == null || !shop.isBuyingShop()) return;
+
+        if (!shop.isAdmin() && isItemBlacklisted(shop.getItem().getType())) {
+            SendMessage.sendPlayerMessage(player, "§cThis item is blacklisted and transactions for it are disabled.");
+            return;
+        }
+
+        double pricePerItem = shop.getPrice();
+        double totalPayout = pricePerItem * amount;
+
+        int playerHas = 0;
+        for (ItemStack item : player.getInventory().getStorageContents()) {
+            if (item != null && isMatchingItem(shop, item)) {
+                playerHas += item.getAmount();
+            }
+        }
+
+        if (playerHas < amount) {
+            SendMessage.sendPlayerMessage(player, "§cYou do not have enough " + getShopDisplayName(shop) + " to sell.");
+            return;
+        }
+
+        if (!shop.isAdmin()) {
+            if (!EconomyUtils.hasBalance(shop.getOwner(), totalPayout)) {
+                SendMessage.sendPlayerMessage(player, "§cThe shop owner does not have enough money to buy your items.");
+                return;
+            }
+        }
+
+        ItemStack toRemove = shop.getItem().clone();
+        toRemove.setAmount(amount);
+        player.getInventory().removeItem(toRemove);
+
+        if (!shop.isAdmin()) {
+            Location loc = shop.getLocation();
+            if (loc != null && loc.getBlock().getType() == Material.BARREL) {
+                Barrel barrel = (Barrel) loc.getBlock().getState();
+                barrel.getInventory().addItem(toRemove);
+                
+                // Update SQLite database stock cache (arithmetic — no chunk load needed)
+                int currentStock = getShopStock(shop);
+                int newStock = currentStock + amount;
+                shop.setStock(newStock);
+                DatabaseManager.updateShopStock(shop.getId(), newStock);
+            }
+        }
+
+        if (shop.isAdmin()) {
+            EconomyUtils.deposit(player.getUniqueId(), totalPayout);
+        } else {
+            if (EconomyUtils.withdraw(shop.getOwner(), totalPayout)) {
+                EconomyUtils.deposit(player.getUniqueId(), totalPayout);
+            } else {
+                player.getInventory().addItem(toRemove);
+                SendMessage.sendPlayerMessage(player, "§cTransaction failed.");
+                return;
+            }
+        }
+
+        if (shop.isAdmin()) {
+            DynamicPriceManager.recordAdminSale(getItemKey(shop), amount);
+        }
+
+        SendMessage.sendPlayerMessage(player, "§aSuccessfully sold " + amount + " " + getShopDisplayName(shop) + " for " + EconomyUtils.format(totalPayout));
+        TransactionLogUtils.log("SELL: " + player.getName() + " sold " + amount + "x " + getShopDisplayName(shop) + " to shop " + shopId + " (Owner: " + shop.getOwner().toString() + ") for " + totalPayout);
+        
+        Bukkit.getScheduler().runTask(Market.getPlugin(), () -> {
+            DisplayUtils.getInstance().updateDisplay(shop);
+        });
+    }
+
     public static String getItemKey(ChestShop shop) {
         return getItemKey(shop.getItem());
     }
@@ -479,9 +454,6 @@ public class ShopUtils {
         return item.getType().name();
     }
 
-    /**
-     * Gets a user-friendly display name for a shop's item.
-     */
     public static String getShopDisplayName(ChestShop shop) {
         return getShopDisplayName(shop.getItem());
     }
@@ -505,7 +477,6 @@ public class ShopUtils {
                 org.bukkit.potion.PotionType type = data.getType();
                 String base = type != null ? formatKey(type.name()) : "Unknown";
                 
-                // Minecraft-standard names for potion effects
                 if (type != null) {
                     base = switch (type.name()) {
                         case "SPEED" -> "Swiftness";

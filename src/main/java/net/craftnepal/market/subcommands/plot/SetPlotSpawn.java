@@ -38,6 +38,12 @@ public class SetPlotSpawn extends SubCommand {
         }
 
         Player player = (Player) commandSender;
+
+        if (!player.hasPermission("market.plot.setspawn")) {
+            SendMessage.sendPlayerMessage(player, "&cYou do not have permission to set plot spawn.");
+            return;
+        }
+
         Location location = player.getLocation();
 
         // Check if player is in their own plot

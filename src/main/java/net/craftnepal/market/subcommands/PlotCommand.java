@@ -13,7 +13,14 @@ public class PlotCommand extends NestedCommand {
         registerSubCommand(new SetPlotSpawn());
         registerSubCommand(new AddMember());
         registerSubCommand(new RemoveMember());
+        registerSubCommand(new Unclaim());
         registerSubCommand(new Info());
+        registerSubCommand(new Manage());
+    }
+    
+    @Override
+    public String getRequiredPermission() {
+        return "market.use";
     }
 
     @Override

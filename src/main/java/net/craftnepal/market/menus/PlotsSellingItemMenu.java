@@ -7,7 +7,7 @@ import me.kodysimpson.simpapi.menu.MenuManager;
 import me.kodysimpson.simpapi.menu.PlayerMenuUtility;
 import net.craftnepal.market.Entities.ChestShop;
 import net.craftnepal.market.Market;
-import net.craftnepal.market.files.RegionData;
+
 import net.craftnepal.market.utils.*;
 import org.bukkit.*;
 import org.bukkit.OfflinePlayer;
@@ -20,7 +20,7 @@ import java.util.*;
 public class PlotsSellingItemMenu extends Menu {
     private String targetProductKey;
     private int currentPage = 0;
-    private static final int PLOTS_PER_PAGE = 45;
+    private static final int PLOTS_PER_PAGE = 36;
     private List<String> plotsSellingItem = new ArrayList<>();
 
     public PlotsSellingItemMenu(PlayerMenuUtility playerMenuUtility) {
@@ -34,8 +34,8 @@ public class PlotsSellingItemMenu extends Menu {
         Map<String, ChestShop> allShops = ShopUtils.getAllShops();
         for (ChestShop shop : allShops.values()) {
             if (ShopUtils.getItemKey(shop).equals(productKey) && ShopUtils.getShopStock(shop) > 0) {
-                // Find plot ID from shop location
-                String plotId = PlotUtils.getPlotIdByLocation(shop.getLocation());
+                // Find plot ID from shop
+                String plotId = shop.getPlotId();
                 if (plotId != null) {
                     plotSet.add(plotId);
                 }
@@ -125,16 +125,21 @@ public class PlotsSellingItemMenu extends Menu {
             Location tpLoc = shopSpawn != null ? shopSpawn : PlotUtils.getPlotCenter(plotId);
             
             if (tpLoc != null) {
-                SendMessage.sendPlayerMessage(playerMenuUtility.getOwner(), "Teleporting to the shop in 5 seconds! Don't move..");
-                playerMenuUtility.getOwner().closeInventory();
+                org.bukkit.entity.Player player = playerMenuUtility.getOwner();
+                org.bukkit.Location origin = player.getLocation();
+                SendMessage.sendPlayerMessage(player, "Teleporting to the shop in 5 seconds! Don't move..");
+                player.closeInventory();
                 
-                TeleportUtils.scheduleTeleport(playerMenuUtility.getOwner(), tpLoc, () -> {
-                    SendMessage.sendPlayerMessage(playerMenuUtility.getOwner(), "Teleported to shop!");
+                TeleportUtils.scheduleTeleport(player, tpLoc, () -> {
+                    if (!net.craftnepal.market.utils.MarketUtils.isInMarketArea(origin)) {
+                        net.craftnepal.market.utils.PlayerUtils.saveLastLocation(player, origin);
+                    }
+                    SendMessage.sendPlayerMessage(player, "Teleported to shop!");
                     
                     // Highlight only the shops matching the specific product
                     Map<String, ChestShop> plotShops = ShopUtils.getAllShops();
                     for (ChestShop shop : plotShops.values()) {
-                        String plotOfShop = PlotUtils.getPlotIdByLocation(shop.getLocation());
+                        String plotOfShop = shop.getPlotId();
                         if (plotId.equals(plotOfShop) && ShopUtils.getItemKey(shop).equals(targetProductKey)) {
                             RegionUtils.showVerticalParticleLine(playerMenuUtility.getOwner(), shop.getLocation().clone().add(0, 2, 0), null, Market.getPlugin());
                         }
@@ -145,15 +150,18 @@ public class PlotsSellingItemMenu extends Menu {
     }
 
     private ItemStack createPlotItem(String plotId) {
-        String ownerUUID = RegionData.get().getString("market.plots." + plotId + ".owner");
-        ItemStack plotItem = PlayerUtils.getPlayerHead(UUID.fromString(ownerUUID));
-        ItemMeta meta = plotItem.getItemMeta();
+        String ownerUUID = PlotUtils.getPlotOwner(plotId);
 
         String ownerName = "Unknown";
+        ItemStack plotItem;
         if (ownerUUID != null) {
+            plotItem = PlayerUtils.getPlayerHead(UUID.fromString(ownerUUID));
             OfflinePlayer owner = Bukkit.getOfflinePlayer(UUID.fromString(ownerUUID));
             ownerName = owner.getName() != null ? owner.getName() : "Unknown";
+        } else {
+            plotItem = new ItemStack(Material.SKELETON_SKULL);
         }
+        ItemMeta meta = plotItem.getItemMeta();
 
         meta.setDisplayName(ChatColor.GREEN + "Plot " + plotId);
 
@@ -162,7 +170,7 @@ public class PlotsSellingItemMenu extends Menu {
         int totalStock = 0;
         Map<String, ChestShop> allShops = ShopUtils.getAllShops();
         for (ChestShop shop : allShops.values()) {
-            String plotOfShop = PlotUtils.getPlotIdByLocation(shop.getLocation());
+            String plotOfShop = shop.getPlotId();
             if (plotId.equals(plotOfShop) && ShopUtils.getItemKey(shop).equals(targetProductKey)) {
                 int stock = ShopUtils.getShopStock(shop);
                 if (stock > 0) {

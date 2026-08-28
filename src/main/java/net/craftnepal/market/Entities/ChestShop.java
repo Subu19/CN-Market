@@ -11,13 +11,39 @@ public class ChestShop {
     private ItemStack item;
     private UUID owner;
     private double price;
+    private boolean isAdmin;
+    private boolean isBuyingShop; // true if the shop BUYS items from players (Player sells to shop)
+    private String plotId;
+    private int stock;
 
     public ChestShop(String id, Location location, ItemStack item, UUID owner, double price) {
+        this(id, location, item, owner, price, false, false);
+    }
+
+    public ChestShop(String id, Location location, ItemStack item, UUID owner, double price, boolean isAdmin, boolean isBuyingShop) {
         this.id = id;
         this.location = location;
         this.item = item;
         this.owner = owner;
         this.price = price;
+        this.isAdmin = isAdmin;
+        this.isBuyingShop = isBuyingShop;
+    }
+
+    public String getPlotId() {
+        return plotId;
+    }
+
+    public void setPlotId(String plotId) {
+        this.plotId = plotId;
+    }
+
+    public int getStock() {
+        return stock;
+    }
+
+    public void setStock(int stock) {
+        this.stock = stock;
     }
 
     // Getters and Setters
@@ -54,10 +80,34 @@ public class ChestShop {
     }
 
     public double getPrice() {
+        if (isAdmin) {
+            double dynamicPrice = net.craftnepal.market.managers.DynamicPriceManager.getDynamicPrice(item);
+            if (isBuyingShop) {
+                double multiplier = net.craftnepal.market.Market.getMainConfig().getDouble("admin-shops.buy-price-multiplier", 0.85);
+                return dynamicPrice * multiplier;
+            }
+            return dynamicPrice;
+        }
         return price;
     }
 
     public void setPrice(double price) {
         this.price = price;
+    }
+
+    public boolean isAdmin() {
+        return isAdmin;
+    }
+
+    public void setAdmin(boolean admin) {
+        isAdmin = admin;
+    }
+
+    public boolean isBuyingShop() {
+        return isBuyingShop;
+    }
+
+    public void setBuyingShop(boolean buyingShop) {
+        isBuyingShop = buyingShop;
     }
 }

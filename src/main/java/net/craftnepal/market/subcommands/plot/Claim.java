@@ -39,12 +39,24 @@ public class Claim extends SubCommand {
     public void perform(CommandSender commandSender, String[] strings) {
         if(commandSender instanceof Player){
             Player player = (Player) commandSender;
+
+            if (!player.hasPermission("market.plot.claim")) {
+                SendMessage.sendPlayerMessage(player, "&cYou do not have permission to claim plots.");
+                return;
+            }
+
             Location location = player.getLocation();
             
             // Get the plot ID at the player's location (checks both manual and automatic plots)
             String selectedPlot = PlotUtils.getPlotIdByLocation(location);
 
             if (selectedPlot != null) {
+                if (PlotUtils.isSpawnPlot(selectedPlot)) {
+                    SendMessage.sendPlayerMessage(player, "&cYou cannot claim plots in the spawn area.");
+                    player.playSound(location, Sound.ITEM_SHIELD_BREAK, 1, 1);
+                    return;
+                }
+
                 // If it's an automatic plot, register it if not already registered
                 if (selectedPlot.startsWith("plot_")) {
                     PlotUtils.registerAutomaticPlot(selectedPlot);
@@ -52,6 +64,16 @@ public class Claim extends SubCommand {
 
                 String owner = PlotUtils.getPlotOwner(selectedPlot);
                 if (owner == null || owner.isEmpty()) {
+                    // Check if the player has reached their plot limit
+                    int currentPlots = PlotUtils.getPlotCount(player);
+                    int maxPlots = PlotUtils.getPlotLimit(player);
+
+                    if (currentPlots >= maxPlots) {
+                        SendMessage.sendPlayerMessage(player, "&cYou have reached your plot limit of " + maxPlots + " plot(s).");
+                        player.playSound(location, Sound.ITEM_SHIELD_BREAK, 1, 1);
+                        return;
+                    }
+
                     PlotUtils.setPlotOwner(selectedPlot, player.getUniqueId().toString());
                     SendMessage.sendPlayerMessage(player, "&aYou successfully claimed plot: " + selectedPlot);
                     player.playSound(location, Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1, 1);

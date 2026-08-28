@@ -121,7 +121,10 @@ public class RegionUtils {
     }
 
     public static boolean isLocationInChunk(Location location, Chunk chunk) {
-        return location.getChunk().equals(chunk);
+        // Use coordinate math to avoid location.getChunk() which forces a chunk load
+        return location.getWorld().equals(chunk.getWorld())
+                && (location.getBlockX() >> 4) == chunk.getX()
+                && (location.getBlockZ() >> 4) == chunk.getZ();
     }
 
     public static void showVerticalParticleLine(Player player, Location startLoc, Location endLoc, Plugin plugin) {

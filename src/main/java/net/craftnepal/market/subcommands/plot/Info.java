@@ -2,6 +2,7 @@ package net.craftnepal.market.subcommands.plot;
 
 import me.kodysimpson.simpapi.command.SubCommand;
 import net.craftnepal.market.files.RegionData;
+import net.craftnepal.market.managers.DatabaseManager;
 import net.craftnepal.market.utils.PlotUtils;
 import net.craftnepal.market.utils.SendMessage;
 import org.bukkit.Bukkit;
@@ -34,6 +35,11 @@ public class Info extends SubCommand {
         if (!(sender instanceof Player)) return;
         Player player = (Player) sender;
 
+        if (!player.hasPermission("market.plot.info")) {
+            SendMessage.sendPlayerMessage(player, "§cYou do not have permission to use this command.");
+            return;
+        }
+
         String plotId = PlotUtils.getPlotIdByLocation(player.getLocation());
 
         if (plotId == null) {
@@ -54,16 +60,14 @@ public class Info extends SubCommand {
         }
 
         // Count shops
-        org.bukkit.configuration.ConfigurationSection shopSection =
-                RegionData.get().getConfigurationSection("market.plots." + plotId + ".shops");
-        int shopCount = shopSection != null ? shopSection.getKeys(false).size() : 0;
+        int shopCount = DatabaseManager.getShopsByPlot(plotId).size();
 
         SendMessage.sendPlayerMessage(player, "§7=============================");
         SendMessage.sendPlayerMessage(player, "§a§l" + friendlyName);
         SendMessage.sendPlayerMessage(player, "§7Owner: §e" + ownerName);
         SendMessage.sendPlayerMessage(player, "§7Shops: §b" + shopCount);
         // Build member names list
-        List<String> members = RegionData.get().getStringList("market.plots." + plotId + ".members");
+        List<String> members = DatabaseManager.getPlotMembers(plotId);
         StringBuilder memberNames = new StringBuilder();
         if (!members.isEmpty()) {
             for (String uuidStr : members) {

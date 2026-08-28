@@ -18,7 +18,10 @@ public class AdminCommand extends NestedCommand {
         registerSubCommand(new Setup());
         registerSubCommand(new ForceUpdate());
         registerSubCommand(new CalcPrices());
+        registerSubCommand(new Reset());
+        registerSubCommand(new SyncStock());
     }
+
 
     @Override
     public String getRequiredPermission() {

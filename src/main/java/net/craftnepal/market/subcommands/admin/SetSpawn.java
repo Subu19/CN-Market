@@ -26,17 +26,24 @@ public class SetSpawn extends SubCommand {
 
     @Override
     public String getSyntax() {
-        return "/amarket setspawn";
+        return "/market admin setspawn";
     }
 
     @Override
     public void perform(CommandSender commandSender, String[] strings) {
-        if(commandSender instanceof Player){
+        if (commandSender instanceof Player) {
             Player p = (Player) commandSender;
             Location location = p.getLocation();
-            RegionData.get().set("market.spawn", location);
-            RegionData.save();
-            p.sendMessage("Spawn set!");
+            
+            // Save to SQLite database
+            net.craftnepal.market.managers.DatabaseManager.setMarketSpawn(location);
+            
+            // Update actual world spawn immediately
+            if (location.getWorld() != null) {
+                location.getWorld().setSpawnLocation(location.getBlockX(), location.getBlockY(), location.getBlockZ());
+            }
+            
+            net.craftnepal.market.utils.SendMessage.sendPlayerMessage(p, "&aMarket spawn location has been set to your current position!");
         }
     }
 

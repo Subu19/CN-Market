@@ -49,8 +49,8 @@ public class PriceCalculator {
         if (depth > 5) return null; // Prevent deep recursion
         
         // Check if we already have a price
-        Integer existingPrice = PriceData.getPrice(material.name());
-        if (existingPrice != null) return existingPrice;
+        Double existingPrice = PriceData.getPrice(material.name());
+        if (existingPrice != null) return (int) Math.max(1, Math.round(existingPrice));
 
         if (processing.contains(material)) return null; // Circular dependency
         processing.add(material);

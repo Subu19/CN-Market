@@ -12,7 +12,7 @@ import java.util.Map;
 public class PriceData {
     private static File file;
     private static FileConfiguration config;
-    private static final Map<String, Integer> priceMap = new HashMap<>();
+    private static final Map<String, Double> priceMap = new HashMap<>();
 
     public static void setup() {
         file = new File(Bukkit.getServer().getPluginManager().getPlugin("Market").getDataFolder(),
@@ -35,7 +35,7 @@ public class PriceData {
             if (config.isConfigurationSection(key))
                 continue;
 
-            int price = config.getInt(key);
+            double price = config.getDouble(key); // fractional prices such as 1.5 are allowed
             // Replace internal Bukkit separators (.) with colons (:) to match our internal key
             // format
             String normalizedKey = normalizeKey(key.replace(".", ":"));
@@ -78,7 +78,7 @@ public class PriceData {
         return String.join(":", parts);
     }
 
-    public static Integer getPrice(String key) {
+    public static Double getPrice(String key) {
         if (key == null)
             return null;
         return priceMap.get(normalizeKey(key));
@@ -89,9 +89,9 @@ public class PriceData {
      * ENCHANTED_BOOK:<ENCHANT>:<LEVEL> entries already in price.yml.
      * Returns 0 if the enchantment price is not defined.
      */
-    public static int getEnchantmentPrice(String enchantKey, int level) {
+    public static double getEnchantmentPrice(String enchantKey, int level) {
         String lookupKey = normalizeKey("ENCHANTED_BOOK:" + enchantKey + ":" + level);
-        Integer price = priceMap.get(lookupKey);
+        Double price = priceMap.get(lookupKey);
         return price != null ? price : 0;
     }
 
@@ -103,19 +103,19 @@ public class PriceData {
      *
      * @return total price, or 0 if the base item has no price entry.
      */
-    public static int getTotalItemPrice(org.bukkit.inventory.ItemStack item) {
+    public static double getTotalItemPrice(org.bukkit.inventory.ItemStack item) {
         if (item == null) return 0;
 
         // Enchanted books are handled via their own composite key; no double-counting.
         if (item.getType() == org.bukkit.Material.ENCHANTED_BOOK) {
-            Integer price = getPrice(net.craftnepal.market.utils.ShopUtils.getItemKey(item));
+            Double price = getPrice(net.craftnepal.market.utils.ShopUtils.getItemKey(item));
             return price != null ? price : 0;
         }
 
-        Integer basePrice = getPrice(item.getType().name());
+        Double basePrice = getPrice(item.getType().name());
         if (basePrice == null || basePrice <= 0) return 0;
 
-        int total = basePrice;
+        double total = basePrice;
 
         // Add a price contribution for every enchantment on the item
         org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
@@ -135,7 +135,7 @@ public class PriceData {
         if (key == null)
             return;
         String normalized = normalizeKey(key);
-        priceMap.put(normalized, price);
+        priceMap.put(normalized, (double) price);
         config.set(normalized.replace(":", "."), price); // Save as nested in YAML for better
                                                          // readability
         // Not saved here: callers set many prices, then call save() once.

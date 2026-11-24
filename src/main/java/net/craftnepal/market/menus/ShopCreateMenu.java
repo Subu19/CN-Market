@@ -114,11 +114,11 @@ public class ShopCreateMenu extends Menu {
                         : realMeta.getEnchants().entrySet()) {
                     String enchantName = entry.getKey().getKey().getKey().toUpperCase();
                     int enchantLevel = entry.getValue();
-                    int enchantPrice = net.craftnepal.market.files.PriceData.getEnchantmentPrice(enchantName, enchantLevel);
+                    double enchantPrice = net.craftnepal.market.files.PriceData.getEnchantmentPrice(enchantName, enchantLevel);
                     String displayName = net.craftnepal.market.utils.ShopUtils.formatKey(enchantName)
                             + " " + toRoman(enchantLevel);
                     lore.add(ChatColor.DARK_GRAY + "  + " + displayName + ": "
-                            + ChatColor.GRAY + String.format("%.2f", (double) enchantPrice));
+                            + ChatColor.GRAY + String.format("%.2f", enchantPrice));
                 }
             }
 

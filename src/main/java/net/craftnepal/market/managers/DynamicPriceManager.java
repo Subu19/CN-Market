@@ -108,7 +108,7 @@ public class DynamicPriceManager {
     }
 
     public static double getDynamicPrice(String itemKey) {
-        Integer basePrice = PriceData.getPrice(itemKey);
+        Double basePrice = PriceData.getPrice(itemKey);
         if (basePrice == null || basePrice <= 0) return 0;
 
         if (dynamicPricesConfig.contains(itemKey + ".price")) {
@@ -116,7 +116,7 @@ public class DynamicPriceManager {
             // this entry was last seeded. We store the base that was used to seed
             // the dynamic price as a ".base" field. If it differs from the current
             // PriceData value, the admin edited price.yml — reset the dynamic price.
-            int storedBase = dynamicPricesConfig.getInt(itemKey + ".base", -1);
+            double storedBase = dynamicPricesConfig.getDouble(itemKey + ".base", -1);
             if (storedBase == -1) {
                 // Migration: Existing config has .price but no .base. 
                 // Set .base to current basePrice to track future changes, but do NOT reset the economy.
@@ -260,7 +260,7 @@ public class DynamicPriceManager {
         }
         
         for (String itemKey : allKeys) {
-            Integer basePrice = PriceData.getPrice(itemKey);
+            Double basePrice = PriceData.getPrice(itemKey);
             if (basePrice == null || basePrice <= 0) continue;
 
             double currentPrice = getDynamicPrice(itemKey);
@@ -424,7 +424,7 @@ public class DynamicPriceManager {
         Map<String, ChestShop> allShops = ShopUtils.getAllShops();
 
         for (String basketItem : basketItems) {
-            Integer itemBase = PriceData.getPrice(basketItem);
+            Double itemBase = PriceData.getPrice(basketItem);
             if (itemBase == null || itemBase <= 0) continue;
 
             baselineIndex += itemBase;

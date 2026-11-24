@@ -4,7 +4,7 @@
   # 🛒 CN-Market
   ### The Ultimate Minecraft Market Solution
   
-  [![Version](https://img.shields.io/badge/version-1.0.10-blue.svg)](https://github.com/Subu19/CN-Market)
+  [![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/Subu19/CN-Market)
   [![Platform](https://img.shields.io/badge/platform-Spigot%20%7C%20Paper-green.svg)](https://papermc.io/)
   [![Java](https://img.shields.io/badge/java-21-orange.svg)](https://www.oracle.com/java/)
   [![License](https://img.shields.io/badge/license-MIT-red.svg)](LICENSE)

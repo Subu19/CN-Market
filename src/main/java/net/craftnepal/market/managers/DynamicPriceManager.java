@@ -83,16 +83,23 @@ public class DynamicPriceManager {
         }
     }
 
+    // Snapshot numbers per file, so an older async write that runs late never replaces a newer one.
+    private static final java.util.Map<File, Long> latestSnapshot = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.Map<File, Long> writtenSnapshot = new java.util.HashMap<>(); // guarded by class lock
+
     private static void write(File file, String yaml, boolean async) {
+        long snapshot = latestSnapshot.merge(file, 1L, Long::sum);
         if (async) {
-            Bukkit.getScheduler().runTaskAsynchronously(Market.getPlugin(), () -> writeNow(file, yaml));
+            Bukkit.getScheduler().runTaskAsynchronously(Market.getPlugin(), () -> writeNow(file, yaml, snapshot));
         } else {
-            writeNow(file, yaml);
+            writeNow(file, yaml, snapshot);
         }
     }
 
     /** Write to a temp file and move it over the old one, so a crash never leaves half a file. */
-    private static synchronized void writeNow(File file, String yaml) {
+    private static synchronized void writeNow(File file, String yaml, long snapshot) {
+        if (writtenSnapshot.getOrDefault(file, 0L) > snapshot) return;
+        writtenSnapshot.put(file, snapshot);
         try {
             java.nio.file.Path tmp = file.toPath().resolveSibling(file.getName() + ".tmp");
             java.nio.file.Files.writeString(tmp, yaml);

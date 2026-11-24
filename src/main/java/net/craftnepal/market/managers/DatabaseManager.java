@@ -51,9 +51,14 @@ public final class DatabaseManager {
             db = new Database(plugin, dbFile);
             db.await("create schema", DatabaseManager::createSchema);
         } catch (IllegalStateException e) {
-            plugin.getLogger().log(Level.SEVERE, "Could not initialize SQLite database", e);
-            return;
+            // Running on with empty memory would let new writes clobber the real data; Bukkit
+            // disables the plugin when onEnable throws.
+            if (db != null) db.close();
+            db = null;
+            throw new IllegalStateException("Could not open market.db; Market will not start", e);
         }
+        // Shop locations need the world, so load it before reading shops.
+        MarketWorldManager.loadWorld(false);
         // Queues its writes on the database thread; the loads below run after them.
         YamlMigration.migrateFromYaml();
         loadAll();
@@ -62,6 +67,9 @@ public final class DatabaseManager {
     public static void close() {
         if (db != null) db.close();
     }
+
+    /** Bump when the tables change, and add the migration next to {@link #createSchema}. */
+    static final int SCHEMA_VERSION = 1;
 
     private static Void createSchema(Connection c) throws SQLException {
         try (Statement stmt = c.createStatement()) {
@@ -82,6 +90,14 @@ public final class DatabaseManager {
             stmt.execute("CREATE TABLE IF NOT EXISTS offline_sales (uuid TEXT NOT NULL, item_key TEXT NOT NULL,"
                     + " item_display_name TEXT NOT NULL, quantity INTEGER NOT NULL DEFAULT 0,"
                     + " earnings REAL NOT NULL DEFAULT 0.0, PRIMARY KEY (uuid, item_key));");
+            try (ResultSet rs = stmt.executeQuery("SELECT value FROM global_metadata WHERE key = 'schema_version'")) {
+                int stored = rs.next() ? Integer.parseInt(rs.getString(1)) : 0;
+                if (stored > SCHEMA_VERSION) {
+                    throw new SQLException("market.db was written by a newer Market (schema " + stored
+                            + ", this build knows " + SCHEMA_VERSION + "); refusing to touch it.");
+                }
+            }
+            stmt.execute("INSERT OR REPLACE INTO global_metadata (key, value) VALUES ('schema_version', '" + SCHEMA_VERSION + "')");
         }
         return null;
     }
@@ -467,9 +483,10 @@ public final class DatabaseManager {
         marketSpawn = null;
         db.write("clear all data", c -> {
             try (Statement stmt = c.createStatement()) {
-                for (String table : new String[] {"plot_members", "shops", "plots", "players", "player_locations", "global_metadata"}) {
+                for (String table : new String[] {"plot_members", "shops", "plots", "players", "player_locations"}) {
                     stmt.executeUpdate("DELETE FROM " + table);
                 }
+                stmt.executeUpdate("DELETE FROM global_metadata WHERE key <> 'schema_version'");
             }
         });
     }

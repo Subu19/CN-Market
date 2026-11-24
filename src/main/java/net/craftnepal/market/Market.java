@@ -105,6 +105,7 @@ public final class Market extends JavaPlugin {
         pm.registerEvents(new SearchListener(), this);
         pm.registerEvents(new CommandTabFilter(), this);
         pm.registerEvents(new ShopProtectionListener(), this);
+        pm.registerEvents(new net.craftnepal.market.protection.WorldRulesListener(), this);
         pm.registerEvents(new MenuCleanupListener(), this);
         pm.registerEvents(new PlayerJoinListener(), this);
     }

@@ -50,7 +50,7 @@ public class TransactionLogUtils {
                     pw.println(logLine);
                 } catch (IOException e) {
                     Bukkit.getLogger().severe("Could not write to transactions.log!");
-                    e.printStackTrace();
+                    net.craftnepal.market.Market.getPlugin().getLogger().log(java.util.logging.Level.WARNING, "TransactionLogUtils failed", e);
                 }
             }
         });

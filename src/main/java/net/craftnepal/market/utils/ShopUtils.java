@@ -264,9 +264,13 @@ public class ShopUtils {
         double actualPrice = pricePerItem * actualGiven;
 
         if (!EconomyUtils.withdraw(player.getUniqueId(), actualPrice)) {
-            // Take back what was given and return it to the barrel.
-            for (ItemStack item : removedItems) {
-                ItemStack given = item.clone();
+            // Take back only what was given (the overflow already went back to the barrel).
+            ItemStack template = removedItems.get(0);
+            int toTake = actualGiven;
+            while (toTake > 0) {
+                ItemStack given = template.clone();
+                given.setAmount(Math.min(toTake, template.getMaxStackSize()));
+                toTake -= given.getAmount();
                 int missing = player.getInventory().removeItem(given).values().stream().mapToInt(ItemStack::getAmount).sum();
                 given.setAmount(given.getAmount() - missing);
                 if (!shop.isAdmin() && given.getAmount() > 0) returnToBarrel(shopLoc, List.of(given));

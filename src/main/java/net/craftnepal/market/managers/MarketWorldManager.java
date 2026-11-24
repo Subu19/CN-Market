@@ -19,13 +19,23 @@ public class MarketWorldManager {
      *                    (used during the initial admin setup flow).
      */
     public static void initialize(boolean forceCreate) {
-        if (!Market.getMainConfig().contains("market-world.name") && !forceCreate) {
-            return;
+        World marketWorld = loadWorld(forceCreate);
+        if (marketWorld != null) {
+            Location spawn = net.craftnepal.market.utils.MarketUtils.spawnIn(marketWorld);
+            marketWorld.setSpawnLocation(spawn.getBlockX(), spawn.getBlockY(), spawn.getBlockZ());
         }
+    }
 
+    /**
+     * Loads the market world if setup has run (or {@code forceCreate}), without touching its spawn.
+     * Must run before shops are read from the database: their locations need the world.
+     */
+    public static World loadWorld(boolean forceCreate) {
+        if (!Market.getMainConfig().contains("market-world.name") && !forceCreate) {
+            return null;
+        }
         String worldName = Market.getMainConfig().getString("market-world.name", "market");
         World marketWorld = Bukkit.getWorld(worldName);
-
         if (marketWorld == null) {
             Bukkit.getLogger().info((forceCreate ? "Creating new" : "Loading existing")
                     + " Market world: " + worldName);
@@ -33,10 +43,6 @@ public class MarketWorldManager {
             creator.generator(new MarketGenerator());
             marketWorld = creator.createWorld();
         }
-
-        if (marketWorld != null) {
-            Location spawn = net.craftnepal.market.utils.MarketUtils.spawnIn(marketWorld);
-            marketWorld.setSpawnLocation(spawn.getBlockX(), spawn.getBlockY(), spawn.getBlockZ());
-        }
+        return marketWorld;
     }
 }

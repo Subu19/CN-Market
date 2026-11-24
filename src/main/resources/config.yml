@@ -1,6 +1,5 @@
 # Market chat prefix — supports & color codes
 prefix: "&2&l[&a&lMarket&2&l] &a"
-join-message: "&eHello there! %player%"
 
 
 # Allow players to fly within the market world
@@ -12,10 +11,24 @@ allow-flight: true
 # in the market world, as it stops rendering displays that are far away.
 display-view-range: 0.25
 
-# Note: Player protection (damage, hunger, mob spawning) is now handled by WorldGuard and Paper.
-
 market-world:
-  # Maximum height players can build in their plots
+  # Set by /market admin setup; shown here for reference. Do not change them on a live market:
+  # plot positions are computed from plot-size and pathway-width.
+  # name: "market"
+  # plot-size: 16
+  # pathway-width: 3
+
+  # Maximum Y players can build at in their plots
+  max-height: 255
+
+  # Optional rules for the market world, all off by default. Turn them on if no other plugin
+  # (WorldGuard, Essentials...) already handles these.
+  rules:
+    no-pvp: false
+    no-monsters: false     # stops hostile mobs spawning naturally; spawn eggs still work
+    no-hunger: false
+    no-fall-damage: false
+
   # Optional: WorldEdit schematic for pathways (relative to plugin folder)
   # If provided, the generator will skip material-based pathway generation
   # and paste this schematic instead.

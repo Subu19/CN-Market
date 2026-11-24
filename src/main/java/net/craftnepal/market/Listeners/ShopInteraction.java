@@ -175,7 +175,7 @@ public class ShopInteraction implements Listener {
                 Bukkit.getLogger().severe("[Market] MenuManagerNotSetupException for " + player.getName());
             } catch (Exception e) {
                 SendMessage.sendPlayerMessage(player, "&cUnexpected error opening menu.");
-                e.printStackTrace();
+                net.craftnepal.market.Market.getPlugin().getLogger().log(java.util.logging.Level.WARNING, "ShopInteraction failed", e);
             }
         } else {
             SendMessage.sendPlayerMessage(player, "&cYou do not own this plot and cannot create shops here.");
@@ -250,7 +250,7 @@ public class ShopInteraction implements Listener {
             org.bukkit.Bukkit.getLogger().severe("[Market] MenuManagerNotSetupException for " + player.getName());
         } catch (Exception e) {
             SendMessage.sendPlayerMessage(player, "&cUnexpected error opening menu.");
-            e.printStackTrace();
+            net.craftnepal.market.Market.getPlugin().getLogger().log(java.util.logging.Level.WARNING, "ShopInteraction failed", e);
         }
     }
 }

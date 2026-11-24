@@ -75,7 +75,7 @@ public class SyncStock extends SubCommand {
                 count++;
             } catch (Exception e) {
                 Bukkit.getLogger().warning("[Market] Failed to sync stock for shop " + shop.getId() + " at " + loc.toString());
-                e.printStackTrace();
+                net.craftnepal.market.Market.getPlugin().getLogger().log(java.util.logging.Level.WARNING, "SyncStock failed", e);
             } finally {
                 if (!wasLoaded) {
                     chunk.unload();

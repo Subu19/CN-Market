@@ -15,15 +15,6 @@ final class YamlMigration {
     private YamlMigration() {}
 
     static void migrateFromYaml() {
-        // Ensure the market world is loaded so that Location instances can be created correctly
-        String worldName = net.craftnepal.market.Market.getMainConfig().getString("market-world.name", "market");
-        if (Bukkit.getWorld(worldName) == null) {
-            Bukkit.getLogger().info("[Market] Loading world '" + worldName + "' for migration...");
-            org.bukkit.WorldCreator creator = new org.bukkit.WorldCreator(worldName);
-            creator.generator(new net.craftnepal.market.world.MarketGenerator());
-            creator.createWorld();
-        }
-
         File dataFolder = Bukkit.getServer().getPluginManager().getPlugin("Market").getDataFolder();
         File regionFile = new File(dataFolder, "RegionData.yml");
         File locationFile = new File(dataFolder, "LocationData.yml");
@@ -31,6 +22,9 @@ final class YamlMigration {
         if (!regionFile.exists() && !locationFile.exists()) {
             return; // No files to migrate
         }
+
+        // Legacy data predates the setup command: the world is "market" unless configured.
+        MarketWorldManager.loadWorld(true);
 
         org.bukkit.configuration.file.FileConfiguration regionConfig = regionFile.exists() ? org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(regionFile) : null;
         org.bukkit.configuration.file.FileConfiguration locationConfig = locationFile.exists() ? org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(locationFile) : null;

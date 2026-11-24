@@ -79,7 +79,7 @@ public class ShopMainMenu extends Menu {
             try {
                 MenuManager.openMenu(AllItemsMenu.class, player);
             } catch (MenuManagerException | MenuManagerNotSetupException e) {
-                e.printStackTrace();
+                net.craftnepal.market.Market.getPlugin().getLogger().log(java.util.logging.Level.WARNING, "ShopMainMenu failed", e);
             }
         } else if (name.equals("Search for an Item")) {
             player.closeInventory();

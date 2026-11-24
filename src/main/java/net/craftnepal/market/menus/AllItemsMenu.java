@@ -180,7 +180,7 @@ public class AllItemsMenu extends Menu {
                     nextMenu.setTargetProduct(matchedKey);
                     nextMenu.open();
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    net.craftnepal.market.Market.getPlugin().getLogger().log(java.util.logging.Level.WARNING, "AllItemsMenu failed", e);
                 }
             }
         }

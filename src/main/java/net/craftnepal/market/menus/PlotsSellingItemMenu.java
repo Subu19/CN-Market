@@ -118,7 +118,7 @@ public class PlotsSellingItemMenu extends Menu {
                 // Just go back to the browse menu (without search query for simplicity, or we could pass it)
                 MenuManager.openMenu(AllItemsMenu.class, playerMenuUtility.getOwner());
             } catch (MenuManagerException | MenuManagerNotSetupException e) {
-                e.printStackTrace();
+                net.craftnepal.market.Market.getPlugin().getLogger().log(java.util.logging.Level.WARNING, "PlotsSellingItemMenu failed", e);
             }
         } else if (displayName.startsWith("Plot ")) {
             String plotId = displayName.replace("Plot ", "");

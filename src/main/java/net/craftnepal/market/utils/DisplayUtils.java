@@ -3,6 +3,7 @@ package net.craftnepal.market.utils;
 import net.craftnepal.market.Market;
 import net.craftnepal.market.Entities.ChestShop;
 import net.craftnepal.market.Entities.DisplayPair;
+import net.craftnepal.market.managers.DatabaseManager;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
 
@@ -14,9 +15,7 @@ import org.joml.AxisAngle4f;
 import org.joml.Vector3f;
 
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 public class DisplayUtils {
@@ -108,7 +107,7 @@ public class DisplayUtils {
 
     public void spawnMarketDisplays() {
         clearAllDisplays();
-        for (ChestShop shop : ShopUtils.getAllShops().values()) {
+        for (ChestShop shop : DatabaseManager.shopIndex().all()) {
             if (RegionUtils.isChunkLoaded(shop.getLocation())) {
                 spawnDisplayPair(shop);
             }
@@ -121,7 +120,7 @@ public class DisplayUtils {
     }
 
     public void updateAllDisplays() {
-        for (ChestShop shop : ShopUtils.getAllShops().values()) {
+        for (ChestShop shop : DatabaseManager.shopIndex().all()) {
             if (RegionUtils.isChunkLoaded(shop.getLocation())) {
                 updateDisplay(shop);
             }
@@ -162,10 +161,8 @@ public class DisplayUtils {
         if (!MarketUtils.isChunkInMarketRegion(chunk))
             return;
 
-        for (ChestShop shop : ShopUtils.getAllShops().values()) {
-            if (RegionUtils.isLocationInChunk(shop.getLocation(), chunk)) {
-                spawnDisplayPair(shop);
-            }
+        for (ChestShop shop : DatabaseManager.shopIndex().inChunk(chunk.getWorld().getName(), chunk.getX(), chunk.getZ())) {
+            spawnDisplayPair(shop);
         }
     }
 
@@ -173,18 +170,8 @@ public class DisplayUtils {
         if (!MarketUtils.isChunkInMarketRegion(chunk))
             return;
 
-        // Collect (plotId, shopId) pairs to remove — avoids mutating while iterating
-        List<String[]> toRemove = new ArrayList<>();
-        for (Map.Entry<String, Map<String, DisplayPair>> plotEntry : marketDisplays.entrySet()) {
-            for (Map.Entry<String, DisplayPair> shopEntry : plotEntry.getValue().entrySet()) {
-                if (RegionUtils.isLocationInChunk(shopEntry.getValue().getLocation(), chunk)) {
-                    toRemove.add(new String[] {plotEntry.getKey(), shopEntry.getKey()});
-                }
-            }
-        }
-
-        for (String[] ids : toRemove) {
-            removeDisplayPair(ids[0], ids[1]);
+        for (ChestShop shop : DatabaseManager.shopIndex().inChunk(chunk.getWorld().getName(), chunk.getX(), chunk.getZ())) {
+            if (shop.getPlotId() != null) removeDisplayPair(shop.getPlotId(), shop.getId());
         }
     }
 

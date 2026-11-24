@@ -86,7 +86,7 @@ public final class Market extends JavaPlugin {
         DynamicPriceManager.setup();
         
         // Initialize SQLite database and trigger any necessary automatic migration
-        net.craftnepal.market.managers.DatabaseManager.initialize(new File(getDataFolder(), "market.db"));
+        net.craftnepal.market.managers.DatabaseManager.initialize(this, new File(getDataFolder(), "market.db"));
         
         TransactionLogUtils.setup();
     }

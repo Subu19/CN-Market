@@ -52,8 +52,8 @@ public class SetOwner extends SubCommand {
             return;
         }
 
-        OfflinePlayer target = Bukkit.getOfflinePlayer(targetName);
-        if (!target.hasPlayedBefore() && !target.isOnline()) {
+        OfflinePlayer target = net.craftnepal.market.utils.PlayerUtils.findKnownPlayer(targetName);
+        if (target == null) {
             SendMessage.sendPlayerMessage(player, "§cPlayer not found.");
             return;
         }

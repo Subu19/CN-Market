@@ -46,9 +46,9 @@ public class AddMember extends SubCommand {
         }
 
         String targetName = args[1];
-        OfflinePlayer target = Bukkit.getOfflinePlayer(targetName);
+        OfflinePlayer target = net.craftnepal.market.utils.PlayerUtils.findKnownPlayer(targetName);
 
-        if (!target.hasPlayedBefore() && !target.isOnline()) {
+        if (target == null) {
             SendMessage.sendPlayerMessage(player, "§cPlayer not found.");
             return;
         }

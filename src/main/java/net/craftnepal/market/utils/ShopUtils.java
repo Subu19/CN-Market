@@ -53,13 +53,9 @@ public class ShopUtils {
         return itemCounts;
     }
 
+    /** Live, read-only view of every shop by id. */
     public static Map<String, ChestShop> getAllShops() {
-        Map<String, ChestShop> shops = new HashMap<>();
-        List<ChestShop> list = DatabaseManager.getAllShops();
-        for (ChestShop shop : list) {
-            shops.put(shop.getId(), shop);
-        }
-        return shops;
+        return DatabaseManager.shopIndex().asMap();
     }
 
     public static List<ChestShop> getPlayerSellingShops(UUID ownerUUID) {
@@ -87,8 +83,7 @@ public class ShopUtils {
 
     public static List<ChestShop> getAllShopsByItemName(String itemName) {
         List<ChestShop> matchingShops = new ArrayList<>();
-        List<ChestShop> allShops = DatabaseManager.getAllShops();
-        for (ChestShop shop : allShops) {
+        for (ChestShop shop : DatabaseManager.shopIndex().all()) {
             String materialName = shop.getItem().getType().toString();
             if (materialName.equalsIgnoreCase(itemName) || materialName.replace("_", " ").equalsIgnoreCase(itemName)) {
                 matchingShops.add(shop);
@@ -498,29 +493,5 @@ public class ShopUtils {
         return java.util.Arrays.stream(key.split("_"))
                 .map(w -> Character.toUpperCase(w.charAt(0)) + w.substring(1).toLowerCase())
                 .collect(Collectors.joining(" "));
-    }
-
-    public static byte[] serializeItem(ItemStack item) {
-        try {
-            java.io.ByteArrayOutputStream io = new java.io.ByteArrayOutputStream();
-            org.bukkit.util.io.BukkitObjectOutputStream os = new org.bukkit.util.io.BukkitObjectOutputStream(io);
-            os.writeObject(item);
-            os.flush();
-            return io.toByteArray();
-        } catch (Exception e) {
-            e.printStackTrace();
-            return new byte[0];
-        }
-    }
-
-    public static ItemStack deserializeItem(byte[] bytes) {
-        try {
-            java.io.ByteArrayInputStream in = new java.io.ByteArrayInputStream(bytes);
-            org.bukkit.util.io.BukkitObjectInputStream is = new org.bukkit.util.io.BukkitObjectInputStream(in);
-            return (ItemStack) is.readObject();
-        } catch (Exception e) {
-            e.printStackTrace();
-            return null;
-        }
     }
 }

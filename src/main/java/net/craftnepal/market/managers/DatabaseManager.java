@@ -3,380 +3,178 @@ package net.craftnepal.market.managers;
 import net.craftnepal.market.Entities.ChestShop;
 import net.craftnepal.market.plot.Plot;
 import net.craftnepal.market.plot.PlotIndex;
+import net.craftnepal.market.shop.ShopIndex;
+import net.craftnepal.market.utils.DisplayUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.plugin.Plugin;
+import org.bukkit.util.io.BukkitObjectInputStream;
+import org.bukkit.util.io.BukkitObjectOutputStream;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Consumer;
+import java.util.logging.Level;
 
-public class DatabaseManager {
+/**
+ * Storage facade. Plots, shops, last locations and the market spawn live in memory and are read
+ * from there; every change updates memory on the server thread, then queues the SQL on the
+ * {@link Database} thread. Only offline earnings are read from SQL, asynchronously.
+ */
+public final class DatabaseManager {
 
-    private static Connection connection;
-    private static File databaseFile;
-    private static final java.util.Map<String, ChestShop> shopCache = new java.util.concurrent.ConcurrentHashMap<>();
+    private static Database db;
+    private static final PlotIndex plotIndex = new PlotIndex();
+    private static final ShopIndex shopIndex = new ShopIndex();
+    /** uuid → serialized location. Deserialized on read so unloaded worlds do not matter. */
+    private static final Map<String, String> lastLocations = new HashMap<>();
+    private static volatile String marketSpawn;
 
-    public static void initialize(File dbFile) {
-        databaseFile = dbFile;
+    private DatabaseManager() {}
+
+    public static void initialize(Plugin plugin, File dbFile) {
         try {
-            // Ensure connection is established and tables exist
-            Connection conn = getConnection();
-            try (Statement stmt = conn.createStatement()) {
-                // Enable foreign keys and optimize database settings
-                stmt.execute("PRAGMA foreign_keys = ON;");
-                stmt.execute("PRAGMA journal_mode = WAL;");
-                stmt.execute("PRAGMA synchronous = NORMAL;");
-                stmt.execute("PRAGMA busy_timeout = 5000;");
-
-                // Plots table
-                stmt.execute("CREATE TABLE IF NOT EXISTS plots (" +
-                        "id TEXT PRIMARY KEY," +
-                        "owner TEXT," +
-                        "pos_min TEXT," +
-                        "pos_max TEXT," +
-                        "spawn TEXT" +
-                        ");");
-
-                // Plot members table
-                stmt.execute("CREATE TABLE IF NOT EXISTS plot_members (" +
-                        "plot_id TEXT," +
-                        "player_uuid TEXT," +
-                        "PRIMARY KEY (plot_id, player_uuid)," +
-                        "FOREIGN KEY (plot_id) REFERENCES plots(id) ON DELETE CASCADE" +
-                        ");");
-
-                // Shops table (with stock column to avoid accesses that cause lag)
-                stmt.execute("CREATE TABLE IF NOT EXISTS shops (" +
-                        "id TEXT PRIMARY KEY," +
-                        "plot_id TEXT," +
-                        "location TEXT NOT NULL," +
-                        "item_bytes TEXT NOT NULL," +
-                        "item_material TEXT NOT NULL," +
-                        "owner TEXT NOT NULL," +
-                        "price REAL NOT NULL," +
-                        "is_buying_shop INTEGER NOT NULL," +
-                        "is_admin INTEGER NOT NULL," +
-                        "stock INTEGER NOT NULL DEFAULT 0," +
-                        "FOREIGN KEY (plot_id) REFERENCES plots(id) ON DELETE CASCADE" +
-                        ");");
-
-                // Players table (offline earnings)
-                stmt.execute("CREATE TABLE IF NOT EXISTS players (" +
-                        "uuid TEXT PRIMARY KEY," +
-                        "offline_earnings REAL NOT NULL DEFAULT 0.0" +
-                        ");");
-
-                // Player locations table (last locations before tp to market)
-                stmt.execute("CREATE TABLE IF NOT EXISTS player_locations (" +
-                        "uuid TEXT PRIMARY KEY," +
-                        "location TEXT NOT NULL" +
-                        ");");
-
-                // Global metadata table (e.g. for market spawn or other global state)
-                stmt.execute("CREATE TABLE IF NOT EXISTS global_metadata (" +
-                        "key TEXT PRIMARY KEY," +
-                        "value TEXT" +
-                        ");");
-
-                // Offline detailed sales table
-                stmt.execute("CREATE TABLE IF NOT EXISTS offline_sales (" +
-                        "uuid TEXT NOT NULL," +
-                        "item_key TEXT NOT NULL," +
-                        "item_display_name TEXT NOT NULL," +
-                        "quantity INTEGER NOT NULL DEFAULT 0," +
-                        "earnings REAL NOT NULL DEFAULT 0.0," +
-                        "PRIMARY KEY (uuid, item_key)" +
-                        ");");
-            }
-            
-            // Perform automatic one-time migration if legacy YAML data files exist
-            migrateFromYaml();
-            loadAllPlots();
-            // Load shops into in-memory cache
-            loadShopsIntoCache();
-        } catch (SQLException e) {
-            Bukkit.getLogger().severe("Could not initialize SQLite database: " + e.getMessage());
-            e.printStackTrace();
+            db = new Database(plugin, dbFile);
+            db.await("create schema", DatabaseManager::createSchema);
+        } catch (IllegalStateException e) {
+            plugin.getLogger().log(Level.SEVERE, "Could not initialize SQLite database", e);
+            return;
         }
+        // Queues its writes on the database thread; the loads below run after them.
+        YamlMigration.migrateFromYaml();
+        loadAll();
     }
 
-    public static void loadShopsIntoCache() {
-        shopCache.clear();
-        String sql = "SELECT * FROM shops";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql);
-             ResultSet rs = pstmt.executeQuery()) {
-            while (rs.next()) {
-                ChestShop shop = mapRowToShop(rs);
-                if (shop != null) {
-                    shopCache.put(shop.getId(), shop);
-                }
-            }
-            Bukkit.getLogger().info("[Market] Loaded " + shopCache.size() + " shops into memory cache.");
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
+    public static void close() {
+        if (db != null) db.close();
     }
 
-    public static void migrateFromYaml() {
-        // Ensure the market world is loaded so that Location instances can be created correctly
-        String worldName = net.craftnepal.market.Market.getMainConfig().getString("market-world.name", "market");
-        if (Bukkit.getWorld(worldName) == null) {
-            Bukkit.getLogger().info("[Market] Loading world '" + worldName + "' for migration...");
-            org.bukkit.WorldCreator creator = new org.bukkit.WorldCreator(worldName);
-            creator.generator(new net.craftnepal.market.world.MarketGenerator());
-            creator.createWorld();
-        }
-
-        File dataFolder = Bukkit.getServer().getPluginManager().getPlugin("Market").getDataFolder();
-        File regionFile = new File(dataFolder, "RegionData.yml");
-        File locationFile = new File(dataFolder, "LocationData.yml");
-
-        if (!regionFile.exists() && !locationFile.exists()) {
-            return; // No files to migrate
-        }
-
-        org.bukkit.configuration.file.FileConfiguration regionConfig = regionFile.exists() ? org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(regionFile) : null;
-        org.bukkit.configuration.file.FileConfiguration locationConfig = locationFile.exists() ? org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(locationFile) : null;
-
-        org.bukkit.configuration.ConfigurationSection plotsSection = regionConfig != null ? regionConfig.getConfigurationSection("market.plots") : null;
-        org.bukkit.configuration.ConfigurationSection playersSection = regionConfig != null ? regionConfig.getConfigurationSection("market.players") : null;
-        org.bukkit.configuration.ConfigurationSection locationsSection = locationConfig != null ? locationConfig.getConfigurationSection("players") : null;
-
-        boolean hasPlots = plotsSection != null && !plotsSection.getKeys(false).isEmpty();
-        boolean hasPlayers = playersSection != null && !playersSection.getKeys(false).isEmpty();
-        boolean hasLocations = locationsSection != null && !locationsSection.getKeys(false).isEmpty();
-
-        if (!hasPlots && !hasPlayers && !hasLocations) {
-            return; // Nothing to migrate
-        }
-
-        Bukkit.getLogger().info("[Market] Starting automatic migration of data from YAML to SQLite database...");
-
-        // 1. Migrate Plots & Shops
-        if (hasPlots) {
-            int plotCount = 0;
-            int shopCount = 0;
-            for (String plotId : plotsSection.getKeys(false)) {
-                String path = "market.plots." + plotId;
-                Location posMin = net.craftnepal.market.utils.LocationUtils.loadLocation(regionConfig, path + ".posMin");
-                Location posMax = net.craftnepal.market.utils.LocationUtils.loadLocation(regionConfig, path + ".posMax");
-                Location spawn = net.craftnepal.market.utils.LocationUtils.loadLocation(regionConfig, path + ".spawn");
-                String owner = regionConfig.getString(path + ".owner");
-
-                savePlot(plotId, owner, posMin, posMax, spawn);
-                plotCount++;
-
-                List<String> members = regionConfig.getStringList(path + ".members");
-                if (members != null) {
-                    for (String member : members) {
-                        addPlotMember(plotId, member);
-                    }
-                }
-
-                org.bukkit.configuration.ConfigurationSection shops = regionConfig.getConfigurationSection(path + ".shops");
-                if (shops != null) {
-                    for (String shopId : shops.getKeys(false)) {
-                        String shopPath = path + ".shops." + shopId;
-                        ChestShop shop = createShopFromYaml(regionConfig, shopId, shopPath);
-                        if (shop != null) {
-                            int stock = 0;
-                            try {
-                                stock = net.craftnepal.market.utils.ShopUtils.getShopStock(shop);
-                            } catch (Exception e) {
-                                // Default to 0 if we can't read the block state
-                            }
-                            saveShop(shop, plotId, stock);
-                            shopCount++;
-                        }
-                    }
-                }
-            }
-            Bukkit.getLogger().info("[Market] Migrated " + plotCount + " plots and " + shopCount + " shops.");
-        }
-
-        // 2. Migrate Player Offline Earnings
-        if (hasPlayers) {
-            int playerEarningsCount = 0;
-            for (String uuidStr : playersSection.getKeys(false)) {
-                double earnings = regionConfig.getDouble("market.players." + uuidStr + ".offline_earnings", 0.0);
-                if (earnings > 0) {
-                    setOfflineEarnings(uuidStr, earnings);
-                    playerEarningsCount++;
-                }
-            }
-            Bukkit.getLogger().info("[Market] Migrated offline earnings for " + playerEarningsCount + " players.");
-        }
-
-        // 3. Migrate Player Back Locations
-        if (hasLocations) {
-            int locationCount = 0;
-            for (String uuidStr : locationsSection.getKeys(false)) {
-                Location lastLoc = net.craftnepal.market.utils.LocationUtils.loadLocation(locationConfig, "players." + uuidStr);
-                if (lastLoc != null) {
-                    saveLastLocation(uuidStr, lastLoc);
-                    locationCount++;
-                }
-            }
-            Bukkit.getLogger().info("[Market] Migrated " + locationCount + " player back locations.");
-        }
-
-        // 4. Migrate Global Spawn
-        if (regionConfig != null && regionConfig.contains("market.spawn")) {
-            Location spawn = regionConfig.getLocation("market.spawn");
-            if (spawn != null) {
-                setMarketSpawn(spawn);
-                Bukkit.getLogger().info("[Market] Migrated global market spawn location.");
-            }
-        }
-
-        Bukkit.getLogger().info("[Market] Data migration to SQLite completed successfully!");
-
-        // 4. Backup the old YAML files by renaming them so we don't migrate again on next startup
-        backupYamlFiles();
-    }
-
-    private static ChestShop createShopFromYaml(org.bukkit.configuration.file.FileConfiguration regionConfig, String shopId, String path) {
-        Location location = net.craftnepal.market.utils.LocationUtils.loadLocation(regionConfig, path + ".location");
-        String ownerString = regionConfig.getString(path + ".owner");
-        UUID owner = ownerString != null ? UUID.fromString(ownerString) : null;
-        double price = regionConfig.getDouble(path + ".price");
-        boolean isAdmin = regionConfig.getBoolean(path + ".is_admin", false);
-        boolean isBuyingShop = regionConfig.getBoolean(path + ".is_buying_shop", false);
-        
-        // Fallback for the short-lived is_sell_shop key
-        if (!isBuyingShop && regionConfig.contains(path + ".is_sell_shop")) {
-            isBuyingShop = regionConfig.getBoolean(path + ".is_sell_shop");
-        }
-
-        ItemStack itemStack = null;
-
-        // Try to load from Base64 bytes first
-        if (regionConfig.contains(path + ".item_bytes")) {
-            String b64 = regionConfig.getString(path + ".item_bytes");
-            if (b64 != null) {
-                try {
-                    byte[] bytes = java.util.Base64.getDecoder().decode(b64);
-                    itemStack = deserializeItem(bytes);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        } else {
-            // Legacy loading fallback
-            String materialName = regionConfig.getString(path + ".item");
-            if (materialName != null) {
-                org.bukkit.Material material = org.bukkit.Material.matchMaterial(materialName);
-                if (material != null) {
-                    itemStack = new ItemStack(material);
-                    if (material == org.bukkit.Material.ENCHANTED_BOOK) {
-                        String enchantKey = regionConfig.getString(path + ".enchantment.key");
-                        int level = regionConfig.getInt(path + ".enchantment.level");
-                        if (enchantKey != null) {
-                            enchantKey = enchantKey.toLowerCase();
-                            org.bukkit.enchantments.Enchantment enchantment = org.bukkit.enchantments.Enchantment.getByKey(org.bukkit.NamespacedKey.minecraft(enchantKey));
-                            if (enchantment != null) {
-                                org.bukkit.inventory.meta.EnchantmentStorageMeta meta = (org.bukkit.inventory.meta.EnchantmentStorageMeta) itemStack.getItemMeta();
-                                if (meta != null) {
-                                    meta.addStoredEnchant(enchantment, level, true);
-                                    itemStack.setItemMeta(meta);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        if (itemStack != null && location != null && owner != null) {
-            return new ChestShop(shopId, location, itemStack, owner, price, isAdmin, isBuyingShop);
+    private static Void createSchema(Connection c) throws SQLException {
+        try (Statement stmt = c.createStatement()) {
+            stmt.execute("PRAGMA foreign_keys = ON;");
+            stmt.execute("PRAGMA journal_mode = WAL;");
+            stmt.execute("PRAGMA synchronous = NORMAL;");
+            stmt.execute("PRAGMA busy_timeout = 5000;");
+            stmt.execute("CREATE TABLE IF NOT EXISTS plots (id TEXT PRIMARY KEY, owner TEXT, pos_min TEXT, pos_max TEXT, spawn TEXT);");
+            stmt.execute("CREATE TABLE IF NOT EXISTS plot_members (plot_id TEXT, player_uuid TEXT, PRIMARY KEY (plot_id, player_uuid),"
+                    + " FOREIGN KEY (plot_id) REFERENCES plots(id) ON DELETE CASCADE);");
+            stmt.execute("CREATE TABLE IF NOT EXISTS shops (id TEXT PRIMARY KEY, plot_id TEXT, location TEXT NOT NULL,"
+                    + " item_bytes TEXT NOT NULL, item_material TEXT NOT NULL, owner TEXT NOT NULL, price REAL NOT NULL,"
+                    + " is_buying_shop INTEGER NOT NULL, is_admin INTEGER NOT NULL, stock INTEGER NOT NULL DEFAULT 0,"
+                    + " FOREIGN KEY (plot_id) REFERENCES plots(id) ON DELETE CASCADE);");
+            stmt.execute("CREATE TABLE IF NOT EXISTS players (uuid TEXT PRIMARY KEY, offline_earnings REAL NOT NULL DEFAULT 0.0);");
+            stmt.execute("CREATE TABLE IF NOT EXISTS player_locations (uuid TEXT PRIMARY KEY, location TEXT NOT NULL);");
+            stmt.execute("CREATE TABLE IF NOT EXISTS global_metadata (key TEXT PRIMARY KEY, value TEXT);");
+            stmt.execute("CREATE TABLE IF NOT EXISTS offline_sales (uuid TEXT NOT NULL, item_key TEXT NOT NULL,"
+                    + " item_display_name TEXT NOT NULL, quantity INTEGER NOT NULL DEFAULT 0,"
+                    + " earnings REAL NOT NULL DEFAULT 0.0, PRIMARY KEY (uuid, item_key));");
         }
         return null;
     }
 
-    private static void backupYamlFiles() {
+    // ── Startup load ───────────────────────────────────────────────────────────
+
+    private record ShopRow(String id, String plotId, String location, String itemBytes, String owner,
+                           double price, boolean buying, boolean admin, int stock) {}
+
+    private record Snapshot(List<Plot> plots, List<String[]> members, List<ShopRow> shops,
+                            Map<String, String> locations, String spawn) {}
+
+    /** Reads every table on the database thread; builds Bukkit objects back on this thread. */
+    private static void loadAll() {
+        Snapshot s;
         try {
-            File dataFolder = Bukkit.getServer().getPluginManager().getPlugin("Market").getDataFolder();
-            File regionFile = new File(dataFolder, "RegionData.yml");
-            if (regionFile.exists()) {
-                File regionBak = new File(dataFolder, "RegionData.yml.bak");
-                if (regionBak.exists()) regionBak.delete();
-                if (regionFile.renameTo(regionBak)) {
-                    Bukkit.getLogger().info("[Market] Renamed RegionData.yml to RegionData.yml.bak");
-                }
-            }
-            File locationFile = new File(dataFolder, "LocationData.yml");
-            if (locationFile.exists()) {
-                File locationBak = new File(dataFolder, "LocationData.yml.bak");
-                if (locationBak.exists()) locationBak.delete();
-                if (locationFile.renameTo(locationBak)) {
-                    Bukkit.getLogger().info("[Market] Renamed LocationData.yml to LocationData.yml.bak");
-                }
-            }
-        } catch (Exception e) {
-            Bukkit.getLogger().warning("[Market] Failed to rename old YAML storage files: " + e.getMessage());
+            s = db.await("load data", DatabaseManager::readSnapshot);
+        } catch (IllegalStateException e) {
+            Bukkit.getLogger().log(Level.SEVERE, "[Market] Could not load data", e);
+            return;
         }
-    }
-
-    public static synchronized Connection getConnection() throws SQLException {
-        if (connection == null || connection.isClosed()) {
-            try {
-                Class.forName("org.sqlite.JDBC");
-            } catch (ClassNotFoundException e) {
-                Bukkit.getLogger().severe("SQLite JDBC Driver not found!");
-            }
-            connection = DriverManager.getConnection("jdbc:sqlite:" + databaseFile.getAbsolutePath());
-        }
-        return connection;
-    }
-
-    public static synchronized void close() {
-        if (connection != null) {
-            try {
-                if (!connection.isClosed()) {
-                    connection.close();
-                }
-            } catch (SQLException e) {
-                e.printStackTrace();
-            } finally {
-                connection = null;
-            }
-        }
-    }
-
-    // ── PLOTS ──────────────────────────────────────────────────────────────────
-    // Reads come from the in-memory PlotIndex. Writes update the index first, then SQL.
-
-    private static final PlotIndex plotIndex = new PlotIndex();
-
-    public static PlotIndex plotIndex() {
-        return plotIndex;
-    }
-
-    /** Loads every plot and member into memory. Called once at startup. */
-    public static void loadAllPlots() {
         plotIndex.clear();
-        try (Statement stmt = getConnection().createStatement()) {
+        for (Plot plot : s.plots()) plotIndex.put(plot);
+        for (String[] m : s.members()) {
+            Plot plot = plotIndex.get(m[0]);
+            if (plot != null) plot.members().add(m[1]);
+        }
+        shopIndex.clear();
+        for (ShopRow row : s.shops()) {
+            ChestShop shop = toShop(row);
+            if (shop != null) shopIndex.put(shop);
+        }
+        lastLocations.clear();
+        lastLocations.putAll(s.locations());
+        marketSpawn = s.spawn();
+        Bukkit.getLogger().info("[Market] Loaded " + plotIndex.all().size() + " plots and "
+                + shopIndex.size() + " shops into memory.");
+    }
+
+    private static Snapshot readSnapshot(Connection c) throws SQLException {
+        List<Plot> plots = new ArrayList<>();
+        List<String[]> members = new ArrayList<>();
+        List<ShopRow> shops = new ArrayList<>();
+        Map<String, String> locations = new HashMap<>();
+        String spawn = null;
+        try (Statement stmt = c.createStatement()) {
             try (ResultSet rs = stmt.executeQuery("SELECT id, owner, pos_min, pos_max, spawn FROM plots")) {
                 while (rs.next()) {
-                    plotIndex.put(new Plot(rs.getString("id"), rs.getString("owner"),
-                            rs.getString("pos_min"), rs.getString("pos_max"), rs.getString("spawn")));
+                    plots.add(new Plot(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5)));
                 }
             }
             try (ResultSet rs = stmt.executeQuery("SELECT plot_id, player_uuid FROM plot_members")) {
+                while (rs.next()) members.add(new String[] {rs.getString(1), rs.getString(2)});
+            }
+            try (ResultSet rs = stmt.executeQuery("SELECT id, plot_id, location, item_bytes, owner, price,"
+                    + " is_buying_shop, is_admin, stock FROM shops")) {
                 while (rs.next()) {
-                    Plot plot = plotIndex.get(rs.getString("plot_id"));
-                    if (plot != null) plot.members().add(rs.getString("player_uuid"));
+                    shops.add(new ShopRow(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4),
+                            rs.getString(5), rs.getDouble(6), rs.getInt(7) == 1, rs.getInt(8) == 1, rs.getInt(9)));
                 }
             }
-            Bukkit.getLogger().info("[Market] Loaded " + plotIndex.all().size() + " plots into memory.");
-        } catch (SQLException e) {
-            Bukkit.getLogger().severe("[Market] Could not load plots: " + e.getMessage());
+            try (ResultSet rs = stmt.executeQuery("SELECT uuid, location FROM player_locations")) {
+                while (rs.next()) locations.put(rs.getString(1), rs.getString(2));
+            }
+            try (ResultSet rs = stmt.executeQuery("SELECT value FROM global_metadata WHERE key = 'market_spawn'")) {
+                if (rs.next()) spawn = rs.getString(1);
+            }
         }
+        return new Snapshot(plots, members, shops, locations, spawn);
+    }
+
+    private static ChestShop toShop(ShopRow row) {
+        Location loc = deserializeLocation(row.location());
+        ItemStack item = null;
+        try {
+            item = row.itemBytes() == null ? null : deserializeItem(Base64.getDecoder().decode(row.itemBytes()));
+        } catch (IllegalArgumentException e) {
+            Bukkit.getLogger().warning("[Market] Shop " + row.id() + " has unreadable item data.");
+        }
+        if (loc == null || item == null) {
+            Bukkit.getLogger().warning("[Market] Skipping shop " + row.id() + ": world not loaded or item unreadable.");
+            return null;
+        }
+        ChestShop shop = new ChestShop(row.id(), loc, item, UUID.fromString(row.owner()), row.price(), row.admin(), row.buying());
+        shop.setPlotId(row.plotId());
+        shop.setStock(row.stock());
+        return shop;
+    }
+
+    // ── Plots ──────────────────────────────────────────────────────────────────
+
+    public static PlotIndex plotIndex() {
+        return plotIndex;
     }
 
     public static boolean plotExists(String id) {
@@ -403,33 +201,34 @@ public class DatabaseManager {
         return plotIndex.ids();
     }
 
+    /**
+     * Creates a plot or updates its owner, bounds and spawn. Members and shops are kept: an upsert,
+     * not INSERT OR REPLACE, which would delete the row and cascade to both.
+     */
     public static void savePlot(String id, String owner, Location posMin, Location posMax, Location spawn) {
-        // INSERT OR REPLACE deletes the old row first, which cascades to its members.
-        plotIndex.put(new Plot(id, owner, serializeLocation(posMin), serializeLocation(posMax), serializeLocation(spawn)));
-        String sql = "INSERT OR REPLACE INTO plots (id, owner, pos_min, pos_max, spawn) VALUES (?, ?, ?, ?, ?)";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
-            pstmt.setString(1, id);
-            pstmt.setString(2, owner);
-            pstmt.setString(3, serializeLocation(posMin));
-            pstmt.setString(4, serializeLocation(posMax));
-            pstmt.setString(5, serializeLocation(spawn));
-            pstmt.executeUpdate();
-        } catch (SQLException e) {
-            Bukkit.getLogger().severe("Failed to save plot " + id + ": " + e.getMessage());
-        }
+        String min = serializeLocation(posMin), max = serializeLocation(posMax), sp = serializeLocation(spawn);
+        Plot old = plotIndex.get(id);
+        Plot plot = new Plot(id, owner, min, max, sp);
+        if (old != null) plot.members().addAll(old.members());
+        plotIndex.put(plot);
+        db.write("save plot " + id, c -> {
+            try (PreparedStatement ps = c.prepareStatement("INSERT INTO plots (id, owner, pos_min, pos_max, spawn) VALUES (?, ?, ?, ?, ?)"
+                    + " ON CONFLICT(id) DO UPDATE SET owner = excluded.owner, pos_min = excluded.pos_min,"
+                    + " pos_max = excluded.pos_max, spawn = excluded.spawn")) {
+                ps.setString(1, id);
+                ps.setString(2, owner);
+                ps.setString(3, min);
+                ps.setString(4, max);
+                ps.setString(5, sp);
+                ps.executeUpdate();
+            }
+        });
     }
 
     public static void setPlotOwner(String id, String owner) {
         Plot plot = plotIndex.get(id);
         if (plot != null) plot.setOwner(owner);
-        String sql = "UPDATE plots SET owner = ? WHERE id = ?";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
-            pstmt.setString(1, owner);
-            pstmt.setString(2, id);
-            pstmt.executeUpdate();
-        } catch (SQLException e) {
-            Bukkit.getLogger().severe("Failed to set owner for plot " + id + ": " + e.getMessage());
-        }
+        update("set owner of plot " + id, "UPDATE plots SET owner = ? WHERE id = ?", owner, id);
     }
 
     public static String getPlotOwner(String id) {
@@ -453,30 +252,21 @@ public class DatabaseManager {
     }
 
     public static void setPlotSpawn(String id, Location spawn) {
+        String text = serializeLocation(spawn);
         Plot plot = plotIndex.get(id);
-        if (plot != null) plot.setSpawnText(serializeLocation(spawn));
-        String sql = "UPDATE plots SET spawn = ? WHERE id = ?";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
-            pstmt.setString(1, serializeLocation(spawn));
-            pstmt.setString(2, id);
-            pstmt.executeUpdate();
-        } catch (SQLException e) {
-            Bukkit.getLogger().severe("Failed to set spawn for plot " + id + ": " + e.getMessage());
-        }
+        if (plot != null) plot.setSpawnText(text);
+        update("set spawn of plot " + id, "UPDATE plots SET spawn = ? WHERE id = ?", text, id);
     }
 
+    /** Deletes a plot with its members and shops (the database cascades; memory and displays follow). */
     public static void deletePlot(String id) {
         plotIndex.remove(id);
-        String sql = "DELETE FROM plots WHERE id = ?";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
-            pstmt.setString(1, id);
-            pstmt.executeUpdate();
-        } catch (SQLException e) {
-            Bukkit.getLogger().severe("Failed to delete plot " + id + ": " + e.getMessage());
+        for (ChestShop shop : shopIndex.byPlot(id)) {
+            shopIndex.remove(shop.getId());
+            DisplayUtils.getInstance().removeDisplayPair(id, shop.getId());
         }
+        update("delete plot " + id, "DELETE FROM plots WHERE id = ?", id);
     }
-
-    // ── PLOT MEMBERS ───────────────────────────────────────────────────────────
 
     public static List<String> getPlotMembers(String plotId) {
         Plot plot = plotIndex.get(plotId);
@@ -486,328 +276,189 @@ public class DatabaseManager {
     public static void addPlotMember(String plotId, String playerUuid) {
         Plot plot = plotIndex.get(plotId);
         if (plot != null) plot.members().add(playerUuid);
-        String sql = "INSERT OR IGNORE INTO plot_members (plot_id, player_uuid) VALUES (?, ?)";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
-            pstmt.setString(1, plotId);
-            pstmt.setString(2, playerUuid);
-            pstmt.executeUpdate();
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
+        update("add member to plot " + plotId, "INSERT OR IGNORE INTO plot_members (plot_id, player_uuid) VALUES (?, ?)", plotId, playerUuid);
     }
 
     public static void removePlotMember(String plotId, String playerUuid) {
         Plot plot = plotIndex.get(plotId);
         if (plot != null) plot.members().remove(playerUuid);
-        String sql = "DELETE FROM plot_members WHERE plot_id = ? AND player_uuid = ?";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
-            pstmt.setString(1, plotId);
-            pstmt.setString(2, playerUuid);
-            pstmt.executeUpdate();
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
+        update("remove member from plot " + plotId, "DELETE FROM plot_members WHERE plot_id = ? AND player_uuid = ?", plotId, playerUuid);
     }
 
-    // ── SHOPS CRUD ─────────────────────────────────────────────────────────────
+    // ── Shops ──────────────────────────────────────────────────────────────────
+
+    public static ShopIndex shopIndex() {
+        return shopIndex;
+    }
 
     public static void saveShop(ChestShop shop, String plotId, int stock) {
-        String sql = "INSERT OR REPLACE INTO shops (id, plot_id, location, item_bytes, item_material, owner, price, is_buying_shop, is_admin, stock) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
-            pstmt.setString(1, shop.getId());
-            pstmt.setString(2, plotId);
-            pstmt.setString(3, serializeLocation(shop.getLocation()));
-            pstmt.setString(4, Base64.getEncoder().encodeToString(serializeItem(shop.getItem())));
-            pstmt.setString(5, shop.getItem().getType().toString());
-            pstmt.setString(6, shop.getOwner().toString());
-            pstmt.setDouble(7, shop.getPrice());
-            pstmt.setInt(8, shop.isBuyingShop() ? 1 : 0);
-            pstmt.setInt(9, shop.isAdmin() ? 1 : 0);
-            pstmt.setInt(10, stock);
-            pstmt.executeUpdate();
-            
-            // Set the cache on the ChestShop object
-            shop.setPlotId(plotId);
-            shop.setStock(stock);
-            // Update in-memory cache
-            shopCache.put(shop.getId(), shop);
-        } catch (SQLException e) {
-            Bukkit.getLogger().severe("Failed to save shop " + shop.getId() + ": " + e.getMessage());
-        }
+        shop.setPlotId(plotId);
+        shop.setStock(stock);
+        shopIndex.put(shop);
+        String location = serializeLocation(shop.getLocation());
+        String item = Base64.getEncoder().encodeToString(serializeItem(shop.getItem()));
+        String material = shop.getItem().getType().toString();
+        String owner = shop.getOwner().toString();
+        double price = shop.getPrice();
+        int buying = shop.isBuyingShop() ? 1 : 0, admin = shop.isAdmin() ? 1 : 0;
+        db.write("save shop " + shop.getId(), c -> {
+            try (PreparedStatement ps = c.prepareStatement("INSERT OR REPLACE INTO shops (id, plot_id, location, item_bytes,"
+                    + " item_material, owner, price, is_buying_shop, is_admin, stock) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+                ps.setString(1, shop.getId());
+                ps.setString(2, plotId);
+                ps.setString(3, location);
+                ps.setString(4, item);
+                ps.setString(5, material);
+                ps.setString(6, owner);
+                ps.setDouble(7, price);
+                ps.setInt(8, buying);
+                ps.setInt(9, admin);
+                ps.setInt(10, stock);
+                ps.executeUpdate();
+            }
+        });
     }
 
     public static void removeShop(String id) {
-        String sql = "DELETE FROM shops WHERE id = ?";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
-            pstmt.setString(1, id);
-            pstmt.executeUpdate();
-            // Remove from in-memory cache
-            shopCache.remove(id);
-        } catch (SQLException e) {
-            Bukkit.getLogger().severe("Failed to remove shop " + id + ": " + e.getMessage());
-        }
+        shopIndex.remove(id);
+        update("remove shop " + id, "DELETE FROM shops WHERE id = ?", id);
     }
 
     public static void updateShopPrice(String id, double price) {
-        String sql = "UPDATE shops SET price = ? WHERE id = ?";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
-            pstmt.setDouble(1, price);
-            pstmt.setString(2, id);
-            pstmt.executeUpdate();
-            // Update in-memory cache
-            ChestShop shop = shopCache.get(id);
-            if (shop != null) {
-                shop.setPrice(price);
-            }
-        } catch (SQLException e) {
-            Bukkit.getLogger().severe("Failed to update shop price " + id + ": " + e.getMessage());
-        }
-    }
-
-    public static ChestShop getShop(String id) {
-        return shopCache.get(id);
-    }
-
-    public static ChestShop getShopAt(Location location) {
-        if (location == null) return null;
-        String targetSerialized = serializeLocation(location);
-        for (ChestShop shop : shopCache.values()) {
-            if (targetSerialized.equals(serializeLocation(shop.getLocation()))) {
-                return shop;
-            }
-        }
-        return null;
-    }
-
-    public static List<ChestShop> getAllShops() {
-        return new ArrayList<>(shopCache.values());
-    }
-
-    public static List<ChestShop> getShopsByPlot(String plotId) {
-        List<ChestShop> shops = new ArrayList<>();
-        if (plotId == null) return shops;
-        for (ChestShop shop : shopCache.values()) {
-            if (plotId.equals(shop.getPlotId())) {
-                shops.add(shop);
-            }
-        }
-        return shops;
-    }
-
-    public static List<ChestShop> getShopsByOwner(String ownerUuid) {
-        List<ChestShop> shops = new ArrayList<>();
-        if (ownerUuid == null) return shops;
-        for (ChestShop shop : shopCache.values()) {
-            if (shop.getOwner() != null && ownerUuid.equals(shop.getOwner().toString())) {
-                shops.add(shop);
-            }
-        }
-        return shops;
-    }
-
-    public static String getPlotIdOfShop(String shopId) {
-        ChestShop shop = shopCache.get(shopId);
-        return shop != null ? shop.getPlotId() : null;
-    }
-
-    public static int getShopStock(String id) {
-        ChestShop shop = shopCache.get(id);
-        return shop != null ? shop.getStock() : 0;
+        ChestShop shop = shopIndex.get(id);
+        if (shop != null) shop.setPrice(price);
+        update("update price of shop " + id, "UPDATE shops SET price = ? WHERE id = ?", price, id);
     }
 
     public static void updateShopStock(String id, int stock) {
-        String sql = "UPDATE shops SET stock = ? WHERE id = ?";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
-            pstmt.setInt(1, stock);
-            pstmt.setString(2, id);
-            pstmt.executeUpdate();
-            // Update in-memory cache
-            ChestShop shop = shopCache.get(id);
-            if (shop != null) {
-                shop.setStock(stock);
-            }
-        } catch (SQLException e) {
-            Bukkit.getLogger().severe("Failed to update shop stock for " + id + ": " + e.getMessage());
-        }
+        ChestShop shop = shopIndex.get(id);
+        if (shop != null) shop.setStock(stock);
+        update("update stock of shop " + id, "UPDATE shops SET stock = ? WHERE id = ?", stock, id);
     }
 
-    // ── PLAYERS (OFFLINE EARNINGS) ─────────────────────────────────────────────
-
-    public static double getOfflineEarnings(String uuid) {
-        String sql = "SELECT offline_earnings FROM players WHERE uuid = ?";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
-            pstmt.setString(1, uuid);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getDouble("offline_earnings");
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return 0.0;
+    public static ChestShop getShop(String id) {
+        return shopIndex.get(id);
     }
+
+    public static ChestShop getShopAt(Location location) {
+        return shopIndex.at(location);
+    }
+
+    public static List<ChestShop> getShopsByPlot(String plotId) {
+        return shopIndex.byPlot(plotId);
+    }
+
+    public static List<ChestShop> getShopsByOwner(String ownerUuid) {
+        return shopIndex.byOwner(ownerUuid);
+    }
+
+    // ── Offline earnings ───────────────────────────────────────────────────────
+
+    public record OfflineSale(String getItemKey, String getItemDisplayName, int getQuantity, double getEarnings) {}
+
+    /** What a player earned while offline: per-item sales plus the legacy lump sum. */
+    public record OfflineEarnings(List<OfflineSale> sales, double legacy) {}
 
     public static void setOfflineEarnings(String uuid, double amount) {
-        String sql = "INSERT OR REPLACE INTO players (uuid, offline_earnings) VALUES (?, ?)";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
-            pstmt.setString(1, uuid);
-            pstmt.setDouble(2, amount);
-            pstmt.executeUpdate();
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
+        update("set offline earnings of " + uuid, "INSERT OR REPLACE INTO players (uuid, offline_earnings) VALUES (?, ?)", uuid, amount);
     }
 
     public static void addOfflineSale(String uuid, String itemKey, String itemDisplayName, int quantity, double earnings) {
-        String sql = "INSERT INTO offline_sales (uuid, item_key, item_display_name, quantity, earnings) VALUES (?, ?, ?, ?, ?) " +
-                     "ON CONFLICT(uuid, item_key) DO UPDATE SET " +
-                     "quantity = quantity + excluded.quantity, " +
-                     "earnings = earnings + excluded.earnings, " +
-                     "item_display_name = excluded.item_display_name";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
-            pstmt.setString(1, uuid);
-            pstmt.setString(2, itemKey);
-            pstmt.setString(3, itemDisplayName);
-            pstmt.setInt(4, quantity);
-            pstmt.setDouble(5, earnings);
-            pstmt.executeUpdate();
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
+        update("add offline sale for " + uuid, "INSERT INTO offline_sales (uuid, item_key, item_display_name, quantity, earnings)"
+                + " VALUES (?, ?, ?, ?, ?) ON CONFLICT(uuid, item_key) DO UPDATE SET quantity = quantity + excluded.quantity,"
+                + " earnings = earnings + excluded.earnings, item_display_name = excluded.item_display_name",
+                uuid, itemKey, itemDisplayName, quantity, earnings);
     }
 
-    public static List<OfflineSale> getOfflineSales(String uuid) {
-        List<OfflineSale> sales = new ArrayList<>();
-        String sql = "SELECT item_key, item_display_name, quantity, earnings FROM offline_sales WHERE uuid = ?";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
-            pstmt.setString(1, uuid);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                while (rs.next()) {
-                    sales.add(new OfflineSale(
-                            rs.getString("item_key"),
-                            rs.getString("item_display_name"),
-                            rs.getInt("quantity"),
-                            rs.getDouble("earnings")
-                    ));
+    /** Reads offline earnings on the database thread and calls back on the server thread. */
+    public static void readOfflineEarnings(String uuid, Consumer<OfflineEarnings> callback) {
+        db.read("read offline earnings of " + uuid, c -> {
+            List<OfflineSale> sales = new ArrayList<>();
+            try (PreparedStatement ps = c.prepareStatement(
+                    "SELECT item_key, item_display_name, quantity, earnings FROM offline_sales WHERE uuid = ?")) {
+                ps.setString(1, uuid);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) sales.add(new OfflineSale(rs.getString(1), rs.getString(2), rs.getInt(3), rs.getDouble(4)));
                 }
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return sales;
+            double legacy = 0;
+            try (PreparedStatement ps = c.prepareStatement("SELECT offline_earnings FROM players WHERE uuid = ?")) {
+                ps.setString(1, uuid);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) legacy = rs.getDouble(1);
+                }
+            }
+            return new OfflineEarnings(sales, legacy);
+        }, callback);
     }
 
-    public static void clearOfflineSales(String uuid) {
-        String sql = "DELETE FROM offline_sales WHERE uuid = ?";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
-            pstmt.setString(1, uuid);
-            pstmt.executeUpdate();
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
+    /** Marks offline earnings as delivered. */
+    public static void clearOfflineEarnings(String uuid) {
+        setOfflineEarnings(uuid, 0.0);
+        update("clear offline sales of " + uuid, "DELETE FROM offline_sales WHERE uuid = ?", uuid);
     }
 
-    public static class OfflineSale {
-        private final String itemKey;
-        private final String itemDisplayName;
-        private final int quantity;
-        private final double earnings;
-
-        public OfflineSale(String itemKey, String itemDisplayName, int quantity, double earnings) {
-            this.itemKey = itemKey;
-            this.itemDisplayName = itemDisplayName;
-            this.quantity = quantity;
-            this.earnings = earnings;
-        }
-
-        public String getItemKey() {
-            return itemKey;
-        }
-
-        public String getItemDisplayName() {
-            return itemDisplayName;
-        }
-
-        public int getQuantity() {
-            return quantity;
-        }
-
-        public double getEarnings() {
-            return earnings;
-        }
-    }
-
-    // ── PLAYER LOCATIONS (BACK) ────────────────────────────────────────────────
+    // ── Last locations (/market back) ──────────────────────────────────────────
 
     public static void saveLastLocation(String uuid, Location location) {
         if (location == null) {
             clearLastLocation(uuid);
             return;
         }
-        String sql = "INSERT OR REPLACE INTO player_locations (uuid, location) VALUES (?, ?)";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
-            pstmt.setString(1, uuid);
-            pstmt.setString(2, serializeLocation(location));
-            pstmt.executeUpdate();
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
+        String text = serializeLocation(location);
+        lastLocations.put(uuid, text);
+        update("save last location of " + uuid, "INSERT OR REPLACE INTO player_locations (uuid, location) VALUES (?, ?)", uuid, text);
     }
 
     public static Location getLastLocation(String uuid) {
-        String sql = "SELECT location FROM player_locations WHERE uuid = ?";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
-            pstmt.setString(1, uuid);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    return deserializeLocation(rs.getString("location"));
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return null;
+        return deserializeLocation(lastLocations.get(uuid));
     }
 
     public static void clearLastLocation(String uuid) {
-        String sql = "DELETE FROM player_locations WHERE uuid = ?";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
-            pstmt.setString(1, uuid);
-            pstmt.executeUpdate();
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
+        if (lastLocations.remove(uuid) == null) return;
+        update("clear last location of " + uuid, "DELETE FROM player_locations WHERE uuid = ?", uuid);
     }
 
-    // ── HELPER METHODS ─────────────────────────────────────────────────────────
+    // ── Market spawn ───────────────────────────────────────────────────────────
 
-    private static ChestShop mapRowToShop(ResultSet rs) throws SQLException {
-        String id = rs.getString("id");
-        Location loc = deserializeLocation(rs.getString("location"));
-        String b64 = rs.getString("item_bytes");
-        ItemStack item = null;
-        if (b64 != null) {
-            try {
-                byte[] bytes = Base64.getDecoder().decode(b64);
-                item = deserializeItem(bytes);
-            } catch (Exception e) {
-                e.printStackTrace();
+    public static void setMarketSpawn(Location spawn) {
+        String text = serializeLocation(spawn);
+        marketSpawn = text;
+        update("set market spawn", "INSERT OR REPLACE INTO global_metadata (key, value) VALUES ('market_spawn', ?)", text);
+    }
+
+    public static Location getMarketSpawn() {
+        return deserializeLocation(marketSpawn);
+    }
+
+    // ── Reset ──────────────────────────────────────────────────────────────────
+
+    /** Wipes plots, shops, players, locations and metadata. Offline sales are kept: that money is owed. */
+    public static void clearAllData() {
+        plotIndex.clear();
+        shopIndex.clear();
+        DisplayUtils.getInstance().clearAllDisplays();
+        lastLocations.clear();
+        marketSpawn = null;
+        db.write("clear all data", c -> {
+            try (Statement stmt = c.createStatement()) {
+                for (String table : new String[] {"plot_members", "shops", "plots", "players", "player_locations", "global_metadata"}) {
+                    stmt.executeUpdate("DELETE FROM " + table);
+                }
             }
-        }
-        UUID owner = UUID.fromString(rs.getString("owner"));
-        double price = rs.getDouble("price");
-        boolean isBuyingShop = rs.getInt("is_buying_shop") == 1;
-        boolean isAdmin = rs.getInt("is_admin") == 1;
+        });
+    }
 
-        if (loc != null && item != null) {
-            ChestShop shop = new ChestShop(id, loc, item, owner, price, isAdmin, isBuyingShop);
-            shop.setPlotId(rs.getString("plot_id"));
-            shop.setStock(rs.getInt("stock"));
-            return shop;
-        }
-        return null;
+    // ── Helpers ────────────────────────────────────────────────────────────────
+
+    /** Queues a single parameterised statement. */
+    private static void update(String operation, String sql, Object... params) {
+        db.write(operation, c -> {
+            try (PreparedStatement ps = c.prepareStatement(sql)) {
+                for (int i = 0; i < params.length; i++) ps.setObject(i + 1, params[i]);
+                ps.executeUpdate();
+            }
+        });
     }
 
     public static String serializeLocation(Location loc) {
@@ -816,79 +467,39 @@ public class DatabaseManager {
     }
 
     public static Location deserializeLocation(String str) {
-        if (str == null || str.trim().isEmpty()) return null;
+        if (str == null || str.isBlank()) return null;
         try {
             String[] parts = str.split(";");
             if (parts.length < 4) return null;
             World world = Bukkit.getWorld(parts[0]);
             if (world == null) return null;
-            double x = Double.parseDouble(parts[1]);
-            double y = Double.parseDouble(parts[2]);
-            double z = Double.parseDouble(parts[3]);
             float yaw = parts.length > 4 ? Float.parseFloat(parts[4]) : 0.0f;
             float pitch = parts.length > 5 ? Float.parseFloat(parts[5]) : 0.0f;
-            return new Location(world, x, y, z, yaw, pitch);
-        } catch (Exception e) {
+            return new Location(world, Double.parseDouble(parts[1]), Double.parseDouble(parts[2]),
+                    Double.parseDouble(parts[3]), yaw, pitch);
+        } catch (NumberFormatException e) {
             return null;
         }
     }
 
-    private static byte[] serializeItem(ItemStack item) {
-        try {
-            java.io.ByteArrayOutputStream io = new java.io.ByteArrayOutputStream();
-            org.bukkit.util.io.BukkitObjectOutputStream os = new org.bukkit.util.io.BukkitObjectOutputStream(io);
+    static byte[] serializeItem(ItemStack item) {
+        try (ByteArrayOutputStream io = new ByteArrayOutputStream();
+             BukkitObjectOutputStream os = new BukkitObjectOutputStream(io)) {
             os.writeObject(item);
             os.flush();
             return io.toByteArray();
         } catch (Exception e) {
-            e.printStackTrace();
+            Bukkit.getLogger().log(Level.SEVERE, "[Market] Could not serialize item " + item, e);
             return new byte[0];
         }
     }
 
-    private static ItemStack deserializeItem(byte[] bytes) {
-        try {
-            java.io.ByteArrayInputStream in = new java.io.ByteArrayInputStream(bytes);
-            org.bukkit.util.io.BukkitObjectInputStream is = new org.bukkit.util.io.BukkitObjectInputStream(in);
+    static ItemStack deserializeItem(byte[] bytes) {
+        try (BukkitObjectInputStream is = new BukkitObjectInputStream(new ByteArrayInputStream(bytes))) {
             return (ItemStack) is.readObject();
         } catch (Exception e) {
-            e.printStackTrace();
+            Bukkit.getLogger().log(Level.WARNING, "[Market] Could not deserialize an item", e);
             return null;
-        }
-    }
-
-    public static void setMarketSpawn(Location spawn) {
-        String sql = "INSERT OR REPLACE INTO global_metadata (key, value) VALUES ('market_spawn', ?)";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
-            pstmt.setString(1, serializeLocation(spawn));
-            pstmt.executeUpdate();
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public static Location getMarketSpawn() {
-        String sql = "SELECT value FROM global_metadata WHERE key = 'market_spawn'";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql);
-             ResultSet rs = pstmt.executeQuery()) {
-            if (rs.next()) {
-                return deserializeLocation(rs.getString("value"));
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
-
-    public static void clearAllData() {
-        String[] tables = {"plot_members", "shops", "plots", "players", "player_locations", "global_metadata"};
-        try (java.sql.Statement stmt = getConnection().createStatement()) {
-            for (String table : tables) {
-                stmt.executeUpdate("DELETE FROM " + table);
-            }
-            plotIndex.clear();
-        } catch (SQLException e) {
-            e.printStackTrace();
         }
     }
 }

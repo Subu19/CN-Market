@@ -210,7 +210,9 @@ public class ShopCreateMenu extends Menu {
         // Count stock initially to cache it correctly in SQLite
         int initialStock = ShopUtils.getPhysicalBarrelStock(chestShop);
         
-        // Save to SQLite database
+        // The shops table references plots: a grid plot (e.g. the spawn plot for admin shops)
+        // must have a row before its first shop is saved.
+        net.craftnepal.market.utils.PlotUtils.registerAutomaticPlot(plotId);
         net.craftnepal.market.managers.DatabaseManager.saveShop(chestShop, plotId, initialStock);
 
         playerMenuUtility.getOwner().closeInventory();

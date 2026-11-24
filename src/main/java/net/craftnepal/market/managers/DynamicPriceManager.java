@@ -344,7 +344,7 @@ public class DynamicPriceManager {
     }
 
     private static void autoScaleShops(String itemKey, double multiplier) {
-        for (ChestShop shop : DatabaseManager.getAllShops()) {
+        for (ChestShop shop : DatabaseManager.shopIndex().all()) {
             if (ShopUtils.getItemKey(shop).equalsIgnoreCase(itemKey)) {
                 double oldPrice = shop.getPrice();
                 double newShopPrice = oldPrice * multiplier;

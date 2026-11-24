@@ -20,7 +20,7 @@ Tick these as phases land. One phase per branch/PR.
 - [x] Phase 1: Baseline build and test harness
 - [x] Phase 2: In-memory plot index and cached settings (fixes Problem 1; shippable alone as a hotfix)
 - [x] Phase 3: Protection core (Problem 2)
-- [ ] Phase 4: Shop index, serialized database access, async writes
+- [x] Phase 4: Shop index, serialized database access, async writes
 - [ ] Phase 5: Price and metrics file I/O off the main thread
 - [ ] Phase 6: Bug fixes (only the ones approved under "Decisions")
 - [ ] Phase 7: Cleanup
@@ -400,6 +400,17 @@ Guards:
 7. Move `Bukkit.getOfflinePlayer(String)` lookups in `AddMember.java:49`, `RemoveMember.java:49`, `SetOwner.java:55` off the main thread, or resolve from online players and the name cache first.
 8. Replace the 31 `printStackTrace()` calls in the database code with the plugin logger. A failed write must log at SEVERE with the operation and key.
 9. `ShopCreateMenu.createShop` (`:204-224`): make sure the plot row exists before inserting the shop. The shops table has a foreign key to plots, and admin or spawn-plot shops can target a grid plot that was never registered, which makes the insert fail silently while the menu reports success.
+
+### Implementation notes (2026-11-24)
+
+- `Database` owns the connection and one executor thread; nothing else can reach the connection (no `getConnection()` left). Startup schema and load use `await`; rows are read on the database thread and turned into `Location`/`ItemStack` on the server thread.
+- Deviation: SQL stays in `DatabaseManager` instead of separate `PlotStore`/`ShopStore`/`PlayerStore` classes. Each would be a thin file of statements with one caller; the facade is ~470 lines after `YamlMigration` moved out. Revisit in Phase 7 if it grows.
+- Deviation: `ShopIndex.byPlot`/`byOwner` scan (few hundred shops, command/menu paths only). `byBlock` and `byChunk` are real maps.
+- Last locations and the market spawn are held in memory (loaded at startup), so `/market back` and `/market spawn` never touch SQL.
+- Found: `savePlot` used `INSERT OR REPLACE`, which deletes the old row and cascades to members and shops. Now an upsert. Verified on a copy of the dev DB: a plot with 46 shops keeps them all.
+- Name lookups (`addmember`, `removemember`, `setowner`) use `PlayerUtils.findKnownPlayer`, which never calls Mojang. Players who never joined are reported as not found, as before.
+- Skipped: the main-thread SQL assertion. With one private connection there is no other path to SQL.
+- Store round-trip tests need a server (`Location` needs a `World`); covered by the smoke test (boot, load 50 plots / 218 shops, clean stop, `integrity_check` ok) and the in-game checklist.
 
 Trade-off to state in the PR: writes are queued, so a hard crash can lose the last few queued writes. SQLite is already in WAL mode with `synchronous=NORMAL`, so this is close to today's durability. A clean shutdown loses nothing because `onDisable` flushes.
 

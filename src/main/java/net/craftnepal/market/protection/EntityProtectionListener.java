@@ -20,7 +20,6 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
-import org.bukkit.event.entity.EntityKnockbackByEntityEvent;
 import org.bukkit.event.entity.PotionSplashEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.hanging.HangingBreakByEntityEvent;
@@ -193,8 +192,9 @@ public class EntityProtectionListener implements Listener {
 
     // ── Wind charges ─────────────────────────────────────────────────────────
     // A wind charge's burst is scheduled before ProjectileHitEvent finishes, so cancelling the
-    // hit is not enough: the entity is removed before it can burst (layer 1). The explosion
-    // handler clears pathway bursts (layer 2) and knockback across plots is cancelled (layer 3).
+    // hit is not enough: the entity is removed before it can burst. The explosion handler clears
+    // pathway bursts. (No knockback handler: Paper deprecates the Bukkit knockback event and
+    // warns on every start; players cannot throw wind charges here anyway.)
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onWindChargeHit(ProjectileHitEvent e) {
@@ -212,15 +212,6 @@ public class EntityProtectionListener implements Listener {
         }
         if (crossPlot) {
             windCharge.remove();
-            e.setCancelled(true);
-        }
-    }
-
-    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
-    public void onKnockback(EntityKnockbackByEntityEvent e) {
-        Entity source = e.getSourceEntity();
-        if (!(source instanceof AbstractWindCharge) || !inMarket(source.getWorld())) return;
-        if (!sameZone(source.getLocation(), e.getEntity().getLocation())) {
             e.setCancelled(true);
         }
     }

@@ -2,11 +2,13 @@ package net.craftnepal.market.utils;
 
 import me.kodysimpson.simpapi.colors.ColorTranslator;
 import net.craftnepal.market.Market;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 public class SendMessage {
 
-    public static void sendPlayerMessage(Player player,String message){
+    /** Works for players and the console. */
+    public static void sendPlayerMessage(CommandSender player, String message){
         player.sendMessage(ColorTranslator.translateColorCodes(Market.settings().prefix() + message));
 
     }

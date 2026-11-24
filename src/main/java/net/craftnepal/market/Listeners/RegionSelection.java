@@ -23,6 +23,13 @@ public class RegionSelection implements Listener {
     private static final Map<UUID, Location> playerSelections = new ConcurrentHashMap<>();
     private static final Map<UUID, Long> selectionCooldowns = new ConcurrentHashMap<>();
 
+    /** Drops a player's selection state when they leave. */
+    public static void forget(UUID uuid) {
+        selectionModePlayers.remove(uuid);
+        playerSelections.remove(uuid);
+        selectionCooldowns.remove(uuid);
+    }
+
     private static final long SELECTION_COOLDOWN_MS = 1000;
     private static final Material SELECTION_TOOL = Material.STICK;
 

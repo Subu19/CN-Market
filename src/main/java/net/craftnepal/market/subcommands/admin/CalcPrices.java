@@ -28,7 +28,7 @@ public class CalcPrices extends SubCommand {
     @Override
     public void perform(CommandSender sender, String[] args) {
         if (sender instanceof Player && !sender.hasPermission("market.admin")) {
-            SendMessage.sendPlayerMessage((Player) sender, "§cYou don't have permission to use this command.");
+            SendMessage.sendPlayerMessage(sender, "§cYou don't have permission to use this command.");
             return;
         }
 
@@ -37,7 +37,7 @@ public class CalcPrices extends SubCommand {
         int updated = PriceCalculator.calculateMissingPrices();
         
         if (sender instanceof Player) {
-            SendMessage.sendPlayerMessage((Player) sender, "§aCalculation complete! Updated §f" + updated + " §aitem prices in price.yml.");
+            SendMessage.sendPlayerMessage(sender, "§aCalculation complete! Updated §f" + updated + " §aitem prices in price.yml.");
         } else {
             sender.sendMessage("Calculation complete! Updated " + updated + " item prices in price.yml.");
         }

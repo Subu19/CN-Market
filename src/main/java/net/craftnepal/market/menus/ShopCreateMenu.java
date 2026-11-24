@@ -8,6 +8,7 @@ import net.craftnepal.market.files.RegionData;
 import net.craftnepal.market.managers.DynamicPriceManager;
 import net.craftnepal.market.utils.DisplayUtils;
 import net.craftnepal.market.utils.LocationUtils;
+import net.craftnepal.market.utils.SendMessage;
 import net.craftnepal.market.utils.ShopUtils;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
@@ -202,6 +203,13 @@ public class ShopCreateMenu extends Menu {
     }
 
     private void createShop() {
+        // An item missing from price.yml has no fair price; a shop at 0 would give it away.
+        if (currentPrice <= 0) {
+            playerMenuUtility.getOwner().closeInventory();
+            SendMessage.sendPlayerMessage(playerMenuUtility.getOwner(),
+                    "&cThis item has no market price yet. Ask an admin to add it to price.yml.");
+            return;
+        }
         UUID uuid = playerMenuUtility.getOwner().getUniqueId();
         String shopId = UUID.randomUUID().toString();
 

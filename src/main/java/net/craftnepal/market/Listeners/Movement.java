@@ -27,6 +27,10 @@ public class Movement implements Listener {
         return new HashMap<>(playersInMarket);
     }
 
+    public static void forget(UUID uuid) {
+        playersInMarket.remove(uuid);
+    }
+
     public static boolean isPlayerInMarket(UUID uuid) {
         Boolean inMarket = playersInMarket.get(uuid);
         return inMarket != null && inMarket;

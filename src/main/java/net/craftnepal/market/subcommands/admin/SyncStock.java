@@ -40,13 +40,13 @@ public class SyncStock extends SubCommand {
     @Override
     public void perform(CommandSender sender, String[] args) {
         if (sender instanceof Player && !sender.hasPermission("market.admin")) {
-            SendMessage.sendPlayerMessage((Player) sender, "§cYou don't have permission to use this command.");
+            SendMessage.sendPlayerMessage(sender, "§cYou don't have permission to use this command.");
             return;
         }
 
         String startMsg = "§aStarting force-synchronization of all player shop stocks...";
         if (sender instanceof Player) {
-            SendMessage.sendPlayerMessage((Player) sender, startMsg);
+            SendMessage.sendPlayerMessage(sender, startMsg);
         } else {
             Bukkit.getLogger().info(startMsg);
         }
@@ -85,7 +85,7 @@ public class SyncStock extends SubCommand {
 
         String completeMsg = "§aSuccessfully synchronized stock for " + count + " player shops!";
         if (sender instanceof Player) {
-            SendMessage.sendPlayerMessage((Player) sender, completeMsg);
+            SendMessage.sendPlayerMessage(sender, completeMsg);
         } else {
             Bukkit.getLogger().info(completeMsg);
         }

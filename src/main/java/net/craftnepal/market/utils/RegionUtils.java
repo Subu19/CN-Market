@@ -33,78 +33,66 @@ public class RegionUtils {
                 locZ >= minZ && locZ <= maxZ;
     }
 
+    /** Toggles border particles around a region until toggled off or the player quits. */
     public static void visibleRegionBorders(Player player, Location min, Location max, Plugin plugin, Color color) {
-        if (particleVisiblePlayers.containsKey(player.getUniqueId())) {
-
-            Bukkit.getScheduler().cancelTask(tasks.get(player.getUniqueId()));
-            tasks.remove(player.getUniqueId());
-            particleVisiblePlayers.remove(player.getUniqueId());
+        if (stopBorders(player.getUniqueId())) {
             player.sendMessage("Turned off borders!");
-
         } else {
-            particleVisiblePlayers.put(player.getUniqueId(), true);
-            tasks.put(player.getUniqueId(), Bukkit.getScheduler().scheduleSyncRepeatingTask(plugin, () -> {
-                for (double x = min.getX(); x <= max.getX(); x++) {
-                    showBorderParticle(player, new Location(min.getWorld(), x, min.getY(), min.getZ()), color);
-                    showBorderParticle(player, new Location(min.getWorld(), x, min.getY(), max.getZ()), color);
-                    showBorderParticle(player, new Location(min.getWorld(), x, max.getY(), min.getZ()), color);
-                    showBorderParticle(player, new Location(min.getWorld(), x, max.getY(), max.getZ()), color);
-                }
-                for (double y = min.getY(); y <= max.getY(); y++) {
-                    showBorderParticle(player, new Location(min.getWorld(), min.getX(), y, min.getZ()), color);
-                    showBorderParticle(player, new Location(min.getWorld(), max.getX(), y, min.getZ()), color);
-                    showBorderParticle(player, new Location(min.getWorld(), min.getX(), y, max.getZ()), color);
-                    showBorderParticle(player, new Location(min.getWorld(), max.getX(), y, max.getZ()), color);
-                }
-                for (double z = min.getZ(); z <= max.getZ(); z++) {
-                    showBorderParticle(player, new Location(min.getWorld(), min.getX(), min.getY(), z), color);
-                    showBorderParticle(player, new Location(min.getWorld(), max.getX(), min.getY(), z), color);
-                    showBorderParticle(player, new Location(min.getWorld(), min.getX(), max.getY(), z), color);
-                    showBorderParticle(player, new Location(min.getWorld(), max.getX(), max.getY(), z), color);
-                }
-            }, 0, 10L));
+            startBorders(player, min, max, plugin, color, -1);
             player.sendMessage("Turned on borders.");
         }
     }
 
+    /** Toggles border particles for {@code time} half-second steps. */
     public static void visibleRegionBorders(Player player, Location min, Location max, Plugin plugin, Color color,
             int time) {
-        particleTimer.put(player.getUniqueId(), time);
-        if (particleVisiblePlayers.containsKey(player.getUniqueId())) {
-            Bukkit.getScheduler().cancelTask(tasks.get(player.getUniqueId()));
-            tasks.remove(player.getUniqueId());
-            particleVisiblePlayers.remove(player.getUniqueId());
-        } else {
-            particleVisiblePlayers.put(player.getUniqueId(), true);
-            tasks.put(player.getUniqueId(), Bukkit.getScheduler().scheduleSyncRepeatingTask(plugin, () -> {
-                for (double x = min.getX(); x <= max.getX(); x++) {
-                    showBorderParticle(player, new Location(min.getWorld(), x, min.getY(), min.getZ()), color);
-                    showBorderParticle(player, new Location(min.getWorld(), x, min.getY(), max.getZ()), color);
-                    showBorderParticle(player, new Location(min.getWorld(), x, max.getY(), min.getZ()), color);
-                    showBorderParticle(player, new Location(min.getWorld(), x, max.getY(), max.getZ()), color);
-                }
-                for (double y = min.getY(); y <= max.getY(); y++) {
-                    showBorderParticle(player, new Location(min.getWorld(), min.getX(), y, min.getZ()), color);
-                    showBorderParticle(player, new Location(min.getWorld(), max.getX(), y, min.getZ()), color);
-                    showBorderParticle(player, new Location(min.getWorld(), min.getX(), y, max.getZ()), color);
-                    showBorderParticle(player, new Location(min.getWorld(), max.getX(), y, max.getZ()), color);
-                }
-                for (double z = min.getZ(); z <= max.getZ(); z++) {
-                    showBorderParticle(player, new Location(min.getWorld(), min.getX(), min.getY(), z), color);
-                    showBorderParticle(player, new Location(min.getWorld(), max.getX(), min.getY(), z), color);
-                    showBorderParticle(player, new Location(min.getWorld(), min.getX(), max.getY(), z), color);
-                    showBorderParticle(player, new Location(min.getWorld(), max.getX(), max.getY(), z), color);
-                }
-                if (particleTimer.get(player.getUniqueId()) > 0) {
-                    particleTimer.put(player.getUniqueId(), particleTimer.get(player.getUniqueId()) - 1);
-                } else {
-                    Bukkit.getScheduler().cancelTask(tasks.get(player.getUniqueId()));
-                    tasks.remove(player.getUniqueId());
-                    particleVisiblePlayers.remove(player.getUniqueId());
-                    particleTimer.remove(player.getUniqueId());
-                }
-            }, 0, 10L));
+        if (!stopBorders(player.getUniqueId())) {
+            startBorders(player, min, max, plugin, color, time);
         }
+    }
+
+    /** Stops a player's border particles. Returns true if any were showing. */
+    public static boolean stopBorders(UUID uuid) {
+        particleTimer.remove(uuid);
+        particleVisiblePlayers.remove(uuid);
+        Integer task = tasks.remove(uuid);
+        if (task != null) Bukkit.getScheduler().cancelTask(task);
+        return task != null;
+    }
+
+    /** {@code time} < 0 runs until stopped. */
+    private static void startBorders(Player player, Location min, Location max, Plugin plugin, Color color, int time) {
+        UUID uuid = player.getUniqueId();
+        particleVisiblePlayers.put(uuid, true);
+        if (time >= 0) particleTimer.put(uuid, time);
+        tasks.put(uuid, Bukkit.getScheduler().scheduleSyncRepeatingTask(plugin, () -> {
+            if (!player.isOnline()) {
+                stopBorders(uuid);
+                return;
+            }
+            for (double x = min.getX(); x <= max.getX(); x++) {
+                showBorderParticle(player, new Location(min.getWorld(), x, min.getY(), min.getZ()), color);
+                showBorderParticle(player, new Location(min.getWorld(), x, min.getY(), max.getZ()), color);
+                showBorderParticle(player, new Location(min.getWorld(), x, max.getY(), min.getZ()), color);
+                showBorderParticle(player, new Location(min.getWorld(), x, max.getY(), max.getZ()), color);
+            }
+            for (double y = min.getY(); y <= max.getY(); y++) {
+                showBorderParticle(player, new Location(min.getWorld(), min.getX(), y, min.getZ()), color);
+                showBorderParticle(player, new Location(min.getWorld(), max.getX(), y, min.getZ()), color);
+                showBorderParticle(player, new Location(min.getWorld(), min.getX(), y, max.getZ()), color);
+                showBorderParticle(player, new Location(min.getWorld(), max.getX(), y, max.getZ()), color);
+            }
+            for (double z = min.getZ(); z <= max.getZ(); z++) {
+                showBorderParticle(player, new Location(min.getWorld(), min.getX(), min.getY(), z), color);
+                showBorderParticle(player, new Location(min.getWorld(), max.getX(), min.getY(), z), color);
+                showBorderParticle(player, new Location(min.getWorld(), min.getX(), max.getY(), z), color);
+                showBorderParticle(player, new Location(min.getWorld(), max.getX(), max.getY(), z), color);
+            }
+            Integer left = particleTimer.get(uuid);
+            if (left == null) return; // unlimited
+            if (left > 0) particleTimer.put(uuid, left - 1);
+            else stopBorders(uuid);
+        }, 0, 10L));
     }
 
     private static void showBorderParticle(Player player, Location location, Color color) {

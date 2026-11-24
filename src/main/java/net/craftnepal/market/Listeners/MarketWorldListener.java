@@ -111,7 +111,13 @@ public class MarketWorldListener implements Listener {
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
-        playerPlotCache.remove(event.getPlayer().getUniqueId());
+        UUID uuid = event.getPlayer().getUniqueId();
+        playerPlotCache.remove(uuid);
+        net.craftnepal.market.utils.RegionUtils.stopBorders(uuid);
+        net.craftnepal.market.utils.TeleportUtils.cancelTeleport(event.getPlayer());
+        RegionSelection.forget(uuid);
+        Movement.forget(uuid);
+        // Bypass mode is kept on purpose: admins may rely on it surviving a relog.
     }
 
     @EventHandler(priority = EventPriority.HIGH)

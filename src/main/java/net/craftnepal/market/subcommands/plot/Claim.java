@@ -32,7 +32,7 @@ public class Claim extends SubCommand {
 
     @Override
     public String getSyntax() {
-        return "/market claim";
+        return "/market plot claim";
     }
 
     @Override

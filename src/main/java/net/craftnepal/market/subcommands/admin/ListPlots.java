@@ -34,7 +34,7 @@ public class ListPlots extends SubCommand {
 
     @Override
     public String getSyntax() {
-        return "/amarket listplots";
+        return "/market admin listplots";
     }
 
     @Override

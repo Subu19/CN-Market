@@ -27,7 +27,7 @@ public class Reset extends SubCommand {
 
     @Override
     public String getSyntax() {
-        return "/amarket reset confirm";
+        return "/market admin reset confirm";
     }
 
     @Override
@@ -45,7 +45,7 @@ public class Reset extends SubCommand {
         if (args.length < 2 || !args[1].equalsIgnoreCase("confirm")) {
             SendMessage.sendPlayerMessage(player,
                     "§c§lWARNING: This will delete the market world and ALL plot/shop data!");
-            SendMessage.sendPlayerMessage(player, "§cTo proceed, type: §f/amarket reset confirm");
+            SendMessage.sendPlayerMessage(player, "§cTo proceed, type: §f/market admin reset confirm");
             return;
         }
 

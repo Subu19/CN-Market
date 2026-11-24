@@ -22,7 +22,7 @@ public class Setup extends SubCommand {
 
     @Override
     public String getSyntax() {
-        return "/amarket setup <worldName> <plotSize> <pathwayWidth>";
+        return "/market admin setup <worldName> <plotSize> <pathwayWidth>";
     }
 
     @Override
@@ -36,7 +36,7 @@ public class Setup extends SubCommand {
         }
 
         if (args.length < 4) {
-            SendMessage.sendPlayerMessage(player, "§cUsage: /amarket setup <worldName> <plotSize> <pathwayWidth>");
+            SendMessage.sendPlayerMessage(player, "§cUsage: /market admin setup <worldName> <plotSize> <pathwayWidth>");
             return;
         }
 

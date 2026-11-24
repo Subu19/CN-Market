@@ -66,7 +66,7 @@ public class ToggleBorder extends SubCommand {
                     player.sendMessage("No plot found at your location. Please specify a plot ID.");
                 }
             }else{
-                player.sendMessage("Invalid usage. /amarket toggleborder plot [plotId]");
+                player.sendMessage("Invalid usage. /market admin toggleborder plot [plotId]");
             }
 
         }

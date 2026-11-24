@@ -27,7 +27,7 @@ public class AddMember extends SubCommand {
 
     @Override
     public String getSyntax() {
-        return "/market addmember <player>";
+        return "/market plot addmember <player>";
     }
 
     @Override
@@ -41,7 +41,7 @@ public class AddMember extends SubCommand {
         }
 
         if (args.length < 2) {
-            SendMessage.sendPlayerMessage(player, "§cUsage: /market addmember <player>");
+            SendMessage.sendPlayerMessage(player, "§cUsage: /market plot addmember <player>");
             return;
         }
 

@@ -27,7 +27,7 @@ public class RemoveMember extends SubCommand {
 
     @Override
     public String getSyntax() {
-        return "/market removemember <player>";
+        return "/market plot removemember <player>";
     }
 
     @Override
@@ -41,7 +41,7 @@ public class RemoveMember extends SubCommand {
         }
 
         if (args.length < 2) {
-            SendMessage.sendPlayerMessage(player, "§cUsage: /market removemember <player>");
+            SendMessage.sendPlayerMessage(player, "§cUsage: /market plot removemember <player>");
             return;
         }
 

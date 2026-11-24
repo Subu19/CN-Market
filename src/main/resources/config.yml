@@ -70,7 +70,7 @@ currency-exchange:
   # The material name of the currency item (case-insensitive)
   currency-item: "DIAMOND"
   
-  # Pricing model to use: CPI_PEG (Consumer Price Index) or TRANSACTION_FLOW (default)
+  # Pricing model to use. Only CPI_PEG (Consumer Price Index) is implemented.
   pricing-model: "CPI_PEG"
   
   # Min and max multipliers of the base price for the currency item.

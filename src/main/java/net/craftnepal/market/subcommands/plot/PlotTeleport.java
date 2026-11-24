@@ -36,7 +36,7 @@ public class PlotTeleport extends SubCommand {
 
     @Override
     public String getSyntax() {
-        return "/market visit <playername/number>";
+        return "/market plot visit <playername/number>";
     }
 
     @Override
@@ -50,7 +50,7 @@ public class PlotTeleport extends SubCommand {
             }
 
             if (strings.length < 2) {
-                SendMessage.sendPlayerMessage(player, "&cUsage: /market visit <playername/plotID>");
+                SendMessage.sendPlayerMessage(player, "&cUsage: /market plot visit <playername/plotID>");
                 return;
             }
             String target = strings[1];

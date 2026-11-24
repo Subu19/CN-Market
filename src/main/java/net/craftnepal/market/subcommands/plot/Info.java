@@ -27,7 +27,7 @@ public class Info extends SubCommand {
 
     @Override
     public String getSyntax() {
-        return "/market info";
+        return "/market plot info";
     }
 
     @Override

@@ -185,7 +185,7 @@ public final class PlotUtils {
 
         Location spawn = getPlotSpawn(plotId);
         if (spawn == null) {
-            SendMessage.sendPlayerMessage(player, "&cYour plot doesn't have a spawn point set! Use /market setplotspawn to set one.");
+            SendMessage.sendPlayerMessage(player, "&cYour plot doesn't have a spawn point set! Use /market plot setspawn to set one.");
             return false;
         }
         Location origin = player.getLocation();

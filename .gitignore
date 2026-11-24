@@ -50,4 +50,4 @@ versions/
 
 # OS Specific
 .DS_Store
-Thumbs.db
+Thumbs.db.codegraph/

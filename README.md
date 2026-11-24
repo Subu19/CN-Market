@@ -11,7 +11,7 @@
 
   **CN-Market** is a feature-rich, high-performance market plugin designed for modern Minecraft servers. It provides a dedicated world for player commerce, complete with a robust plot system, dynamic pricing, and ironclad grief protection.
 
-  [Features](#-features) • [Commands](#-commands) • [Permissions](#-permissions) • [Setup](#-setup) • [Installation](#-installation)
+  [Features](#-features) • [Installation](#-installation) • [Commands](#-commands) • [Permissions](#-permissions) • [Configuration](#-configuration)
 </div>
 
 ---
@@ -20,7 +20,7 @@
 
 - **🗺️ Dedicated Market World**: Automated world generation with pre-configured pathways and plot layouts.
 - **🏠 Advanced Plot System**: Players can claim, manage, and add members to their own market plots.
-- **🛡️ Comprehensive Protection**: State-of-the-art grief protection covering 18+ different vectors, from TNT to wind charges.
+- **🛡️ Plot Protection**: Explosions, fire, pistons, fluids, mobs and projectiles cannot cross plot borders.
 - **📈 Dynamic Pricing**: Real-time price adjustments based on supply and demand, ensuring a balanced economy.
 - **🖥️ Professional GUIs**: Intuitive, lag-free menus for browsing shops and managing listings.
 - **✨ Visual Shop Displays**: Beautiful item displays that make the market feel alive and premium.
@@ -28,51 +28,107 @@
 
 ---
 
-## 🛠️ Commands
+## 📋 Requirements
 
-| Command | Description | Permission |
-| :--- | :--- | :--- |
-| `/market` | Main command to teleport to the market world. | `market.use` |
-| `/market plot claim` | Claim the plot you are currently standing in. | `market.plot.claim` |
-| `/market plot unclaim` | Unclaim your current plot. | `market.plot.unclaim` |
-| `/market plot info` | View detailed information about a plot. | `market.plot.info` |
-| `/market shops` | Open the graphical shop browser. | `market.shops` |
-| `/market back` | Return to your previous location outside the market. | `market.back` |
-| `/market admin setup` | Initialize the market world and its configuration. | `market.admin.setup` |
-
----
-
-## 🔐 Permissions
-
-### Player Permissions
-- `market.use`: Allows access to the market world and base commands.
-- `market.plot.claim`: Allows players to claim their own market space.
-- `market.plot.addmember`: Allows adding trusted friends to a plot.
-- `market.shops`: Allows opening the shop browsing menu.
-
-### Admin Permissions
-- `market.admin`: Full access to all administrative functions.
-- `market.admin.bypass`: Bypass all region protections in the market world.
-- `market.admin.forceupdate`: Manually trigger a dynamic price update cycle.
-- `market.admin.reset`: Completely reset the market world and its database.
-
----
-
-## 🚀 Setup
-
-1. **Install Dependencies**: Ensure you have [Vault](https://www.spigotmc.org/resources/vault.341/) and an economy plugin installed.
-2. **Initial Setup**: Run `/market admin setup <worldName> <plotSize> <pathwayWidth>` to generate the world.
-3. **Configure**: Adjust `config.yml` and `price.yml` to fit your server's economy.
-4. **Enjoy**: Players can now start claiming plots and building their commercial empire!
+- Java 21, Spigot or Paper **1.21 or newer** (tested up to 26.3). Folia is not supported yet.
+- [Vault](https://www.spigotmc.org/resources/vault.341/) and any Vault economy plugin (EssentialsX, CMI, ...).
+- Optional: WorldEdit or FastAsyncWorldEdit, only to paste a custom pathway schematic. Without it the pathways are built from blocks.
 
 ---
 
 ## 📦 Installation
 
-1. Download the latest `Market.jar`.
-2. Drop it into your server's `plugins` folder.
-3. Restart the server.
-4. Profit!
+1. Drop `Market.jar` into `plugins/` and restart.
+2. As an op or from the console, run `/market admin setup <worldName> <plotSize> <pathwayWidth>`, e.g. `/market admin setup market 32 7`.
+3. Optional: stand where players should arrive and run `/market admin setspawn`.
+4. Adjust `config.yml` and `price.yml`, then `/market admin reload`.
+
+Do not change `plot-size` or `pathway-width` once players have claimed plots: plot positions are computed from them.
+
+---
+
+## 🛠️ Commands
+
+### Players
+
+| Command | Description | Permission |
+| :--- | :--- | :--- |
+| `/market` | Teleport to the market. | `market.use` |
+| `/market leave` | Return to where you were before the market. | `market.back` |
+| `/market shops` | Browse every shop in a menu, with search. | `market.shops` |
+| `/market help` | List commands. | |
+| `/market plot claim` | Claim the plot you stand in. | `market.plot.claim` |
+| `/market plot unclaim` | Give up your plot (refused while your shops hold stock). | `market.plot.unclaim` |
+| `/market plot info` | Show the plot you stand in. | `market.plot.info` |
+| `/market plot manage` | Manage your plot and see out-of-stock shops. | `market.use` |
+| `/market plot spawn` | Teleport to your plot. | `market.plot.teleport` |
+| `/market plot visit <player\|plotId>` | Teleport to someone's plot. | `market.plot.teleport` |
+| `/market plot setspawn` | Set your plot's arrival point. | `market.plot.setspawn` |
+| `/market plot addmember <player>` | Let a player build on your plot. | `market.plot.addmember` |
+| `/market plot removemember <player>` | Remove a member. | `market.plot.removemember` |
+
+Shops: place a barrel on your plot, then right-click it to create a selling or buying shop.
+
+### Admins (`market.admin`)
+
+| Command | Description |
+| :--- | :--- |
+| `/market admin setup <world> <plotSize> <pathwayWidth>` | Create the market world. Console allowed. |
+| `/market admin setspawn` | Set the market arrival point to where you stand. |
+| `/market admin reload` | Reload config and price files. Console allowed. |
+| `/market admin forceupdate` | Run the daily price update now. Console allowed. |
+| `/market admin calcprices` | Recalculate base prices. Console allowed. |
+| `/market admin syncstock` | Re-count stock in every shop barrel. Console allowed. |
+| `/market admin listplots` | List plots. |
+| `/market admin setowner <plotId> <player>` | Give a plot to a player. Console allowed. |
+| `/market admin deleteplot <plotId>` | Delete a plot and its shops. |
+| `/market admin toggleborder plot [plotId]` | Show plot borders. |
+| `/market admin selectionmode <mode>` | Select plot corners by hand. |
+| `/market admin bypass` | Toggle bypassing plot protection. |
+| `/market admin reset confirm` | Delete the market world and **all** plot and shop data. Console allowed. |
+
+---
+
+## 🔐 Permissions
+
+Player permissions are granted to everyone by default; negate them in your permissions plugin to restrict.
+
+| Permission | Default | Grants |
+| :--- | :--- | :--- |
+| `market.use` | everyone | `/market` |
+| `market.back` | everyone | `/market leave` |
+| `market.shops` | everyone | the shop browser |
+| `market.plot.claim`, `.unclaim`, `.info`, `.teleport`, `.setspawn`, `.addmember`, `.removemember` | everyone | the matching `/market plot` command |
+| `market.plots.limit.<n>` | none | claim up to `<n>` plots (overrides `max-plots-per-player`) |
+| `market.plots.limit.unlimited` | nobody | no plot limit |
+| `market.admin` | op | admin commands, admin shops, building anywhere in the market |
+
+---
+
+## ⚙️ Configuration
+
+`config.yml` is commented. The main keys:
+
+- `market-world.max-plots-per-player`, `max-height`, `spawn-radius` (unclaimable plots around 0,0).
+- `market-world.rules`: optional `no-pvp`, `no-monsters`, `no-hunger`, `no-fall-damage` for the market world, all off by default. Leave them off if WorldGuard or another plugin already handles this.
+- `market-world.allowed-interact-blocks`: blocks anyone may use anywhere (ender chests, crafting tables).
+- `player-shop-blacklist`: items players cannot sell.
+- `admin-shops` and `currency-exchange`: the dynamic pricing limits.
+- `display-view-range`: lower it if clients lag in the market.
+
+Data lives in `plugins/Market/market.db` (SQLite). Prices are in `price.yml` (base) and `dynamic_prices.yml` (current).
+
+---
+
+## 🛡️ Protection
+
+Inside the market world only plot owners, members and admins can change a plot. Explosions, fire, pistons, fluids, growth, dispensers, projectiles, vehicles and entities cannot cross a plot border. Pathways and the spawn area are protected for everyone except admins. The full list is in [`docs/PROTECTION_CHECKLIST.md`](docs/PROTECTION_CHECKLIST.md).
+
+---
+
+## 🔄 Upgrading from 1.x
+
+Replace the jar and restart. Existing `market.db`, `config.yml` and prices load unchanged. Note that player permissions now default to everyone, and the unused `market.admin.*` child permissions are gone: grant `market.admin` instead.
 
 ---
 

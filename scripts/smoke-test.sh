@@ -9,6 +9,9 @@
 # TYPE        PAPER (default) or SPIGOT
 # VERSION     Minecraft version, default 26.1.2
 # JAR=path    test another jar instead of target/Market.jar
+# EXTRA_PLUGINS="a.jar b.jar"  copy these jars into plugins/ too (e.g. Vault on a fresh server)
+# MODRINTH="essentialsx"       let the image download these Modrinth projects
+# WAIT=360    seconds to wait for "Done" (Spigot builds itself with BuildTools on first run: raise it)
 #
 # Leaves the container running as "market-smoke" so you can send console commands:
 #   docker exec market-smoke rcon-cli <command>
@@ -30,16 +33,18 @@ if [ "${SEED:-copy}" = "copy" ]; then
 fi
 mkdir -p "$WORK/plugins"
 cp "$JAR" "$WORK/plugins/Market.jar"
+for p in ${EXTRA_PLUGINS:-}; do cp "$p" "$WORK/plugins/"; done
 
 docker run -d --name market-smoke \
   -e EULA=TRUE -e TYPE="$TYPE" -e VERSION="$VERSION" -e MEMORY=2G \
   -e UID="$(id -u)" -e GID="$(id -g)" -e ENABLE_RCON=true -e RCON_PASSWORD=smoke \
-  -e ONLINE_MODE=FALSE \
+  -e ONLINE_MODE=FALSE ${MODRINTH:+-e MODRINTH_PROJECTS="$MODRINTH"} \
   -v "$WORK:/data" itzg/minecraft-server >/dev/null
 
 echo "waiting for server start..."
-for _ in $(seq 1 180); do
+for _ in $(seq 1 $(( ${WAIT:-360} / 2 ))); do
   if docker logs market-smoke 2>&1 | grep -q 'Done ('; then break; fi
+  docker ps -q -f name=market-smoke | grep -q . || break   # container exited
   sleep 2
 done
 docker logs market-smoke 2>&1 | grep -q 'Done (' || { echo "server did not start"; docker logs --tail 80 market-smoke; exit 1; }

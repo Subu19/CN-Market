@@ -27,8 +27,7 @@ public class Setup extends SubCommand {
 
     @Override
     public void perform(CommandSender sender, String[] args) {
-        if (!(sender instanceof Player)) return;
-        Player player = (Player) sender;
+                CommandSender player = sender; // console allowed
 
         if (!player.hasPermission("market.admin")) {
             SendMessage.sendPlayerMessage(player, "§cYou don't have permission to use this command.");

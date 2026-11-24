@@ -16,6 +16,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.event.world.WorldLoadEvent;
 import org.bukkit.event.world.WorldUnloadEvent;
@@ -111,5 +112,14 @@ public class MarketWorldListener implements Listener {
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         playerPlotCache.remove(event.getPlayer().getUniqueId());
+    }
+
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onRespawn(PlayerRespawnEvent event) {
+        if (event.isBedSpawn() || event.isAnchorSpawn()) return;
+        if (!MarketUtils.isInMarketWorld(event.getPlayer().getWorld())) return;
+        if (!Market.getMainConfig().getBoolean("market-world.respawn-at-market-spawn", true)) return;
+        Location spawn = MarketUtils.getMarketSpawn();
+        if (spawn != null) event.setRespawnLocation(spawn);
     }
 }

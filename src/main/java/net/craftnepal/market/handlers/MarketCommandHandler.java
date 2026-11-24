@@ -36,10 +36,7 @@ public class MarketCommandHandler {
             return;
         }
 
-        Location location = net.craftnepal.market.managers.DatabaseManager.getMarketSpawn();
-        if (location == null) {
-            location = marketWorld.getSpawnLocation();
-        }
+        Location location = MarketUtils.spawnIn(marketWorld);
 
         Location origin = p.getLocation();
         SendMessage.sendPlayerMessage(p, "&eTeleporting to the market in 5 seconds... don't move!");

@@ -30,6 +30,15 @@ market-world:
   # You can also use permissions: market.plots.limit.<number> to override this.
   max-plots-per-player: 1
 
+  # The protected spawn area: the plots within spawn-radius plots of 0,0 cannot be claimed or
+  # built on. It is always centred on 0,0, even after /market admin setspawn moves the point
+  # where players arrive.
+  spawn-radius: 1
+
+  # Players who die in the market world respawn at the market spawn, unless they have a bed or
+  # respawn anchor. Set to false to use the server's normal respawn point.
+  respawn-at-market-spawn: true
+
   # Blocks that anyone can interact with anywhere in the market world
   # (e.g. Ender Chests, Crafting Tables)
   allowed-interact-blocks:

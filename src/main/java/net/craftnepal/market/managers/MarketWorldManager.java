@@ -36,15 +36,8 @@ public class MarketWorldManager {
         }
 
         if (marketWorld != null) {
-            Location savedSpawn = net.craftnepal.market.managers.DatabaseManager.getMarketSpawn();
-            if (savedSpawn != null) {
-                marketWorld.setSpawnLocation(
-                        savedSpawn.getBlockX(),
-                        savedSpawn.getBlockY(),
-                        savedSpawn.getBlockZ());
-            } else {
-                marketWorld.setSpawnLocation(0, 65, 0);
-            }
+            Location spawn = net.craftnepal.market.utils.MarketUtils.spawnIn(marketWorld);
+            marketWorld.setSpawnLocation(spawn.getBlockX(), spawn.getBlockY(), spawn.getBlockZ());
         }
     }
 }

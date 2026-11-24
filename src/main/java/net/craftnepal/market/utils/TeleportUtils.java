@@ -29,8 +29,13 @@ public class TeleportUtils {
                 Bukkit.getPluginManager().getPlugin("Market"),
                 () -> {
                     teleportTasks.remove(player.getUniqueId());
-                    player.teleport(targetLocation);
-                    if (onSuccess != null) onSuccess.run();
+                    if (!player.isOnline()) return;
+                    // Another plugin may cancel the teleport; then nothing else should happen.
+                    if (player.teleport(targetLocation)) {
+                        if (onSuccess != null) onSuccess.run();
+                    } else {
+                        SendMessage.sendPlayerMessage(player, "&cTeleport was blocked.");
+                    }
                 },
                 delayTicks
         );

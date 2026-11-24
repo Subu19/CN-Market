@@ -15,6 +15,8 @@ import java.util.*;
 public class ShopItemListMenu extends Menu {
 
     private final String plotId;
+    /** Menu slot → item key. */
+    private final Map<Integer, String> slotKeys = new java.util.HashMap<>();
     private int currentPage = 0;
     private final Map<String, Integer> itemCounts;
     private final Map<String, ChestShop> representativeShops = new HashMap<>();
@@ -66,6 +68,7 @@ public class ShopItemListMenu extends Menu {
             inventory.setItem(i, border);
         }
 
+        slotKeys.clear();
         // Calculate pagination
         List<String> keys = new ArrayList<>(itemCounts.keySet());
         int totalPages = (int) Math.ceil((double) keys.size() / ITEMS_PER_PAGE);
@@ -86,7 +89,10 @@ public class ShopItemListMenu extends Menu {
                     ChatColor.DARK_GRAY + "Click to teleport to shop"));
             itemStack.setItemMeta(meta);
 
-            inventory.addItem(itemStack);
+            int slot = inventory.firstEmpty();
+            if (slot < 0) break;
+            inventory.setItem(slot, itemStack);
+            slotKeys.put(slot, key);
         }
 
         // Add navigation items
@@ -113,24 +119,21 @@ public class ShopItemListMenu extends Menu {
 
     @Override
     public void handleMenu(InventoryClickEvent event) {
-        ItemStack clickedItem = event.getCurrentItem();
-        if (clickedItem == null || !clickedItem.hasItemMeta())
-            return;
+        // Matched by slot in this menu, never by an item's name.
+        int slot = event.getRawSlot();
+        if (slot >= getSlots()) return;
+        ItemStack slotItem = inventory.getItem(slot);
+        boolean arrow = slotItem != null && slotItem.getType() == Material.ARROW;
 
-        String displayName = ChatColor.stripColor(clickedItem.getItemMeta().getDisplayName());
-
-        if (displayName.equals("Previous Page")) {
+        if (slot == 48 && arrow) {
             currentPage--;
             setMenuItems();
-        } else if (displayName.equals("Next Page")) {
+        } else if (slot == 50 && arrow) {
             currentPage++;
             setMenuItems();
-        } else if (displayName.equals("Close Menu")) {
+        } else if (slot == 53) {
             playerMenuUtility.getOwner().closeInventory();
-        } else if (!clickedItem.getType().equals(Material.BLUE_STAINED_GLASS_PANE)
-                && !clickedItem.getType().equals(Material.BOOK)) {
-            // Handle item click
-            Material clickedMaterial = clickedItem.getType();
+        } else if (slotKeys.containsKey(slot)) {
 
             // Fetch location to teleport. Either Plot spawn or Plot center
             Location shopLocation;
@@ -146,17 +149,7 @@ public class ShopItemListMenu extends Menu {
                         "Teleporting to the shop in 5 seconds! Don't move..");
                 playerMenuUtility.getOwner().closeInventory();
 
-                // Find the matched key from display name
-                String name = ChatColor.stripColor(clickedItem.getItemMeta().getDisplayName());
-                String matchedKey = null;
-                for (String key : representativeShops.keySet()) {
-                    if (ShopUtils.getShopDisplayName(representativeShops.get(key)).equals(name)) {
-                        matchedKey = key;
-                        break;
-                    }
-                }
-
-                final String finalKey = matchedKey;
+                final String finalKey = slotKeys.get(slot);
                 TeleportUtils.scheduleTeleport(playerMenuUtility.getOwner(), shopLocation, () -> {
                     SendMessage.sendPlayerMessage(playerMenuUtility.getOwner(),
                             "Teleported to shop!");

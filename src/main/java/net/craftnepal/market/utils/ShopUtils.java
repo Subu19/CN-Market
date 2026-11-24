@@ -30,6 +30,7 @@ public class ShopUtils {
         List<ChestShop> shops = DatabaseManager.getShopsByPlot(plotId);
 
         for (ChestShop shop : shops) {
+            if (shop.isBuyingShop()) continue; // items a shop bought are not for sale
             String key = getItemKey(shop);
             int stock = getShopStock(shop); // Uses the database stock cache — fast!
 

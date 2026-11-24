@@ -251,6 +251,7 @@ public class DynamicPriceManager {
         
         // We will process every material that has either base price or stock or purchases
         boolean pricesChanged = false;
+        java.util.Set<String> changedToday = new java.util.HashSet<>();
         
         // To compute over all active keys, we take materials + any recorded stock/purchases
         java.util.Set<String> allKeys = new java.util.HashSet<>(totalStockMap.keySet());
@@ -320,6 +321,7 @@ public class DynamicPriceManager {
                     dynamicPricesConfig.set(itemKey + ".price", newPrice);
                     dynamicPricesConfig.set(itemKey + ".trend", trend);
                     pricesChanged = true;
+                    changedToday.add(itemKey);
 
                     Bukkit.getLogger().info("[Market] Admin item " + itemKey + " price changed by " + String.format("%.1f%%", trend * 100) + " (New: " + newPrice + ")");
                     
@@ -365,6 +367,7 @@ public class DynamicPriceManager {
                         dynamicPricesConfig.set(itemKey + ".price", newPrice);
                         dynamicPricesConfig.set(itemKey + ".trend", trend);
                         pricesChanged = true;
+                        changedToday.add(itemKey);
                         
                         Bukkit.getLogger().info("[Market] " + itemKey + " price changed by " + String.format("%.1f%%", trend * 100) + " (New: " + newPrice + ")");
                         
@@ -372,6 +375,14 @@ public class DynamicPriceManager {
                         autoScaleShops(itemKey, actualMultiplier);
                     }
                 }
+            }
+        }
+
+        // A trend shows the last change; an item whose price did not move today shows none.
+        for (String key : dynamicPricesConfig.getKeys(false)) {
+            if (!changedToday.contains(key) && dynamicPricesConfig.getDouble(key + ".trend", 0.0) != 0.0) {
+                dynamicPricesConfig.set(key + ".trend", 0.0);
+                pricesChanged = true;
             }
         }
 
@@ -394,9 +405,18 @@ public class DynamicPriceManager {
     /** Shops grouped by lower-case item key, built once per daily update. */
     private static Map<String, List<ChestShop>> shopsByKey = new HashMap<>();
 
+    /**
+     * Moves player selling shops with the market price, kept inside the same 0.85x-1.5x band of the
+     * new fair price that shop creation allows. Admin shops are priced live and buying shops set
+     * their own offer, so neither is touched.
+     */
     private static void autoScaleShops(String itemKey, double multiplier) {
         for (ChestShop shop : shopsByKey.getOrDefault(itemKey.toLowerCase(java.util.Locale.ROOT), List.of())) {
-            DatabaseManager.updateShopPrice(shop.getId(), shop.getPrice() * multiplier);
+            if (shop.isAdmin() || shop.isBuyingShop()) continue;
+            double fair = getDynamicPrice(shop.getItem());
+            double price = shop.getPrice() * multiplier;
+            if (fair > 0) price = Math.max(fair * 0.85, Math.min(fair * 1.50, price));
+            DatabaseManager.updateShopPrice(shop.getId(), price);
         }
     }
 

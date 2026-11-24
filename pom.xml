@@ -42,7 +42,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
-                <version>3.2.4</version>
+                <version>3.6.0</version>
                 <executions>
                     <execution>
                         <phase>package</phase>
@@ -51,6 +51,36 @@
                         </goals>
                         <configuration>
                             <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <!-- SimpAPI gets our own package name so it cannot clash with another
+                                 plugin's copy of a different version. -->
+                            <relocations>
+                                <relocation>
+                                    <pattern>me.kodysimpson.simpapi</pattern>
+                                    <shadedPattern>net.craftnepal.market.lib.simpapi</shadedPattern>
+                                </relocation>
+                            </relocations>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                        <exclude>META-INF/maven/**</exclude>
+                                    </excludes>
+                                </filter>
+                                <!-- The SimpAPI jar bundles Jackson, SnakeYAML and annotations for its
+                                     config package, which this plugin does not use. Take only the rest. -->
+                                <filter>
+                                    <artifact>com.github.KodySimpson:SimpAPI</artifact>
+                                    <includes>
+                                        <include>me/kodysimpson/simpapi/**</include>
+                                    </includes>
+                                    <excludes>
+                                        <exclude>me/kodysimpson/simpapi/config/**</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
                         </configuration>
                     </execution>
                 </executions>
@@ -98,6 +128,22 @@
             <groupId>com.github.KodySimpson</groupId>
             <artifactId>SimpAPI</artifactId>
             <version>4.6.1</version>
+            <!-- Only SimpAPI's config package (unused here) needs these; leaving them out keeps
+                 the jar small and avoids shipping a second SnakeYAML. -->
+            <exclusions>
+                <exclusion>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.fasterxml.jackson.dataformat</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.jetbrains</groupId>
+                    <artifactId>annotations</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>com.github.MilkBowl</groupId>

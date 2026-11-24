@@ -20,7 +20,7 @@ import java.util.UUID;
 
 public class SearchListener implements Listener {
 
-    private static final Set<UUID> searchers = new HashSet<>();
+    private static final Set<UUID> searchers = java.util.concurrent.ConcurrentHashMap.newKeySet(); // read from the async chat thread
 
     public static void addSearcher(Player player) {
         searchers.add(player.getUniqueId());
@@ -37,13 +37,11 @@ public class SearchListener implements Listener {
             event.setCancelled(true);
             String message = event.getMessage().trim();
 
+            searchers.remove(player.getUniqueId());
             if (message.equalsIgnoreCase("cancel")) {
-                searchers.remove(player.getUniqueId());
                 player.sendMessage(ChatColor.RED + "Search cancelled.");
                 return;
             }
-
-            searchers.remove(player.getUniqueId());
 
             // Open menu synchronously
             Bukkit.getScheduler().runTask(Market.getPlugin(), () -> {
@@ -53,7 +51,7 @@ public class SearchListener implements Listener {
                     menu.open();
                 } catch (Exception e) {
                     player.sendMessage(ChatColor.RED + "An error occurred while opening the search menu.");
-                    e.printStackTrace();
+                    Market.getPlugin().getLogger().log(java.util.logging.Level.WARNING, "Could not open search menu", e);
                 }
             });
         }

@@ -1,45 +1,41 @@
 package net.craftnepal.market.Listeners;
 
 import me.kodysimpson.simpapi.menu.MenuManager;
-import me.kodysimpson.simpapi.menu.PlayerMenuUtility;
-import org.bukkit.entity.Player;
+import net.craftnepal.market.Market;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
 
 import java.lang.reflect.Field;
-import java.util.HashMap;
+import java.util.Map;
 
+/**
+ * SimpAPI keeps a menu utility per {@code Player} object and never drops it, so a rejoining
+ * player would get a stale one. This removes it on quit through reflection on a private field.
+ * If a SimpAPI update renames the field, this logs once and does nothing.
+ */
 public class MenuCleanupListener implements Listener {
 
-    private static Field utilityMapField;
+    private static final Field utilityMapField = findField();
 
-    static {
+    private static Field findField() {
         try {
-            utilityMapField = MenuManager.class.getDeclaredField("playerMenuUtilityMap");
-            utilityMapField.setAccessible(true);
-        } catch (NoSuchFieldException e) {
-            e.printStackTrace();
+            Field field = MenuManager.class.getDeclaredField("playerMenuUtilityMap");
+            field.setAccessible(true);
+            return field;
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            Market.getPlugin().getLogger().warning("SimpAPI changed; menu data is not cleaned up on quit: " + e);
+            return null;
         }
     }
 
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
-        if (utilityMapField == null)
-            return;
-
+        if (utilityMapField == null) return;
         try {
-            @SuppressWarnings("unchecked")
-            HashMap<Player, PlayerMenuUtility> map =
-                    (HashMap<Player, PlayerMenuUtility>) utilityMapField.get(null);
-            if (map != null) {
-                // Remove the quitting player's utility from the map.
-                // This ensures that when they rejoin, a new PlayerMenuUtility
-                // is created with the new Player instance.
-                map.remove(event.getPlayer());
-            }
+            if (utilityMapField.get(null) instanceof Map<?, ?> map) map.remove(event.getPlayer());
         } catch (IllegalAccessException e) {
-            e.printStackTrace();
+            // setAccessible succeeded above; cannot happen in practice.
         }
     }
 }

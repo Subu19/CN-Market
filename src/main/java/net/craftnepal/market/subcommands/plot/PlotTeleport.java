@@ -107,12 +107,8 @@ public class PlotTeleport extends SubCommand {
             );
         }
 
-        Location origin = player.getLocation();
         SendMessage.sendPlayerMessage(player, "&eTeleporting to plot " + plotId + " in 5 seconds.. don't move!");
-        TeleportUtils.scheduleTeleport(player, tpLocation, () -> {
-            if (!net.craftnepal.market.utils.MarketUtils.isInMarketArea(origin)) {
-                net.craftnepal.market.utils.PlayerUtils.saveLastLocation(player, origin);
-            }
+        TeleportUtils.teleportFromOrigin(player, tpLocation, () -> {
             RegionUtils.visibleRegionBorders(player, min, max, Market.getPlugin(), Color.PURPLE, 30);
         });
     }

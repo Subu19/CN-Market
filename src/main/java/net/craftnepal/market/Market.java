@@ -3,6 +3,7 @@ package net.craftnepal.market;
 import me.kodysimpson.simpapi.command.CommandManager;
 import net.craftnepal.market.Listeners.*;
 import net.craftnepal.market.protection.EntityProtectionListener;
+import net.craftnepal.market.protection.ShopProtectionListener;
 import net.craftnepal.market.protection.PlayerProtectionListener;
 import net.craftnepal.market.protection.WorldProtectionListener;
 import net.craftnepal.market.files.PriceData;

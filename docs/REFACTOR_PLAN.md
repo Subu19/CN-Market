@@ -23,7 +23,7 @@ Tick these as phases land. One phase per branch/PR.
 - [x] Phase 4: Shop index, serialized database access, async writes
 - [x] Phase 5: Price and metrics file I/O off the main thread
 - [x] Phase 6: Bug fixes (only the ones approved under "Decisions")
-- [ ] Phase 7: Cleanup
+- [x] Phase 7: Cleanup
 - [ ] Phase 8: Final verification
 - [ ] Phase 9: Public release readiness
 
@@ -530,6 +530,16 @@ No behaviour change. Do after everything above is merged.
 - **Build and metadata:** relocate the shaded SimpAPI package to avoid clashes with other plugins; set the correct `api-version` once confirmed; update the README version badge; add missing default keys to `config.yml` (`market-world.max-height`, and the orphan comment at `:17-19`); remove `join-message` if it stays unused.
 - **Optional, cosmetic:** rename packages `Listeners` and `Entities` to lower case. Pure rename, large diff; do it last or skip it.
 - `MenuCleanupListener.java:19-39` reflects into a private SimpAPI field. Leave it, but wrap it so a library change logs once instead of throwing on every quit.
+
+### Implementation notes (2026-11-24)
+
+Done: dead code (re-grepped; `ShopListMenu` and `ShopItemListMenu` were reachable from nothing), the teleport-then-remember-origin helper (`TeleportUtils.teleportFromOrigin`, five callers), the border-particle duplicate, `handleMovement` without `getBlock()`, a concurrent set in `SearchListener`, `MenuCleanupListener` logging once, `ShopProtectionListener` moved into `protection/`.
+
+Build: SimpAPI is relocated to `net.craftnepal.market.lib.simpapi`. The SimpAPI jar is itself a fat jar carrying Jackson, SnakeYAML and JetBrains annotations for its config package, which this plugin does not use; the shade filter keeps only SimpAPI's own classes. Jar size 2.7 MB → 294 KB. Shade plugin 3.2.4 → 3.6.0 (relocation rewrites Java 21 class files).
+
+Found: `/market admin ...` did nothing from the console because `NestedCommand` returned for non-players. Every subcommand already checks for a player itself, so the console can now run forceupdate, reload, syncstock and calcprices. Found: `/market leave` removed the player from a copy of the flight map.
+
+Skipped as low value for the diff size: replacing fully qualified names with imports, `Bukkit.getLogger()` → plugin logger, making `Bypass.bypassPlayers` private, folding pagination and owner-or-admin checks, the lower-case package rename, and removing the `DatabaseManager` static facade (it is the storage API now, not a leftover).
 
 ---
 

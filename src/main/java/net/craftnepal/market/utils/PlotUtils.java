@@ -188,12 +188,8 @@ public final class PlotUtils {
             SendMessage.sendPlayerMessage(player, "&cYour plot doesn't have a spawn point set! Use /market plot setspawn to set one.");
             return false;
         }
-        Location origin = player.getLocation();
         SendMessage.sendPlayerMessage(player, "&eTeleporting in 5 seconds.. don't move!");
-        TeleportUtils.scheduleTeleport(player, spawn, () -> {
-            if (!MarketUtils.isInMarketArea(origin)) {
-                PlayerUtils.saveLastLocation(player, origin);
-            }
+        TeleportUtils.teleportFromOrigin(player, spawn, () -> {
             SendMessage.sendPlayerMessage(player, "&aTeleported to your plot's spawn point!");
         });
         return true;

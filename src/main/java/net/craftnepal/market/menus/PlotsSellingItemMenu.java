@@ -128,14 +128,10 @@ public class PlotsSellingItemMenu extends Menu {
             
             if (tpLoc != null) {
                 org.bukkit.entity.Player player = playerMenuUtility.getOwner();
-                org.bukkit.Location origin = player.getLocation();
                 SendMessage.sendPlayerMessage(player, "Teleporting to the shop in 5 seconds! Don't move..");
                 player.closeInventory();
-                
-                TeleportUtils.scheduleTeleport(player, tpLoc, () -> {
-                    if (!net.craftnepal.market.utils.MarketUtils.isInMarketArea(origin)) {
-                        net.craftnepal.market.utils.PlayerUtils.saveLastLocation(player, origin);
-                    }
+
+                TeleportUtils.teleportFromOrigin(player, tpLoc, () -> {
                     SendMessage.sendPlayerMessage(player, "Teleported to shop!");
                     
                     // Highlight only the shops matching the specific product

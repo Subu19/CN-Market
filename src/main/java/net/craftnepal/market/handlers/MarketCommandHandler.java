@@ -37,13 +37,9 @@ public class MarketCommandHandler {
 
         Location location = MarketUtils.spawnIn(marketWorld);
 
-        Location origin = p.getLocation();
         SendMessage.sendPlayerMessage(p, "&eTeleporting to the market in 5 seconds... don't move!");
 
-        TeleportUtils.scheduleTeleport(p, location, () -> {
-            if (!MarketUtils.isInMarketArea(origin)) {
-                PlayerUtils.saveLastLocation(p, origin);
-            }
+        TeleportUtils.teleportFromOrigin(p, location, () -> {
             p.playSound(p.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1, 1);
             Movement.checkAndToggle(p, true);
         });

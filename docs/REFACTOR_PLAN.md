@@ -21,8 +21,8 @@ Tick these as phases land. One phase per branch/PR.
 - [x] Phase 2: In-memory plot index and cached settings (fixes Problem 1; shippable alone as a hotfix)
 - [x] Phase 3: Protection core (Problem 2)
 - [x] Phase 4: Shop index, serialized database access, async writes
-- [ ] Phase 5: Price and metrics file I/O off the main thread
-- [ ] Phase 6: Bug fixes (only the ones approved under "Decisions")
+- [x] Phase 5: Price and metrics file I/O off the main thread
+- [x] Phase 6: Bug fixes (only the ones approved under "Decisions")
 - [ ] Phase 7: Cleanup
 - [ ] Phase 8: Final verification
 - [ ] Phase 9: Public release readiness
@@ -442,6 +442,13 @@ Tasks:
 4. `PriceCalculator`: collect results, save once.
 5. `SchematicManager`: read the paste settings once per reload instead of per chunk (`:210,216,243-247`); drop the per-chunk INFO logging or lower it to debug.
 
+Implementation notes (2026-11-24):
+
+- Landed inside commit d5804b4 (a `git add` swept it into the A1-A5 commit); not split afterwards.
+- Both YAML files stay `YamlConfiguration` objects in memory; the old save calls only mark them dirty. A server-thread timer (every 5 min) runs the daily update when due, then builds the YAML text and writes it on an async task to a temp file that is moved over the old one. `onDisable` writes synchronously.
+- Verified on the smoke server: the timer ran the overdue daily update, 2 prices changed, each file was written once, no temp files left, max tick 86 ms for the once-a-day pass.
+- Skipped: extracting the pricing maths for a unit test. This phase changed only file I/O; the maths is untouched.
+
 Verification:
 
 - `grep -n "\.save(" M/managers/DynamicPriceManager.java M/files/PriceData.java` shows saves only in the flush method.
@@ -502,6 +509,8 @@ Choices made by the planner under "do the recommended thing":
 | B15 | Help text and usage strings are stale (`/amarket ...`, `/market back` instead of `leave`). | `HelpCommand.java:39`, several subcommands |
 
 Each fix gets its own commit and, where the logic is testable without a server, a unit test.
+
+Implementation notes (2026-11-24): fixes are grouped by area in seven commits (d5804b4 trades, 6b1adb2 shop removal, 920a5e1 spawn, 5cf1cfd console/quit/logs/zero price, d5313a1 fractional prices, 152748b prices and menus, 2130af3 permissions and text). A10 was already fixed in Phase 2. Choices: `/market _buy` and `/market _removeshop` had no sender in the code and were removed rather than guarded; unclaim is refused while shop barrels hold items (A6) instead of moving or deleting the items; trades require the player within 8 blocks of the barrel. None of these paths is unit-testable without a server; they are in the in-game checklist.
 
 ---
 

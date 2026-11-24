@@ -32,6 +32,11 @@ public class DynamicPriceManager {
 
     private static final long UPDATE_INTERVAL_MS = 24L * 60L * 60L * 1000L; // 24 hours
 
+    // Both files are kept in memory and written on a timer, not on every buy or sell.
+    private static boolean pricesDirty;
+    private static boolean metricsDirty;
+    private static long lastUpdate;
+
     public static void setup() {
         dynamicPricesFile = new File(Market.getPlugin().getDataFolder(), "dynamic_prices.yml");
         if (!dynamicPricesFile.exists()) {
@@ -52,15 +57,54 @@ public class DynamicPriceManager {
             }
         }
         metricsConfig = YamlConfiguration.loadConfiguration(metricsFile);
+        lastUpdate = metricsConfig.getLong("last_update", 0L);
 
-        // Schedule the periodic check every 5 minutes (6000 ticks)
-        Bukkit.getScheduler().runTaskTimerAsynchronously(Market.getPlugin(), () -> {
-            long lastUpdate = metricsConfig.getLong("last_update", 0L);
+        // Every 5 minutes (6000 ticks): run the daily update when due, then write changed files.
+        Bukkit.getScheduler().runTaskTimer(Market.getPlugin(), () -> {
             if (System.currentTimeMillis() - lastUpdate >= UPDATE_INTERVAL_MS) {
-                // Time to update!
-                Bukkit.getScheduler().runTask(Market.getPlugin(), DynamicPriceManager::triggerDailyUpdate);
+                triggerDailyUpdate();
             }
+            flush(false);
         }, 6000L, 6000L);
+    }
+
+    /**
+     * Writes changed files. The YAML text is built here on the server thread; with
+     * {@code async} the disk write happens on a background thread. Call with false on disable.
+     */
+    public static void flush(boolean async) {
+        if (pricesDirty) {
+            pricesDirty = false;
+            write(dynamicPricesFile, dynamicPricesConfig.saveToString(), async);
+        }
+        if (metricsDirty) {
+            metricsDirty = false;
+            write(metricsFile, metricsConfig.saveToString(), async);
+        }
+    }
+
+    private static void write(File file, String yaml, boolean async) {
+        if (async) {
+            Bukkit.getScheduler().runTaskAsynchronously(Market.getPlugin(), () -> writeNow(file, yaml));
+        } else {
+            writeNow(file, yaml);
+        }
+    }
+
+    /** Write to a temp file and move it over the old one, so a crash never leaves half a file. */
+    private static synchronized void writeNow(File file, String yaml) {
+        try {
+            java.nio.file.Path tmp = file.toPath().resolveSibling(file.getName() + ".tmp");
+            java.nio.file.Files.writeString(tmp, yaml);
+            try {
+                java.nio.file.Files.move(tmp, file.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                        java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+            } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                java.nio.file.Files.move(tmp, file.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException e) {
+            Bukkit.getLogger().severe("[Market] Could not save " + file.getName() + ": " + e.getMessage());
+        }
     }
 
     public static double getDynamicPrice(String itemKey) {
@@ -190,9 +234,11 @@ public class DynamicPriceManager {
         Map<String, Integer> totalStockMap = new HashMap<>();
         Map<String, ChestShop> allShops = ShopUtils.getAllShops();
         java.util.Set<String> adminShopKeys = new java.util.HashSet<>();
+        shopsByKey = new HashMap<>();
 
         for (ChestShop shop : allShops.values()) {
             String key = ShopUtils.getItemKey(shop);
+            shopsByKey.computeIfAbsent(key.toLowerCase(java.util.Locale.ROOT), k -> new ArrayList<>()).add(shop);
             if (shop.isAdmin()) {
                 adminShopKeys.add(key);
                 continue; // Admin shops have infinite supply, ignore for market balance
@@ -339,35 +385,27 @@ public class DynamicPriceManager {
         metricsConfig.set("purchased_today", null);
         metricsConfig.set("admin_purchased_today", null);
         metricsConfig.set("admin_sold_today", null);
-        metricsConfig.set("last_update", System.currentTimeMillis());
+        lastUpdate = System.currentTimeMillis();
+        metricsConfig.set("last_update", lastUpdate);
         saveMetrics();
+        flush(true);
     }
 
+    /** Shops grouped by lower-case item key, built once per daily update. */
+    private static Map<String, List<ChestShop>> shopsByKey = new HashMap<>();
+
     private static void autoScaleShops(String itemKey, double multiplier) {
-        for (ChestShop shop : DatabaseManager.shopIndex().all()) {
-            if (ShopUtils.getItemKey(shop).equalsIgnoreCase(itemKey)) {
-                double oldPrice = shop.getPrice();
-                double newShopPrice = oldPrice * multiplier;
-                shop.setPrice(newShopPrice);
-                DatabaseManager.updateShopPrice(shop.getId(), newShopPrice);
-            }
+        for (ChestShop shop : shopsByKey.getOrDefault(itemKey.toLowerCase(java.util.Locale.ROOT), List.of())) {
+            DatabaseManager.updateShopPrice(shop.getId(), shop.getPrice() * multiplier);
         }
     }
 
     private static void saveDynamicPrices() {
-        try {
-            dynamicPricesConfig.save(dynamicPricesFile);
-        } catch (IOException e) {
-            Bukkit.getLogger().severe("Could not save dynamic_prices.yml");
-        }
+        pricesDirty = true;
     }
 
     private static void saveMetrics() {
-        try {
-            metricsConfig.save(metricsFile);
-        } catch (IOException e) {
-            Bukkit.getLogger().severe("Could not save market_metrics.yml");
-        }
+        metricsDirty = true;
     }
 
     private static double calculateCPIPrice(String itemKey, double basePrice) {
@@ -453,6 +491,9 @@ public class DynamicPriceManager {
         }
         if (metricsFile != null) {
             metricsConfig = YamlConfiguration.loadConfiguration(metricsFile);
+            lastUpdate = metricsConfig.getLong("last_update", 0L);
         }
+        pricesDirty = false;
+        metricsDirty = false;
     }
 }

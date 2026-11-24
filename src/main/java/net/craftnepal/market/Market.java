@@ -68,6 +68,7 @@ public final class Market extends JavaPlugin {
     @Override
     public void onDisable() {
         if (displayUtils != null) displayUtils.clearAllDisplays();
+        net.craftnepal.market.managers.DynamicPriceManager.flush(false);
         net.craftnepal.market.managers.DatabaseManager.close();
         Bukkit.getLogger().info("Market is shutting down!");
     }
@@ -102,7 +103,6 @@ public final class Market extends JavaPlugin {
         pm.registerEvents(new MarketDisplayListener(this), this);
         pm.registerEvents(new ShopStockListener(), this);
         pm.registerEvents(new MarketWorldListener(), this);
-        pm.registerEvents(new InternalCommandListener(), this);
         pm.registerEvents(new SearchListener(), this);
         pm.registerEvents(new CommandTabFilter(), this);
         pm.registerEvents(new ShopProtectionListener(), this);

@@ -138,7 +138,7 @@ public class PriceData {
         priceMap.put(normalized, price);
         config.set(normalized.replace(":", "."), price); // Save as nested in YAML for better
                                                          // readability
-        save();
+        // Not saved here: callers set many prices, then call save() once.
     }
 
     public static void save() {

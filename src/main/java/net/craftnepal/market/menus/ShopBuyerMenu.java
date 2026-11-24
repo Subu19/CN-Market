@@ -144,21 +144,23 @@ public class ShopBuyerMenu extends Menu {
 
     @Override
     public void handleMenu(InventoryClickEvent event) {
-        ItemStack clicked = event.getCurrentItem();
-        if (clicked == null || !clicked.hasItemMeta())
-            return;
-
-        String name = ChatColor.stripColor(clicked.getItemMeta().getDisplayName());
-
-        if (name.equals("Close Menu")) {
+        // Buttons are matched by their slot in this menu, never by an item's name: a renamed item
+        // in the player's own inventory must not act as a button.
+        if (event.getRawSlot() >= getSlots() || shop == null) return;
+        int amount = switch (event.getRawSlot()) {
+            case 29 -> 1;
+            case 31 -> 16;
+            case 33 -> 64;
+            default -> 0;
+        };
+        if (event.getRawSlot() == 40) {
             playerMenuUtility.getOwner().closeInventory();
-        } else if (name.startsWith("Buy ")) {
-            int amount = Integer.parseInt(name.split(" ")[1]);
-            ShopUtils.processPurchase(playerMenuUtility.getOwner(), plotId, shopId, amount);
-            setMenuItems();
-        } else if (name.startsWith("Sell ")) {
-            int amount = Integer.parseInt(name.split(" ")[1]);
-            ShopUtils.processPlayerSale(playerMenuUtility.getOwner(), plotId, shopId, amount);
+        } else if (amount > 0) {
+            if (shop.isBuyingShop()) {
+                ShopUtils.processPlayerSale(playerMenuUtility.getOwner(), plotId, shopId, amount);
+            } else {
+                ShopUtils.processPurchase(playerMenuUtility.getOwner(), plotId, shopId, amount);
+            }
             setMenuItems();
         }
     }

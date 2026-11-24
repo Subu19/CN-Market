@@ -118,9 +118,6 @@ public class SchematicManager {
             return; // already in queue
 
         pasteQueue.add(new PendingChunk(world, chunk, plotSize, pathwayWidth, key));
-        Market.getPlugin().getLogger().info("[Market] Queued chunk " + chunk.getX() + ","
-                + chunk.getZ() + " (queue size: " + pasteQueue.size() + ")");
-
         startDrainTaskIfNeeded();
     }
 
@@ -195,7 +192,10 @@ public class SchematicManager {
         int nXEnd = (maxWorldX / totalSize) + 1;
         int nZEnd = (maxWorldZ / totalSize) + 1;
 
-        boolean pastedAny = false;
+        // Read once per chunk, not per tile.
+        int limit = Market.settings().grid().spawnRadius() - 1;
+        int y = Market.getMainConfig().getInt("market-world.pathway-y-level", 65);
+
         for (int nx = nXStart; nx <= nXEnd; nx++) {
             int pasteX = nx * totalSize;
             if (pasteX < minWorldX || pasteX > maxWorldX)
@@ -207,23 +207,12 @@ public class SchematicManager {
                     continue;
 
                 // Skip ONLY the strictly internal pathway intersections
-                int spawnRadius = Market.getMainConfig().getInt("market-world.spawn-radius", 1);
-                int limit = spawnRadius - 1;
                 if (nx >= -limit && nx <= limit && nz >= -limit && nz <= limit) {
                     continue;
                 }
 
-                int y = Market.getMainConfig().getInt("market-world.pathway-y-level", 65);
                 pasteSchematic(pending.world, pasteX, y, pasteZ);
-                pastedAny = true;
-                Market.getPlugin().getLogger().info("[Market] Pasted tile at " + pasteX + "," + pasteZ
-                        + " for chunk " + pending.chunk.getX() + "," + pending.chunk.getZ());
             }
-        }
-
-        if (!pastedAny) {
-            Market.getPlugin().getLogger().info("[Market] No pathway tiles in chunk "
-                    + pending.chunk.getX() + "," + pending.chunk.getZ());
         }
     }
 
@@ -240,12 +229,7 @@ public class SchematicManager {
                 editSession.setFastMode(true);
 
                 // Prevent the schematic arms from overwriting ANY blocks in the 3D spawn area column
-                int plotSize = Market.getMainConfig().getInt("market-world.plot-size", 16);
-                int pathwayWidth = Market.getMainConfig().getInt("market-world.pathway-width", 3);
-                int totalSize = plotSize + pathwayWidth;
-                int halfPath = pathwayWidth / 2;
-                int spawnRadiusConfig = Market.getMainConfig().getInt("market-world.spawn-radius", 1);
-                int symmetricRadius = spawnRadiusConfig * totalSize - (pathwayWidth - halfPath);
+                int symmetricRadius = Market.settings().grid().spawnAreaRadius();
 
                 com.sk89q.worldedit.regions.CuboidRegion spawnRegion = new com.sk89q.worldedit.regions.CuboidRegion(
                         weWorld,

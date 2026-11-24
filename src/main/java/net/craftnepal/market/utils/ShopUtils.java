@@ -156,12 +156,48 @@ public class ShopUtils {
         return item.isSimilar(shop.getItem());
     }
 
+    /** Trades are only opened from a barrel click; the player must still be near it. */
+    private static final double MAX_TRADE_DISTANCE_SQUARED = 8 * 8;
+
+    private static boolean canTrade(Player player, ChestShop shop, int amount) {
+        if (amount <= 0) return false;
+        Location loc = shop.getLocation();
+        if (loc == null || loc.getWorld() != player.getWorld()
+                || loc.distanceSquared(player.getLocation()) > MAX_TRADE_DISTANCE_SQUARED) {
+            SendMessage.sendPlayerMessage(player, "§cYou are too far from this shop.");
+            return false;
+        }
+        return true;
+    }
+
+    /** Puts items back into a barrel; anything that does not fit is dropped on top so nothing is lost. */
+    private static void returnToBarrel(Location shopLoc, Iterable<ItemStack> items) {
+        Barrel barrel = (Barrel) shopLoc.getBlock().getState();
+        for (ItemStack item : items) {
+            for (ItemStack left : barrel.getInventory().addItem(item).values()) {
+                shopLoc.getWorld().dropItemNaturally(shopLoc.clone().add(0.5, 1.0, 0.5), left);
+            }
+        }
+    }
+
+    /** How many more of the shop's item fit into an inventory's storage slots. */
+    private static int spaceFor(ChestShop shop, ItemStack[] contents) {
+        int max = shop.getItem().getMaxStackSize();
+        int space = 0;
+        for (ItemStack slot : contents) {
+            if (slot == null || slot.getType() == Material.AIR) space += max;
+            else if (isMatchingItem(shop, slot)) space += Math.max(0, max - slot.getAmount());
+        }
+        return space;
+    }
+
     public static void processPurchase(Player player, String plotId, String shopId, int amount) {
         ChestShop shop = DatabaseManager.getShop(shopId);
         if (shop == null) {
             SendMessage.sendPlayerMessage(player, "§cThis shop no longer exists.");
             return;
         }
+        if (!canTrade(player, shop, amount)) return;
 
         if (!shop.isAdmin() && isItemBlacklisted(shop.getItem().getType())) {
             SendMessage.sendPlayerMessage(player, "§cThis item is blacklisted and transactions for it are disabled.");
@@ -251,8 +287,7 @@ public class ShopUtils {
 
             int totalRemoved = removedItems.stream().mapToInt(ItemStack::getAmount).sum();
             if (totalRemoved != amount) {
-                for (ItemStack item : removedItems)
-                    barrelInv.addItem(item);
+                returnToBarrel(shopLoc, removedItems);
                 SendMessage.sendPlayerMessage(player, "§cTransaction failed: could not remove items from shop.");
                 return;
             }
@@ -268,9 +303,7 @@ public class ShopUtils {
         int actualGiven = amount - overflowAmount;
 
         if (!overflow.isEmpty() && !shop.isAdmin()) {
-            Barrel barrel = (Barrel) shopLoc.getBlock().getState();
-            for (ItemStack leftover : overflow.values())
-                barrel.getInventory().addItem(leftover);
+            returnToBarrel(shopLoc, overflow.values());
         }
 
         if (actualGiven <= 0) {
@@ -282,13 +315,12 @@ public class ShopUtils {
         double actualPrice = pricePerItem * actualGiven;
 
         if (!EconomyUtils.withdraw(player.getUniqueId(), actualPrice)) {
+            // Take back what was given and return it to the barrel.
             for (ItemStack item : removedItems) {
-                Map<Integer, ItemStack> notRemoved = player.getInventory().removeItem(item.clone());
-                if (!shop.isAdmin()) {
-                    Barrel barrel = (Barrel) shopLoc.getBlock().getState();
-                    for (ItemStack rb : notRemoved.values())
-                        barrel.getInventory().addItem(rb);
-                }
+                ItemStack given = item.clone();
+                int missing = player.getInventory().removeItem(given).values().stream().mapToInt(ItemStack::getAmount).sum();
+                given.setAmount(given.getAmount() - missing);
+                if (!shop.isAdmin() && given.getAmount() > 0) returnToBarrel(shopLoc, List.of(given));
             }
             SendMessage.sendPlayerMessage(player, "§cCould not process payment. Transaction cancelled.");
             return;
@@ -340,9 +372,15 @@ public class ShopUtils {
         });
     }
 
+    /**
+     * A player sells to a buying shop. Order matters: everything that can fail (stock, space,
+     * owner's money) is checked or done before the player's items move, so a failure never
+     * leaves items in two places or in none.
+     */
     public static void processPlayerSale(Player player, String plotId, String shopId, int amount) {
         ChestShop shop = DatabaseManager.getShop(shopId);
         if (shop == null || !shop.isBuyingShop()) return;
+        if (!canTrade(player, shop, amount)) return;
 
         if (!shop.isAdmin() && isItemBlacklisted(shop.getItem().getType())) {
             SendMessage.sendPlayerMessage(player, "§cThis item is blacklisted and transactions for it are disabled.");
@@ -351,6 +389,7 @@ public class ShopUtils {
 
         double pricePerItem = shop.getPrice();
         double totalPayout = pricePerItem * amount;
+        String displayName = getShopDisplayName(shop);
 
         int playerHas = 0;
         for (ItemStack item : player.getInventory().getStorageContents()) {
@@ -358,14 +397,25 @@ public class ShopUtils {
                 playerHas += item.getAmount();
             }
         }
-
         if (playerHas < amount) {
-            SendMessage.sendPlayerMessage(player, "§cYou do not have enough " + getShopDisplayName(shop) + " to sell.");
+            SendMessage.sendPlayerMessage(player, "§cYou do not have enough " + displayName + " to sell.");
             return;
         }
 
+        Location loc = shop.getLocation();
+        Barrel barrel = null;
         if (!shop.isAdmin()) {
-            if (!EconomyUtils.hasBalance(shop.getOwner(), totalPayout)) {
+            if (loc == null || loc.getBlock().getType() != Material.BARREL) {
+                SendMessage.sendPlayerMessage(player, "§cShop barrel is missing or corrupted.");
+                return;
+            }
+            barrel = (Barrel) loc.getBlock().getState();
+            if (spaceFor(shop, barrel.getInventory().getStorageContents()) < amount) {
+                SendMessage.sendPlayerMessage(player, "§cThis shop's barrel is full.");
+                return;
+            }
+            if (!EconomyUtils.hasBalance(shop.getOwner(), totalPayout)
+                    || !EconomyUtils.withdraw(shop.getOwner(), totalPayout)) {
                 SendMessage.sendPlayerMessage(player, "§cThe shop owner does not have enough money to buy your items.");
                 return;
             }
@@ -373,44 +423,35 @@ public class ShopUtils {
 
         ItemStack toRemove = shop.getItem().clone();
         toRemove.setAmount(amount);
-        player.getInventory().removeItem(toRemove);
+        int notTaken = player.getInventory().removeItem(toRemove).values().stream().mapToInt(ItemStack::getAmount).sum();
+        int sold = amount - notTaken;
+        if (sold <= 0) {
+            if (!shop.isAdmin()) EconomyUtils.deposit(shop.getOwner(), totalPayout);
+            SendMessage.sendPlayerMessage(player, "§cTransaction failed.");
+            return;
+        }
+        double payout = pricePerItem * sold;
+        if (!shop.isAdmin() && sold < amount) {
+            EconomyUtils.deposit(shop.getOwner(), totalPayout - payout); // refund the part not sold
+        }
 
         if (!shop.isAdmin()) {
-            Location loc = shop.getLocation();
-            if (loc != null && loc.getBlock().getType() == Material.BARREL) {
-                Barrel barrel = (Barrel) loc.getBlock().getState();
-                barrel.getInventory().addItem(toRemove);
-                
-                // Update SQLite database stock cache (arithmetic — no chunk load needed)
-                int currentStock = getShopStock(shop);
-                int newStock = currentStock + amount;
-                shop.setStock(newStock);
-                DatabaseManager.updateShopStock(shop.getId(), newStock);
-            }
+            ItemStack stored = shop.getItem().clone();
+            stored.setAmount(sold);
+            returnToBarrel(loc, List.of(stored));
+            int newStock = getShopStock(shop) + sold;
+            DatabaseManager.updateShopStock(shop.getId(), newStock);
         }
+        EconomyUtils.deposit(player.getUniqueId(), payout);
 
         if (shop.isAdmin()) {
-            EconomyUtils.deposit(player.getUniqueId(), totalPayout);
-        } else {
-            if (EconomyUtils.withdraw(shop.getOwner(), totalPayout)) {
-                EconomyUtils.deposit(player.getUniqueId(), totalPayout);
-            } else {
-                player.getInventory().addItem(toRemove);
-                SendMessage.sendPlayerMessage(player, "§cTransaction failed.");
-                return;
-            }
+            DynamicPriceManager.recordAdminSale(getItemKey(shop), sold);
         }
 
-        if (shop.isAdmin()) {
-            DynamicPriceManager.recordAdminSale(getItemKey(shop), amount);
-        }
+        SendMessage.sendPlayerMessage(player, "§aSuccessfully sold " + sold + " " + displayName + " for " + EconomyUtils.format(payout));
+        TransactionLogUtils.log("SELL: " + player.getName() + " sold " + sold + "x " + displayName + " to shop " + shopId + " (Owner: " + shop.getOwner() + ") for " + payout);
 
-        SendMessage.sendPlayerMessage(player, "§aSuccessfully sold " + amount + " " + getShopDisplayName(shop) + " for " + EconomyUtils.format(totalPayout));
-        TransactionLogUtils.log("SELL: " + player.getName() + " sold " + amount + "x " + getShopDisplayName(shop) + " to shop " + shopId + " (Owner: " + shop.getOwner().toString() + ") for " + totalPayout);
-        
-        Bukkit.getScheduler().runTask(Market.getPlugin(), () -> {
-            DisplayUtils.getInstance().updateDisplay(shop);
-        });
+        DisplayUtils.getInstance().updateDisplay(shop);
     }
 
     public static String getItemKey(ChestShop shop) {

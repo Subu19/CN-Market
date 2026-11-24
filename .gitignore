@@ -50,4 +50,7 @@ versions/
 
 # OS Specific
 .DS_Store
-Thumbs.db.codegraph/
+Thumbs.db
+
+# Local code index
+.codegraph/

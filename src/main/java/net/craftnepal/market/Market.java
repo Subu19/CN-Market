@@ -2,6 +2,9 @@ package net.craftnepal.market;
 
 import me.kodysimpson.simpapi.command.CommandManager;
 import net.craftnepal.market.Listeners.*;
+import net.craftnepal.market.protection.EntityProtectionListener;
+import net.craftnepal.market.protection.PlayerProtectionListener;
+import net.craftnepal.market.protection.WorldProtectionListener;
 import net.craftnepal.market.files.LocationData;
 import net.craftnepal.market.files.PriceData;
 import net.craftnepal.market.files.RegionData;
@@ -91,7 +94,9 @@ public final class Market extends JavaPlugin {
     private void registerListeners() {
         var pm = getServer().getPluginManager();
         pm.registerEvents(new RegionSelection(), this);
-        pm.registerEvents(new MarketRegionProtection(), this);
+        pm.registerEvents(new PlayerProtectionListener(), this);
+        pm.registerEvents(new WorldProtectionListener(), this);
+        pm.registerEvents(new EntityProtectionListener(), this);
         pm.registerEvents(new Movement(this), this);
         pm.registerEvents(new ShopInteraction(), this);
         pm.registerEvents(new MarketDisplayListener(this), this);

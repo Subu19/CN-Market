@@ -5,7 +5,7 @@ import net.craftnepal.market.MarketSettings;
 import net.craftnepal.market.managers.DatabaseManager;
 import net.craftnepal.market.plot.Plot;
 import net.craftnepal.market.plot.PlotGrid;
-import net.craftnepal.market.plot.PlotIndex;
+import net.craftnepal.market.plot.Zones;
 import net.craftnepal.market.subcommands.admin.Bypass;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -15,7 +15,7 @@ import org.bukkit.entity.Player;
 import java.util.List;
 
 /**
- * Plot lookups. Everything here reads the in-memory {@link PlotIndex} and {@link PlotGrid}; no call
+ * Plot lookups. Everything here reads the in-memory {@link net.craftnepal.market.plot.PlotIndex} and {@link PlotGrid}; no call
  * touches the database except the write helpers. Main-thread only.
  */
 public final class PlotUtils {
@@ -39,33 +39,14 @@ public final class PlotUtils {
 
     /** Plot id at a block: a plot with its own bounds first, then the automatic grid. */
     public static String plotIdAt(World world, int x, int y, int z) {
-        PlotIndex index = DatabaseManager.plotIndex();
-        if (index.hasBoundedPlots()) {
-            Plot bounded = index.boundedAt(world.getName(), x, y, z);
-            if (bounded != null) return bounded.id();
-        }
-        if (world != Market.getPlugin().getMarketWorld()) return null;
-        return Market.settings().grid().plotIdAt(x, z);
+        return Zones.plotIdAt(DatabaseManager.plotIndex(), Market.settings().grid(), world.getName(),
+                world == Market.getPlugin().getMarketWorld(), x, y, z);
     }
 
-    /**
-     * True when both blocks are in the same plot, or both are outside every plot. Same answer as
-     * comparing two {@link #plotIdAt} results, without building strings.
-     */
+    /** True when both blocks are in the same plot, or both are outside every plot. */
     public static boolean sameZone(World world, int x1, int y1, int z1, int x2, int y2, int z2) {
-        PlotIndex index = DatabaseManager.plotIndex();
-        if (index.hasBoundedPlots()) {
-            String name = world.getName();
-            Plot a = index.boundedAt(name, x1, y1, z1);
-            Plot b = index.boundedAt(name, x2, y2, z2);
-            if (a != null || b != null) return a == b;
-        }
-        if (world != Market.getPlugin().getMarketWorld()) return true;
-        PlotGrid grid = Market.settings().grid();
-        boolean pathA = grid.isPathway(x1, z1);
-        boolean pathB = grid.isPathway(x2, z2);
-        if (pathA || pathB) return pathA == pathB;
-        return grid.cell(x1) == grid.cell(x2) && grid.cell(z1) == grid.cell(z2);
+        return Zones.sameZone(DatabaseManager.plotIndex(), Market.settings().grid(), world.getName(),
+                world == Market.getPlugin().getMarketWorld(), x1, y1, z1, x2, y2, z2);
     }
 
     public static boolean sameZone(Block a, Block b) {
@@ -235,10 +216,7 @@ public final class PlotUtils {
     }
 
     private static boolean isTrusted(Player player, World world, int x, int y, int z) {
-        if (y > Market.settings().maxHeight()) return false;
-        Plot plot = getPlot(plotIdAt(world, x, y, z));
-        if (plot == null) return false; // pathway, spawn or unclaimed grid plot
-        String uuid = player.getUniqueId().toString();
-        return uuid.equals(plot.owner()) || plot.members().contains(uuid);
+        return Zones.isTrusted(DatabaseManager.plotIndex(), Market.settings().grid(), world.getName(),
+                Market.settings().maxHeight(), player.getUniqueId().toString(), x, y, z);
     }
 }

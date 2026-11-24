@@ -19,7 +19,7 @@ Tick these as phases land. One phase per branch/PR.
 
 - [x] Phase 1: Baseline build and test harness
 - [x] Phase 2: In-memory plot index and cached settings (fixes Problem 1; shippable alone as a hotfix)
-- [ ] Phase 3: Protection core (Problem 2)
+- [x] Phase 3: Protection core (Problem 2)
 - [ ] Phase 4: Shop index, serialized database access, async writes
 - [ ] Phase 5: Price and metrics file I/O off the main thread
 - [ ] Phase 6: Bug fixes (only the ones approved under "Decisions")
@@ -340,6 +340,17 @@ Knockback (D1 = Spigot):
 - Do not add `PlayerFlowerPotManipulateEvent`, `PlayerOpenSignEvent`, `BlockPreDispenseEvent` or `EntityInsideBlockEvent`. They are Paper-only. Flower pots and signs are already covered by the default-deny `PlayerInteractEvent` rule.
 
 Before using any event from this table that is not in "Verified facts" (`PlayerFishEvent`, `PlayerEggThrowEvent`, `PotionSplashEvent`, `PortalCreateEvent`, `PlayerTeleportEvent`), confirm its getters with `javap` against the API jar.
+
+### Implementation notes (2026-11-24)
+
+Not added, on purpose:
+
+- `PlayerTakeLecternBookEvent`: taking a book needs the lectern GUI, which the interact rule already denies.
+- Generic `ProjectileHitEvent` on blocks: cancelling it makes arrows fly through walls. Block changes by projectiles (pots, chorus flowers) are already cancelled by the entity-change-block rule.
+- `InventoryMoveItemEvent` (hoppers): left out, as GriefPrevention does; placing a hopper already needs build trust.
+- `PlayerTeleportEvent` (ender pearls): plots are shops and visitors are welcome.
+
+Found while implementing: the old `PlayerInteractEntityEvent` handler never saw armor stand right-clicks, because `PlayerInteractAtEntityEvent` and `PlayerArmorStandManipulateEvent` have their own handler lists. Both are now handled. Falling blocks now remember where they started (persistent data on the entity) instead of comparing the landing spot with itself.
 
 ### Verification
 

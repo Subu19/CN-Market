@@ -131,6 +131,7 @@ public class Reset extends SubCommand {
             // 5. Update config
             Market.getMainConfig().set("market-world.name", null);
             Market.getPlugin().saveConfig();
+            Market.applyConfigChanges();
 
             SendMessage.sendPlayerMessage(player, "§a§lMarket system reset successfully!");
             SendMessage.sendPlayerMessage(player, "§eUse §f/market admin setup §eto start over.");

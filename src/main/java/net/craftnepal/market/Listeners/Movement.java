@@ -46,7 +46,7 @@ public class Movement implements Listener {
 
         Player player = e.getPlayer();
 
-        boolean allowFlight = Market.getMainConfig().getBoolean("allow-flight", false);
+        boolean allowFlight = Market.settings().allowFlight();
         if (!allowFlight) {
             return;
         }
@@ -76,7 +76,7 @@ public class Movement implements Listener {
     }
 
     public static void checkAndToggle(Player player, boolean toggle) {
-        boolean allowFlight = Market.getMainConfig().getBoolean("allow-flight", false);
+        boolean allowFlight = Market.settings().allowFlight();
         if (allowFlight) {
             player.setAllowFlight(toggle);
 

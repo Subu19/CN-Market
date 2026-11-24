@@ -12,6 +12,24 @@ import java.util.UUID;
 
 public class PlayerUtils {
 
+    private static final java.util.Map<UUID, String> nameCache = new java.util.HashMap<>();
+
+    /**
+     * Last known name of a player, cached so repeated lookups do not hit the player data files.
+     * Main-thread only.
+     */
+    public static String getName(UUID uuid) {
+        Player online = Bukkit.getPlayer(uuid);
+        if (online != null) {
+            nameCache.put(uuid, online.getName());
+            return online.getName();
+        }
+        return nameCache.computeIfAbsent(uuid, id -> {
+            String name = Bukkit.getOfflinePlayer(id).getName();
+            return name != null ? name : "Unknown";
+        });
+    }
+
     public static ItemStack getPlayerHead(UUID playerUUID) {
         ItemStack head = new ItemStack(Material.PLAYER_HEAD);
         SkullMeta meta = (SkullMeta) head.getItemMeta();

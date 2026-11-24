@@ -17,8 +17,8 @@ Paths are relative to the repo root. `M/` means `src/main/java/net/craftnepal/ma
 
 Tick these as phases land. One phase per branch/PR.
 
-- [ ] Phase 1: Baseline build and test harness
-- [ ] Phase 2: In-memory plot index and cached settings (fixes Problem 1; shippable alone as a hotfix)
+- [x] Phase 1: Baseline build and test harness
+- [x] Phase 2: In-memory plot index and cached settings (fixes Problem 1; shippable alone as a hotfix)
 - [ ] Phase 3: Protection core (Problem 2)
 - [ ] Phase 4: Shop index, serialized database access, async writes
 - [ ] Phase 5: Price and metrics file I/O off the main thread

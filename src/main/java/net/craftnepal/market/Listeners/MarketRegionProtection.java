@@ -5,6 +5,7 @@ import net.craftnepal.market.utils.PlotUtils;
 import net.craftnepal.market.utils.SendMessage;
 import net.craftnepal.market.utils.ShopUtils;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
@@ -104,9 +105,7 @@ public class MarketRegionProtection implements Listener {
 
         // Allow configurable global blocks (e.g. Ender Chests) everywhere
         if (e.getAction() == Action.RIGHT_CLICK_BLOCK) {
-            List<String> allowed = net.craftnepal.market.Market.getMainConfig()
-                    .getStringList("market-world.allowed-interact-blocks");
-            if (allowed.contains(clickedBlock.getType().name()))
+            if (net.craftnepal.market.Market.settings().allowedInteractBlocks().contains(clickedBlock.getType()))
                 return;
         }
 
@@ -608,27 +607,29 @@ public class MarketRegionProtection implements Listener {
     // a different plot.
     // =========================================================================
 
-    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    private static final int[][] NEIGHBOURS = {{0, 0, -1}, {0, 0, 1}, {1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}};
+
+    // BlockRedstoneEvent is not Cancellable: resetting the current is the only lever.
+    @EventHandler(priority = EventPriority.HIGH)
     public void onBlockRedstone(BlockRedstoneEvent e) {
-        if (!isMarketWorld(e.getBlock().getLocation()))
+        Block block = e.getBlock();
+        if (!MarketUtils.isInMarketWorld(block.getWorld()))
             return;
 
         // Only restrict redstone components that can cause neighbour block updates
-        if (!REDSTONE_COMPONENTS.contains(e.getBlock().getType()))
+        if (!REDSTONE_COMPONENTS.contains(block.getType()))
             return;
 
-        String blockPlot = PlotUtils.getPlotIdByLocation(e.getBlock().getLocation());
+        // Fast path: a block away from every plot edge cannot reach another plot.
+        if (PlotUtils.isGridInterior(block))
+            return;
 
-        // Check all 6 neighbours — if any neighbour is in a DIFFERENT plot,
-        // block the power change entirely to prevent cross-plot BUD updates.
-        for (BlockFace face : new BlockFace[] {BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST,
-                BlockFace.WEST, BlockFace.UP, BlockFace.DOWN}) {
-            Block neighbour = e.getBlock().getRelative(face);
-            if (!isMarketWorld(neighbour.getLocation()))
-                continue;
-            String neighbourPlot = PlotUtils.getPlotIdByLocation(neighbour.getLocation());
-            if (!Objects.equals(blockPlot, neighbourPlot)) {
-                // Revert power level to prevent cross-plot signal propagation
+        // If any neighbour is in a different plot, revert the power change to prevent
+        // cross-plot BUD updates.
+        World world = block.getWorld();
+        int x = block.getX(), y = block.getY(), z = block.getZ();
+        for (int[] d : NEIGHBOURS) {
+            if (!PlotUtils.sameZone(world, x, y, z, x + d[0], y + d[1], z + d[2])) {
                 e.setNewCurrent(e.getOldCurrent());
                 return;
             }

@@ -56,6 +56,7 @@ public class Setup extends SubCommand {
         Market.getMainConfig().set("market-world.plot-size", plotSize);
         Market.getMainConfig().set("market-world.pathway-width", pathwayWidth);
         Market.getPlugin().saveConfig();
+        Market.applyConfigChanges();
 
         SendMessage.sendPlayerMessage(player, "§aGenerating market world '" + worldName + "'... This may cause lag.");
         Market.getPlugin().initializeMarketWorld(true);

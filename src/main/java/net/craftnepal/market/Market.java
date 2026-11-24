@@ -19,7 +19,6 @@ import net.craftnepal.market.world.SchematicManager;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
@@ -28,7 +27,8 @@ public final class Market extends JavaPlugin {
 
     private static Market plugin;
     private static FileConfiguration config;
-    private static File cfile;
+    private static volatile MarketSettings settings;
+    private World marketWorld;
     private DisplayUtils displayUtils;
 
     @Override
@@ -75,7 +75,7 @@ public final class Market extends JavaPlugin {
         config = getConfig();
         config.options().copyDefaults(true);
         saveConfig();
-        cfile = new File(getDataFolder(), "config.yml");
+        settings = MarketSettings.from(config, getLogger());
     }
 
     private void setupDataFiles() {
@@ -126,15 +126,37 @@ public final class Market extends JavaPlugin {
         MarketWorldManager.initialize(forceCreate);
     }
 
+    /** The market world, or null when it is not loaded. Cached; see {@link #onWorldChanged()}. */
     public World getMarketWorld() {
-        return Bukkit.getWorld(config.getString("market-world.name", "market"));
+        World world = marketWorld;
+        if (world == null) {
+            world = Bukkit.getWorld(settings.worldName());
+            marketWorld = world;
+        }
+        return world;
+    }
+
+    /** Drops the cached world reference; call when a world loads or unloads, or the name changes. */
+    public void onWorldChanged() {
+        marketWorld = null;
     }
 
     public static Market getPlugin() { return plugin; }
 
     public static FileConfiguration getMainConfig() { return config; }
 
+    public static MarketSettings settings() { return settings; }
+
+    /** Reloads config.yml from disk. */
     public static void reloadMainConfig() {
-        config = YamlConfiguration.loadConfiguration(cfile);
+        plugin.reloadConfig();
+        config = plugin.getConfig();
+        applyConfigChanges();
+    }
+
+    /** Rebuilds the settings snapshot after values in {@link #getMainConfig()} were changed in code. */
+    public static void applyConfigChanges() {
+        settings = MarketSettings.from(config, plugin.getLogger());
+        plugin.onWorldChanged();
     }
 }

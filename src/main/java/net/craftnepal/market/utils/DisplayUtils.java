@@ -65,7 +65,7 @@ public class DisplayUtils {
                 new Transformation(new Vector3f(0, 0, 0), new AxisAngle4f(0, 0, 0, 0),
                         new Vector3f(0.5f, 0.5f, 0.5f), new AxisAngle4f(0, 0, 0, 0));
 
-        float viewRange = (float) Market.getMainConfig().getDouble("display-view-range", 1.0);
+        float viewRange = Market.settings().displayViewRange();
 
         ItemDisplay itemDisplay = shopLoc.getWorld().spawn(itemLoc, ItemDisplay.class, d -> {
             d.setItemStack(itemStack);
@@ -147,7 +147,7 @@ public class DisplayUtils {
 
         pair.update(buildDisplayItem(shop), buildDisplayText(shop));
 
-        float viewRange = (float) Market.getMainConfig().getDouble("display-view-range", 1.0);
+        float viewRange = Market.settings().displayViewRange();
         if (pair.getItemDisplay() != null) {
             pair.getItemDisplay().setViewRange(viewRange);
         }

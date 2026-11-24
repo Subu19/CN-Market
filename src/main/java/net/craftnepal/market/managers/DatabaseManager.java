@@ -1,6 +1,8 @@
 package net.craftnepal.market.managers;
 
 import net.craftnepal.market.Entities.ChestShop;
+import net.craftnepal.market.plot.Plot;
+import net.craftnepal.market.plot.PlotIndex;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -94,6 +96,7 @@ public class DatabaseManager {
             
             // Perform automatic one-time migration if legacy YAML data files exist
             migrateFromYaml();
+            loadAllPlots();
             // Load shops into in-memory cache
             loadShopsIntoCache();
         } catch (SQLException e) {
@@ -345,64 +348,64 @@ public class DatabaseManager {
         }
     }
 
-    // ── PLOTS CRUD ─────────────────────────────────────────────────────────────
+    // ── PLOTS ──────────────────────────────────────────────────────────────────
+    // Reads come from the in-memory PlotIndex. Writes update the index first, then SQL.
+
+    private static final PlotIndex plotIndex = new PlotIndex();
+
+    public static PlotIndex plotIndex() {
+        return plotIndex;
+    }
+
+    /** Loads every plot and member into memory. Called once at startup. */
+    public static void loadAllPlots() {
+        plotIndex.clear();
+        try (Statement stmt = getConnection().createStatement()) {
+            try (ResultSet rs = stmt.executeQuery("SELECT id, owner, pos_min, pos_max, spawn FROM plots")) {
+                while (rs.next()) {
+                    plotIndex.put(new Plot(rs.getString("id"), rs.getString("owner"),
+                            rs.getString("pos_min"), rs.getString("pos_max"), rs.getString("spawn")));
+                }
+            }
+            try (ResultSet rs = stmt.executeQuery("SELECT plot_id, player_uuid FROM plot_members")) {
+                while (rs.next()) {
+                    Plot plot = plotIndex.get(rs.getString("plot_id"));
+                    if (plot != null) plot.members().add(rs.getString("player_uuid"));
+                }
+            }
+            Bukkit.getLogger().info("[Market] Loaded " + plotIndex.all().size() + " plots into memory.");
+        } catch (SQLException e) {
+            Bukkit.getLogger().severe("[Market] Could not load plots: " + e.getMessage());
+        }
+    }
 
     public static boolean plotExists(String id) {
-        String sql = "SELECT 1 FROM plots WHERE id = ?";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
-            pstmt.setString(1, id);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                return rs.next();
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return false;
+        return plotIndex.get(id) != null;
     }
 
     public static List<String> getActivePlotIds() {
         List<String> list = new ArrayList<>();
-        String sql = "SELECT id FROM plots WHERE owner IS NOT NULL AND owner != ''";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql);
-             ResultSet rs = pstmt.executeQuery()) {
-            while (rs.next()) {
-                list.add(rs.getString("id"));
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
+        for (Plot plot : plotIndex.all()) {
+            if (plot.isOwned()) list.add(plot.id());
         }
         return list;
     }
 
     public static List<String> getAvailablePlotIds() {
         List<String> list = new ArrayList<>();
-        String sql = "SELECT id FROM plots WHERE owner IS NULL OR owner = ''";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql);
-             ResultSet rs = pstmt.executeQuery()) {
-            while (rs.next()) {
-                list.add(rs.getString("id"));
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
+        for (Plot plot : plotIndex.all()) {
+            if (!plot.isOwned()) list.add(plot.id());
         }
         return list;
     }
 
     public static List<String> getAllPlotIds() {
-        List<String> list = new ArrayList<>();
-        String sql = "SELECT id FROM plots";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql);
-             ResultSet rs = pstmt.executeQuery()) {
-            while (rs.next()) {
-                list.add(rs.getString("id"));
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return list;
+        return plotIndex.ids();
     }
 
     public static void savePlot(String id, String owner, Location posMin, Location posMax, Location spawn) {
+        // INSERT OR REPLACE deletes the old row first, which cascades to its members.
+        plotIndex.put(new Plot(id, owner, serializeLocation(posMin), serializeLocation(posMax), serializeLocation(spawn)));
         String sql = "INSERT OR REPLACE INTO plots (id, owner, pos_min, pos_max, spawn) VALUES (?, ?, ?, ?, ?)";
         try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
             pstmt.setString(1, id);
@@ -417,6 +420,8 @@ public class DatabaseManager {
     }
 
     public static void setPlotOwner(String id, String owner) {
+        Plot plot = plotIndex.get(id);
+        if (plot != null) plot.setOwner(owner);
         String sql = "UPDATE plots SET owner = ? WHERE id = ?";
         try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
             pstmt.setString(1, owner);
@@ -428,66 +433,28 @@ public class DatabaseManager {
     }
 
     public static String getPlotOwner(String id) {
-        String sql = "SELECT owner FROM plots WHERE id = ?";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
-            pstmt.setString(1, id);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getString("owner");
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return null;
+        Plot plot = plotIndex.get(id);
+        return plot == null ? null : plot.owner();
     }
 
     public static Location getPlotPosMin(String id) {
-        String sql = "SELECT pos_min FROM plots WHERE id = ?";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
-            pstmt.setString(1, id);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    return deserializeLocation(rs.getString("pos_min"));
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return null;
+        Plot plot = plotIndex.get(id);
+        return plot == null ? null : deserializeLocation(plot.posMinText());
     }
 
     public static Location getPlotPosMax(String id) {
-        String sql = "SELECT pos_max FROM plots WHERE id = ?";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
-            pstmt.setString(1, id);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    return deserializeLocation(rs.getString("pos_max"));
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return null;
+        Plot plot = plotIndex.get(id);
+        return plot == null ? null : deserializeLocation(plot.posMaxText());
     }
 
     public static Location getPlotSpawn(String id) {
-        String sql = "SELECT spawn FROM plots WHERE id = ?";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
-            pstmt.setString(1, id);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    return deserializeLocation(rs.getString("spawn"));
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return null;
+        Plot plot = plotIndex.get(id);
+        return plot == null ? null : deserializeLocation(plot.spawnText());
     }
 
     public static void setPlotSpawn(String id, Location spawn) {
+        Plot plot = plotIndex.get(id);
+        if (plot != null) plot.setSpawnText(serializeLocation(spawn));
         String sql = "UPDATE plots SET spawn = ? WHERE id = ?";
         try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
             pstmt.setString(1, serializeLocation(spawn));
@@ -499,6 +466,7 @@ public class DatabaseManager {
     }
 
     public static void deletePlot(String id) {
+        plotIndex.remove(id);
         String sql = "DELETE FROM plots WHERE id = ?";
         try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
             pstmt.setString(1, id);
@@ -508,34 +476,16 @@ public class DatabaseManager {
         }
     }
 
-    public static void resetAllPlots() {
-        String sql = "DELETE FROM plots";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
-            pstmt.executeUpdate();
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-    }
-
     // ── PLOT MEMBERS ───────────────────────────────────────────────────────────
 
     public static List<String> getPlotMembers(String plotId) {
-        List<String> members = new ArrayList<>();
-        String sql = "SELECT player_uuid FROM plot_members WHERE plot_id = ?";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
-            pstmt.setString(1, plotId);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                while (rs.next()) {
-                    members.add(rs.getString("player_uuid"));
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return members;
+        Plot plot = plotIndex.get(plotId);
+        return plot == null ? new ArrayList<>() : new ArrayList<>(plot.members());
     }
 
     public static void addPlotMember(String plotId, String playerUuid) {
+        Plot plot = plotIndex.get(plotId);
+        if (plot != null) plot.members().add(playerUuid);
         String sql = "INSERT OR IGNORE INTO plot_members (plot_id, player_uuid) VALUES (?, ?)";
         try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
             pstmt.setString(1, plotId);
@@ -547,20 +497,12 @@ public class DatabaseManager {
     }
 
     public static void removePlotMember(String plotId, String playerUuid) {
+        Plot plot = plotIndex.get(plotId);
+        if (plot != null) plot.members().remove(playerUuid);
         String sql = "DELETE FROM plot_members WHERE plot_id = ? AND player_uuid = ?";
         try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
             pstmt.setString(1, plotId);
             pstmt.setString(2, playerUuid);
-            pstmt.executeUpdate();
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public static void clearPlotMembers(String plotId) {
-        String sql = "DELETE FROM plot_members WHERE plot_id = ?";
-        try (PreparedStatement pstmt = getConnection().prepareStatement(sql)) {
-            pstmt.setString(1, plotId);
             pstmt.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();
@@ -944,6 +886,7 @@ public class DatabaseManager {
             for (String table : tables) {
                 stmt.executeUpdate("DELETE FROM " + table);
             }
+            plotIndex.clear();
         } catch (SQLException e) {
             e.printStackTrace();
         }

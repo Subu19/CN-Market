@@ -2,6 +2,7 @@ package net.craftnepal.market.Listeners;
 
 import net.craftnepal.market.utils.MarketUtils;
 import net.craftnepal.market.managers.DatabaseManager;
+import net.craftnepal.market.plot.Plot;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -93,30 +94,22 @@ public class RegionSelection implements Listener {
     }
 
     private void saveMarketPlot(RegionBounds bounds, Player player) {
-        List<String> plotIds = DatabaseManager.getAllPlotIds();
-        
         // Generate a unique ID for the manual plot
         String newPlotId = "manual_" + System.currentTimeMillis();
 
-        // Check for overlaps
-        for (String plotId : plotIds) {
-            RegionBounds existingPlot = getPlotBounds(plotId);
-            if (existingPlot.getMin() != null && bounds.intersects(existingPlot)) {
-                player.sendMessage("Error: The selected area overlaps with existing plot " + plotId);
-                return;
-            }
+        Location min = bounds.getMin();
+        Location max = bounds.getMax();
+        Plot overlap = DatabaseManager.plotIndex().firstOverlap(min.getWorld().getName(),
+                min.getBlockX(), min.getBlockY(), min.getBlockZ(), max.getBlockX(), max.getBlockY(), max.getBlockZ());
+        if (overlap != null) {
+            player.sendMessage("Error: The selected area overlaps with existing plot " + overlap.id());
+            return;
         }
 
         // Save the new plot to SQLite
-        DatabaseManager.savePlot(newPlotId, null, bounds.getMin(), bounds.getMax(), null);
+        DatabaseManager.savePlot(newPlotId, null, min, max, null);
 
         player.sendMessage("Created new manual plot: " + newPlotId);
-    }
-
-    private RegionBounds getPlotBounds(String plotId) {
-        Location min = DatabaseManager.getPlotPosMin(plotId);
-        Location max = DatabaseManager.getPlotPosMax(plotId);
-        return new RegionBounds(min, max);
     }
 
     private void cleanupSelection(UUID uuid) {
@@ -150,24 +143,6 @@ public class RegionSelection implements Listener {
 
         public Location getMax() {
             return max;
-        }
-
-        public boolean intersects(RegionBounds other) {
-            if (min == null || max == null || other.min == null || other.max == null) {
-                return false;
-            }
-            return (min.getX() <= other.max.getX() && max.getX() >= other.min.getX()) &&
-                    (min.getY() <= other.max.getY() && max.getY() >= other.min.getY()) &&
-                    (min.getZ() <= other.max.getZ() && max.getZ() >= other.min.getZ());
-        }
-
-        public boolean contains(RegionBounds other) {
-            if (min == null || max == null || other.min == null || other.max == null) {
-                return false;
-            }
-            return min.getX() <= other.min.getX() && max.getX() >= other.max.getX() &&
-                    min.getY() <= other.min.getY() && max.getY() >= other.max.getY() &&
-                    min.getZ() <= other.min.getZ() && max.getZ() >= other.max.getZ();
         }
     }
 

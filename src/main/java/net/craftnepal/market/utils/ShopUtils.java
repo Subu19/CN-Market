@@ -153,16 +153,7 @@ public class ShopUtils {
     }
 
     public static boolean isItemBlacklisted(Material material) {
-        if (material == null) return false;
-        List<String> blacklist = Market.getMainConfig().getStringList("player-shop-blacklist");
-        if (blacklist == null) return false;
-        String matName = material.name();
-        for (String item : blacklist) {
-            if (item.equalsIgnoreCase(matName)) {
-                return true;
-            }
-        }
-        return false;
+        return material != null && Market.settings().shopBlacklist().contains(material);
     }
 
     public static boolean isMatchingItem(ChestShop shop, ItemStack item) {

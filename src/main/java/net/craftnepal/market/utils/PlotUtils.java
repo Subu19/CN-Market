@@ -1,131 +1,125 @@
 package net.craftnepal.market.utils;
 
-import org.bukkit.Location;
-import org.bukkit.entity.Player;
-import org.bukkit.configuration.ConfigurationSection;
 import net.craftnepal.market.Market;
-import net.craftnepal.market.files.RegionData;
+import net.craftnepal.market.MarketSettings;
+import net.craftnepal.market.managers.DatabaseManager;
+import net.craftnepal.market.plot.Plot;
+import net.craftnepal.market.plot.PlotGrid;
+import net.craftnepal.market.plot.PlotIndex;
+import net.craftnepal.market.subcommands.admin.Bypass;
+import org.bukkit.Location;
 import org.bukkit.World;
-import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.block.Block;
+import org.bukkit.entity.Player;
 
-import java.util.ArrayList;
 import java.util.List;
 
-public class PlotUtils {
+/**
+ * Plot lookups. Everything here reads the in-memory {@link PlotIndex} and {@link PlotGrid}; no call
+ * touches the database except the write helpers. Main-thread only.
+ */
+public final class PlotUtils {
+
+    private PlotUtils() {}
 
     public static List<String> getActivePlotIds() {
-        return net.craftnepal.market.managers.DatabaseManager.getActivePlotIds();
+        return DatabaseManager.getActivePlotIds();
     }
 
-    public static List<String> getAvailablePlotIds() {
-        return net.craftnepal.market.managers.DatabaseManager.getAvailablePlotIds();
-    }
+    // ── Location → plot ──────────────────────────────────────────────────────
 
     public static String getPlotIdByLocation(Location location) {
-        List<String> plots = net.craftnepal.market.managers.DatabaseManager.getAllPlotIds();
-        
-        // First check manually registered plots
-        for (String plotId : plots) {
-            Location min = net.craftnepal.market.managers.DatabaseManager.getPlotPosMin(plotId);
-            Location max = net.craftnepal.market.managers.DatabaseManager.getPlotPosMax(plotId);
-
-            if (min != null && max != null &&
-                    RegionUtils.isLocationInsideRegion(location, min, max)) {
-                return plotId;
-            }
-        }
-
-        // If not found, check if it's an automatic plot in the market world
-        return getAutomaticPlotIdAt(location);
+        if (location == null || location.getWorld() == null) return null;
+        return plotIdAt(location.getWorld(), location.getBlockX(), location.getBlockY(), location.getBlockZ());
     }
 
-    public static String getAutomaticPlotIdAt(Location location) {
-        World marketWorld = Market.getPlugin().getMarketWorld();
-        if (marketWorld == null || !location.getWorld().equals(marketWorld)) {
-            return null;
+    public static String getPlotIdByBlock(Block block) {
+        return plotIdAt(block.getWorld(), block.getX(), block.getY(), block.getZ());
+    }
+
+    /** Plot id at a block: a plot with its own bounds first, then the automatic grid. */
+    public static String plotIdAt(World world, int x, int y, int z) {
+        PlotIndex index = DatabaseManager.plotIndex();
+        if (index.hasBoundedPlots()) {
+            Plot bounded = index.boundedAt(world.getName(), x, y, z);
+            if (bounded != null) return bounded.id();
         }
+        if (world != Market.getPlugin().getMarketWorld()) return null;
+        return Market.settings().grid().plotIdAt(x, z);
+    }
 
-        FileConfiguration config = Market.getMainConfig();
-        int plotSize = config.getInt("market-world.plot-size", 16);
-        int pathwayWidth = config.getInt("market-world.pathway-width", 3);
-        int totalSize = plotSize + pathwayWidth;
-
-        int worldX = location.getBlockX();
-        int worldZ = location.getBlockZ();
-
-        int adjustedX = worldX + (pathwayWidth / 2);
-        int adjustedZ = worldZ + (pathwayWidth / 2);
-
-        int modX = Math.abs(adjustedX) % totalSize;
-        int modZ = Math.abs(adjustedZ) % totalSize;
-
-        if (adjustedX < 0 && modX != 0) modX = totalSize - modX;
-        if (adjustedZ < 0 && modZ != 0) modZ = totalSize - modZ;
-
-        if (modX < pathwayWidth || modZ < pathwayWidth) {
-            return null; // Standing on a pathway
+    /**
+     * True when both blocks are in the same plot, or both are outside every plot. Same answer as
+     * comparing two {@link #plotIdAt} results, without building strings.
+     */
+    public static boolean sameZone(World world, int x1, int y1, int z1, int x2, int y2, int z2) {
+        PlotIndex index = DatabaseManager.plotIndex();
+        if (index.hasBoundedPlots()) {
+            String name = world.getName();
+            Plot a = index.boundedAt(name, x1, y1, z1);
+            Plot b = index.boundedAt(name, x2, y2, z2);
+            if (a != null || b != null) return a == b;
         }
+        if (world != Market.getPlugin().getMarketWorld()) return true;
+        PlotGrid grid = Market.settings().grid();
+        boolean pathA = grid.isPathway(x1, z1);
+        boolean pathB = grid.isPathway(x2, z2);
+        if (pathA || pathB) return pathA == pathB;
+        return grid.cell(x1) == grid.cell(x2) && grid.cell(z1) == grid.cell(z2);
+    }
 
-        // Calculate plot ID based on grid coordinates
-        int plotX = (int) Math.floor((double) adjustedX / totalSize);
-        int plotZ = (int) Math.floor((double) adjustedZ / totalSize);
-        
-        return "plot_" + plotX + "_" + plotZ;
+    public static boolean sameZone(Block a, Block b) {
+        return sameZone(a.getWorld(), a.getX(), a.getY(), a.getZ(), b.getX(), b.getY(), b.getZ());
+    }
+
+    /** True when the block and its six neighbours are certainly in the same plot. */
+    public static boolean isGridInterior(Block block) {
+        return !DatabaseManager.plotIndex().hasBoundedPlots()
+                && Market.settings().grid().isInterior(block.getX(), block.getZ());
+    }
+
+    // ── Plot data ────────────────────────────────────────────────────────────
+
+    public static Plot getPlot(String plotId) {
+        return DatabaseManager.plotIndex().get(plotId);
     }
 
     public static void registerAutomaticPlot(String plotId) {
-        if (net.craftnepal.market.managers.DatabaseManager.plotExists(plotId)) {
-            return; // Already registered with boundaries
-        }
+        if (DatabaseManager.plotExists(plotId)) return;
+        int[] cell = PlotGrid.parseId(plotId);
+        if (cell == null) return;
 
-        String[] parts = plotId.split("_");
-        if (parts.length != 3) return;
-
-        int plotX = Integer.parseInt(parts[1]);
-        int plotZ = Integer.parseInt(parts[2]);
-
-        FileConfiguration config = Market.getMainConfig();
-        int plotSize = config.getInt("market-world.plot-size", 16);
-        int pathwayWidth = config.getInt("market-world.pathway-width", 3);
-        int totalSize = plotSize + pathwayWidth;
-
-        int startX = (plotX * totalSize) - (pathwayWidth / 2) + pathwayWidth;
-        int startZ = (plotZ * totalSize) - (pathwayWidth / 2) + pathwayWidth;
-
+        MarketSettings settings = Market.settings();
+        PlotGrid grid = settings.grid();
         World world = Market.getPlugin().getMarketWorld();
-        int maxHeight = config.getInt("market-world.max-height", 255);
-        Location min = new Location(world, startX, 64, startZ);
-        Location max = new Location(world, startX + plotSize - 1, maxHeight, startZ + plotSize - 1);
+        Location min = new Location(world, grid.minBlock(cell[0]), 64, grid.minBlock(cell[1]));
+        Location max = new Location(world, grid.maxBlock(cell[0]), settings.maxHeight(), grid.maxBlock(cell[1]));
+        DatabaseManager.savePlot(plotId, null, min, max, null);
+    }
 
-        net.craftnepal.market.managers.DatabaseManager.savePlot(plotId, null, min, max, null);
+    private static void ensureRegistered(String plotId) {
+        if (plotId != null && plotId.startsWith(PlotGrid.GRID_PREFIX) && !DatabaseManager.plotExists(plotId)) {
+            registerAutomaticPlot(plotId);
+        }
     }
 
     public static String getPlotOwner(String plotId) {
-        return net.craftnepal.market.managers.DatabaseManager.getPlotOwner(plotId);
+        return DatabaseManager.getPlotOwner(plotId);
     }
 
     public static String getPlotIdByPlayer(Player player) {
-        List<String> plots = net.craftnepal.market.managers.DatabaseManager.getAllPlotIds();
-        String playerUuid = player.getUniqueId().toString();
-
-        for (String plotId : plots) {
-            String owner = getPlotOwner(plotId);
-            if (owner != null && owner.equals(playerUuid)) {
-                return plotId;
-            }
+        String uuid = player.getUniqueId().toString();
+        for (Plot plot : DatabaseManager.plotIndex().all()) {
+            if (uuid.equals(plot.owner())) return plot.id();
         }
         return null;
     }
 
     public static int getPlotCount(Player player) {
-        List<String> plots = net.craftnepal.market.managers.DatabaseManager.getAllPlotIds();
+        String uuid = player.getUniqueId().toString();
         int count = 0;
-        String playerUuid = player.getUniqueId().toString();
-        for (String plotId : plots) {
-            String owner = getPlotOwner(plotId);
-            if (owner != null && owner.equals(playerUuid)) {
-                count++;
-            }
+        for (Plot plot : DatabaseManager.plotIndex().all()) {
+            if (uuid.equals(plot.owner())) count++;
         }
         return count;
     }
@@ -134,134 +128,72 @@ public class PlotUtils {
         if (player.hasPermission("market.plots.limit.unlimited")) {
             return Integer.MAX_VALUE;
         }
-
-        // Check for permission-based limits (highest one wins)
-        int limit = Market.getMainConfig().getInt("market-world.max-plots-per-player", 1);
-        
-        // This is a bit expensive but common for plot plugins
-        // We check from 100 down to the config limit
+        int limit = Market.settings().maxPlotsPerPlayer();
+        // ponytail: up to 100 permission checks, but only on /market plot claim.
         for (int i = 100; i > limit; i--) {
             if (player.hasPermission("market.plots.limit." + i)) {
                 return i;
             }
         }
-
         return limit;
     }
 
     public static boolean isSpawnPlot(String plotId) {
-        if (plotId == null || !plotId.startsWith("plot_")) return false;
-        try {
-            String[] parts = plotId.split("_");
-            if (parts.length != 3) return false;
-            int x = Integer.parseInt(parts[1]);
-            int z = Integer.parseInt(parts[2]);
-            int radius = Market.getMainConfig().getInt("market-world.spawn-radius", 1);
-            return x >= -radius && x < radius && z >= -radius && z < radius;
-        } catch (Exception e) {
-            return false;
-        }
+        return Market.settings().grid().isSpawnPlot(plotId);
     }
 
     public static boolean isSpawnLocation(Location location) {
         World marketWorld = Market.getPlugin().getMarketWorld();
-        if (marketWorld == null || !location.getWorld().equals(marketWorld)) {
-            return false;
-        }
-
-        FileConfiguration config = Market.getMainConfig();
-        int plotSize = config.getInt("market-world.plot-size", 16);
-        int pathwayWidth = config.getInt("market-world.pathway-width", 3);
-        int totalSize = plotSize + pathwayWidth;
-        int halfPath = pathwayWidth / 2;
-        int spawnRadius = config.getInt("market-world.spawn-radius", 1);
-        int symmetricRadius = spawnRadius * totalSize - (pathwayWidth - halfPath);
-
-        return Math.abs(location.getBlockX()) <= symmetricRadius && Math.abs(location.getBlockZ()) <= symmetricRadius;
-    }
-
-    public static boolean isPlotAvailable(String plotId) {
-        return getPlotOwner(plotId) == null;
+        if (marketWorld == null || location.getWorld() != marketWorld) return false;
+        return Market.settings().grid().isSpawnArea(location.getBlockX(), location.getBlockZ());
     }
 
     public static Location getPlotCenter(String plotId) {
-        if (!net.craftnepal.market.managers.DatabaseManager.plotExists(plotId) && plotId.startsWith("plot_")) {
-            registerAutomaticPlot(plotId);
-        }
-        Location min = net.craftnepal.market.managers.DatabaseManager.getPlotPosMin(plotId);
-        Location max = net.craftnepal.market.managers.DatabaseManager.getPlotPosMax(plotId);
+        ensureRegistered(plotId);
+        Location min = DatabaseManager.getPlotPosMin(plotId);
+        Location max = DatabaseManager.getPlotPosMax(plotId);
         if (min == null || max == null) return null;
-
-        return new Location(
-                min.getWorld(),
-                (min.getX() + max.getX()) / 2,
-                (min.getY()) + 1, // +1 to be above ground
-                (min.getZ() + max.getZ()) / 2
-        );
+        return new Location(min.getWorld(), (min.getX() + max.getX()) / 2, min.getY() + 1,
+                (min.getZ() + max.getZ()) / 2);
     }
 
     public static boolean isPlayerInOwnPlot(Player player) {
-        String plotId = getPlotIdByLocation(player.getLocation());
-        if (plotId == null) return false;
-
-        String owner = getPlotOwner(plotId);
-        return owner != null && owner.equals(player.getUniqueId().toString());
+        Plot plot = getPlot(getPlotIdByLocation(player.getLocation()));
+        return plot != null && player.getUniqueId().toString().equals(plot.owner());
     }
 
     public static Location getPlotSpawn(String plotId) {
-        if (!net.craftnepal.market.managers.DatabaseManager.plotExists(plotId) && plotId.startsWith("plot_")) {
-            registerAutomaticPlot(plotId);
-        }
-        return net.craftnepal.market.managers.DatabaseManager.getPlotSpawn(plotId);
+        ensureRegistered(plotId);
+        return DatabaseManager.getPlotSpawn(plotId);
     }
 
     public static Location getPlotPosMin(String plotId) {
-        if (!net.craftnepal.market.managers.DatabaseManager.plotExists(plotId) && plotId.startsWith("plot_")) {
-            registerAutomaticPlot(plotId);
-        }
-        return net.craftnepal.market.managers.DatabaseManager.getPlotPosMin(plotId);
+        ensureRegistered(plotId);
+        return DatabaseManager.getPlotPosMin(plotId);
     }
 
     public static Location getPlotPosMax(String plotId) {
-        if (!net.craftnepal.market.managers.DatabaseManager.plotExists(plotId) && plotId.startsWith("plot_")) {
-            registerAutomaticPlot(plotId);
-        }
-        return net.craftnepal.market.managers.DatabaseManager.getPlotPosMax(plotId);
+        ensureRegistered(plotId);
+        return DatabaseManager.getPlotPosMax(plotId);
     }
 
     /**
-     * Set the owner of a plot and update displays accordingly
-     * @param plotId The ID of the plot
-     * @param ownerUUID The UUID of the new owner, or null to unclaim
+     * Set the owner of a plot.
+     * @param ownerUUID the new owner's UUID, or null to unclaim
      */
     public static void setPlotOwner(String plotId, String ownerUUID) {
-        if (!net.craftnepal.market.managers.DatabaseManager.plotExists(plotId) && plotId.startsWith("plot_")) {
-            registerAutomaticPlot(plotId);
-        }
-        net.craftnepal.market.managers.DatabaseManager.setPlotOwner(plotId, ownerUUID);
+        ensureRegistered(plotId);
+        DatabaseManager.setPlotOwner(plotId, ownerUUID);
     }
 
     public static void setPlotSpawn(String plotId, Location location) {
-        if (!net.craftnepal.market.managers.DatabaseManager.plotExists(plotId) && plotId.startsWith("plot_")) {
-            registerAutomaticPlot(plotId);
-        }
-        net.craftnepal.market.managers.DatabaseManager.setPlotSpawn(plotId, location);
-    }
-
-    public static void teleportToPlotSpawn(Player player, String plotId) {
-        Location spawn = getPlotSpawn(plotId);
-        if (spawn != null) {
-            player.teleport(spawn);
-            SendMessage.sendPlayerMessage(player, "&aTeleported to plot spawn point!");
-        } else {
-            SendMessage.sendPlayerMessage(player, "&cThis plot doesn't have a spawn point set!");
-        }
+        ensureRegistered(plotId);
+        DatabaseManager.setPlotSpawn(plotId, location);
     }
 
     /**
-     * Teleport a player to their own plot's spawn point
-     * @param player The player to teleport
-     * @return true if teleported successfully, false if player doesn't own a plot or plot has no spawn
+     * Teleport a player to their own plot's spawn point.
+     * @return true if a teleport was scheduled
      */
     public static boolean teleportToOwnPlotSpawn(Player player) {
         String plotId = getPlotIdByPlayer(player);
@@ -269,15 +201,15 @@ public class PlotUtils {
             SendMessage.sendPlayerMessage(player, "&cYou don't own a plot!");
             return false;
         }
-        
+
         Location spawn = getPlotSpawn(plotId);
         if (spawn == null) {
             SendMessage.sendPlayerMessage(player, "&cYour plot doesn't have a spawn point set! Use /market setplotspawn to set one.");
             return false;
         }
         Location origin = player.getLocation();
-        SendMessage.sendPlayerMessage(player,"&eTeleporting in 5 seconds.. don't move!");
-        TeleportUtils.scheduleTeleport(player,spawn,()->{
+        SendMessage.sendPlayerMessage(player, "&eTeleporting in 5 seconds.. don't move!");
+        TeleportUtils.scheduleTeleport(player, spawn, () -> {
             if (!MarketUtils.isInMarketArea(origin)) {
                 PlayerUtils.saveLastLocation(player, origin);
             }
@@ -287,39 +219,26 @@ public class PlotUtils {
     }
 
     /**
-     * Comprehensive check if a player can interact with or modify a block at a given location.
-     *
-     * @param player The player performing the action
-     * @param location The location being interacted with
-     * @return true if allowed, false if denied
+     * Whether a player may build at or interact with a location: bypass, outside the market, or
+     * owner/member of the plot there. Pathways, spawn and anything above the height limit are denied.
      */
     public static boolean canPlayerInteract(Player player, Location location) {
-        if (net.craftnepal.market.subcommands.admin.Bypass.bypassPlayers.containsKey(player.getUniqueId())) {
-            return true;
-        }
-        if (!MarketUtils.isInMarketArea(location)) {
-            return true;
-        }
+        if (Bypass.bypassPlayers.containsKey(player.getUniqueId())) return true;
+        if (!MarketUtils.isInMarketArea(location)) return true;
+        return isTrusted(player, location.getWorld(), location.getBlockX(), location.getBlockY(), location.getBlockZ());
+    }
 
-        // Max-height restriction
-        int maxHeight = Market.getMainConfig().getInt("market-world.max-height", 255);
-        if (location.getBlockY() > maxHeight) {
-            return false;
-        }
+    public static boolean canPlayerInteract(Player player, Block block) {
+        if (Bypass.bypassPlayers.containsKey(player.getUniqueId())) return true;
+        if (!MarketUtils.isInMarketWorld(block.getWorld())) return true;
+        return isTrusted(player, block.getWorld(), block.getX(), block.getY(), block.getZ());
+    }
 
-        // Must be inside own plot (or be a member)
-        String plot = getPlotIdByLocation(location);
-        if (plot == null) {
-            // Pathway or spawn — no one builds here
-            return false;
-        }
-
-        String owner = getPlotOwner(plot);
-        if (owner != null && owner.equals(player.getUniqueId().toString())) {
-            return true;
-        }
-
-        List<String> members = net.craftnepal.market.managers.DatabaseManager.getPlotMembers(plot);
-        return members != null && members.contains(player.getUniqueId().toString());
+    private static boolean isTrusted(Player player, World world, int x, int y, int z) {
+        if (y > Market.settings().maxHeight()) return false;
+        Plot plot = getPlot(plotIdAt(world, x, y, z));
+        if (plot == null) return false; // pathway, spawn or unclaimed grid plot
+        String uuid = player.getUniqueId().toString();
+        return uuid.equals(plot.owner()) || plot.members().contains(uuid);
     }
 }

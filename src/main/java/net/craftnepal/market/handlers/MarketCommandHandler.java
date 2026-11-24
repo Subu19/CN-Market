@@ -2,7 +2,6 @@ package net.craftnepal.market.handlers;
 
 import net.craftnepal.market.Market;
 import net.craftnepal.market.Listeners.Movement;
-import net.craftnepal.market.files.RegionData;
 import net.craftnepal.market.utils.*;
 import org.bukkit.Location;
 import org.bukkit.Sound;

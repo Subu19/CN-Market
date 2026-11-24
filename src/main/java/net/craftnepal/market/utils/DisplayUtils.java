@@ -217,15 +217,4 @@ public class DisplayUtils {
     private String getDisplayName(ChestShop shop) {
         return ShopUtils.getShopDisplayName(shop);
     }
-
-    // ── Accessors ─────────────────────────────────────────────────────
-
-    public Map<String, Map<String, DisplayPair>> getMarketDisplays() {
-        return marketDisplays;
-    }
-
-    public DisplayPair getDisplayPair(String plotId, String shopId) {
-        Map<String, DisplayPair> plotDisplays = marketDisplays.get(plotId);
-        return plotDisplays != null ? plotDisplays.get(shopId) : null;
-    }
 }

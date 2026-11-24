@@ -1,7 +1,6 @@
 package net.craftnepal.market.managers;
 
 import net.craftnepal.market.Market;
-import net.craftnepal.market.files.RegionData;
 import net.craftnepal.market.world.MarketGenerator;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;

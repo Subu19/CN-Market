@@ -10,29 +10,6 @@ public class RegionUtils {
     private static HashMap<UUID, Integer> particleTimer = new HashMap<>();
     private static HashMap<UUID, Integer> tasks = new HashMap<>();
 
-    public static boolean isLocationInsideRegion(Location location, Location min, Location max) {
-        if (location == null || min == null || max == null)
-            return false;
-        if (!location.getWorld().equals(min.getWorld()) || !location.getWorld().equals(max.getWorld()))
-            return false;
-
-        double locX = location.getX();
-        double locY = location.getY();
-        double locZ = location.getZ();
-
-        double minX = Math.min(min.getX(), max.getX());
-        double minY = Math.min(min.getY(), max.getY());
-        double minZ = Math.min(min.getZ(), max.getZ());
-
-        double maxX = Math.max(min.getX(), max.getX());
-        double maxY = Math.max(min.getY(), max.getY());
-        double maxZ = Math.max(min.getZ(), max.getZ());
-
-        return locX >= minX && locX <= maxX &&
-                locY >= minY && locY <= maxY &&
-                locZ >= minZ && locZ <= maxZ;
-    }
-
     /** Toggles border particles around a region until toggled off or the player quits. */
     public static void visibleRegionBorders(Player player, Location min, Location max, Plugin plugin, Color color) {
         if (stopBorders(player.getUniqueId())) {

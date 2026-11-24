@@ -25,35 +25,6 @@ import java.util.stream.Collectors;
 
 public class ShopUtils {
 
-    public static Map<String, Integer> getAllShopItemKeysAndCountsByPlotID(String plotId) {
-        Map<String, Integer> itemCounts = new HashMap<>();
-        List<ChestShop> shops = DatabaseManager.getShopsByPlot(plotId);
-
-        for (ChestShop shop : shops) {
-            if (shop.isBuyingShop()) continue; // items a shop bought are not for sale
-            String key = getItemKey(shop);
-            int stock = getShopStock(shop); // Uses the database stock cache — fast!
-
-            if (stock > 0) {
-                itemCounts.put(key, itemCounts.getOrDefault(key, 0) + stock);
-            }
-        }
-        return itemCounts;
-    }
-
-    public static Map<Material, Integer> getAllShopItemsAndCountsByPlotID(String plotId) {
-        Map<Material, Integer> itemCounts = new HashMap<>();
-        Map<String, Integer> keyCounts = getAllShopItemKeysAndCountsByPlotID(plotId);
-        
-        for (Map.Entry<String, Integer> entry : keyCounts.entrySet()) {
-            Material mat = Material.matchMaterial(entry.getKey().split(":")[0]);
-            if (mat != null) {
-                itemCounts.put(mat, mat.getMaxStackSize() > 0 ? itemCounts.getOrDefault(mat, 0) + entry.getValue() : 0);
-            }
-        }
-        return itemCounts;
-    }
-
     /** Live, read-only view of every shop by id. */
     public static Map<String, ChestShop> getAllShops() {
         return DatabaseManager.shopIndex().asMap();
@@ -68,29 +39,6 @@ public class ShopUtils {
             }
         }
         return shops;
-    }
-
-    public static List<ChestShop> getPlotShopsByItemName(String plotId, String itemName) {
-        List<ChestShop> matchingShops = new ArrayList<>();
-        List<ChestShop> plotShops = DatabaseManager.getShopsByPlot(plotId);
-        for (ChestShop shop : plotShops) {
-            String materialName = shop.getItem().getType().toString();
-            if (materialName.equalsIgnoreCase(itemName) || materialName.replace("_", " ").equalsIgnoreCase(itemName)) {
-                matchingShops.add(shop);
-            }
-        }
-        return matchingShops;
-    }
-
-    public static List<ChestShop> getAllShopsByItemName(String itemName) {
-        List<ChestShop> matchingShops = new ArrayList<>();
-        for (ChestShop shop : DatabaseManager.shopIndex().all()) {
-            String materialName = shop.getItem().getType().toString();
-            if (materialName.equalsIgnoreCase(itemName) || materialName.replace("_", " ").equalsIgnoreCase(itemName)) {
-                matchingShops.add(shop);
-            }
-        }
-        return matchingShops;
     }
 
     public static ChestShop getShopAt(Location location) {

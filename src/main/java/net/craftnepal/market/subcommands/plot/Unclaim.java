@@ -2,7 +2,6 @@ package net.craftnepal.market.subcommands.plot;
 
 import me.kodysimpson.simpapi.command.SubCommand;
 import net.craftnepal.market.managers.DatabaseManager;
-import net.craftnepal.market.utils.DisplayUtils;
 import net.craftnepal.market.utils.PlotUtils;
 import net.craftnepal.market.utils.SendMessage;
 import net.craftnepal.market.Entities.ChestShop;
@@ -56,14 +55,18 @@ public class Unclaim extends SubCommand {
                 return;
             }
 
-            // Remove all shop displays then delete shops from database
-            List<ChestShop> shops = DatabaseManager.getShopsByPlot(plotId);
-            for (ChestShop shop : shops) {
-                DisplayUtils.getInstance().removeDisplayPair(plotId, shop.getId());
+            // The barrels stay in the world for the next owner: they must be empty first.
+            int stocked = 0;
+            for (ChestShop shop : DatabaseManager.getShopsByPlot(plotId)) {
+                if (!shop.isAdmin() && shop.getStock() > 0) stocked++;
+            }
+            if (stocked > 0) {
+                SendMessage.sendPlayerMessage(player, "&cEmpty your shop barrels first: " + stocked
+                        + " shop(s) still hold items, which the next owner of this plot would get.");
+                return;
             }
 
-            // Delete the entire plot (cascades to shops + members via FK)
-            DatabaseManager.deletePlot(plotId);
+            DatabaseManager.unclaimPlot(plotId);
 
             SendMessage.sendPlayerMessage(player, "&aYou have successfully unclaimed plot: " + plotId);
             player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1, 1);

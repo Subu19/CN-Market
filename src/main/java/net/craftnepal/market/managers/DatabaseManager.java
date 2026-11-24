@@ -268,6 +268,31 @@ public final class DatabaseManager {
         update("delete plot " + id, "DELETE FROM plots WHERE id = ?", id);
     }
 
+    /**
+     * Releases a plot: no owner, no members, no shops. The plot row and its bounds stay, so a
+     * manually defined plot remains claimable just like a grid plot.
+     */
+    public static void unclaimPlot(String id) {
+        Plot plot = plotIndex.get(id);
+        if (plot != null) {
+            plot.setOwner(null);
+            plot.members().clear();
+        }
+        for (ChestShop shop : shopIndex.byPlot(id)) {
+            shopIndex.remove(shop.getId());
+            DisplayUtils.getInstance().removeDisplayPair(id, shop.getId());
+        }
+        db.write("unclaim plot " + id, c -> {
+            for (String sql : new String[] {"UPDATE plots SET owner = NULL WHERE id = ?",
+                    "DELETE FROM plot_members WHERE plot_id = ?", "DELETE FROM shops WHERE plot_id = ?"}) {
+                try (PreparedStatement ps = c.prepareStatement(sql)) {
+                    ps.setString(1, id);
+                    ps.executeUpdate();
+                }
+            }
+        });
+    }
+
     public static List<String> getPlotMembers(String plotId) {
         Plot plot = plotIndex.get(plotId);
         return plot == null ? new ArrayList<>() : new ArrayList<>(plot.members());

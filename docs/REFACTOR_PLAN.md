@@ -606,7 +606,7 @@ Still needs a person with a client: `docs/PROTECTION_CHECKLIST.md` and the trade
 
 ---
 
-## Phase 10: Market world environment (2.1.0)
+## Phase 10: Market world environment (2.1.0) — done
 
 Asked for after 2.0.0: on CraftNepal the market world is kept calm by five WorldGuard global flags (pvp, mob-spawning, creeper-explosion, fire-spread deny; weather-lock clear). 2.0.0 only covers part of that, and its `rules` are off by default. A market world is a shopping hub, not survival land, so the plugin should ship it that way: sensible defaults on, each one switchable, no WorldGuard needed.
 
@@ -655,6 +655,20 @@ Optional, off by default:
 - Production copy: the five WorldGuard flags are matched with WorldGuard removed from the copy.
 
 Version 2.1.0. README, config comments and listing updated; the README's "leave these off if WorldGuard..." note goes.
+
+### Results (2026-11-25)
+
+Built as planned, with these changes:
+
+- `explosions` has two modes, `off` and `contained`. The planned `vanilla` would have behaved exactly like `contained` (plot protection always applies); `vanilla`, `on` and `true` are read as `contained`.
+- `GameRule` is a class in the Spigot 1.21 API and an interface in Paper and Spigot 26.x, so any direct call to it fails on one of them (`IncompatibleClassChangeError`). The rule is found by reflection and only `World` methods are called.
+- `SpawnReason.BUCKET` is not in the 1.21 API; it and `BUILD_COPPERGOLEM` are looked up by name.
+- Game rules the plugin set are recorded in the world's data, so turning an option off restores only those rules, never ones the admin set by hand.
+- The clean-up command is `/market admin clearmobs`; the settings command is `/market admin environment`.
+
+Tests: 6 new unit tests (29 total). `scripts/environment-test.sh` on fresh Paper 26.3 and Spigot 1.21.1: game rules set under each version's names, no natural mob in the market after 150 s, `summon` works, powered TNT stays a block, summoned TNT breaks nothing, fire next to planks neither spreads nor burns, `clearmobs animals` keeps the named cow; options switched to vanilla and back restore the rules both ways. Production copy without WorldGuard: defaults written into the existing config with comments, rules set, all 131 plots and 1981 shops load; an unnamed zombie is removed when its chunk loads again, named ones stay. The production market had no mobs in its central 256 chunks, so nothing changes for players there.
+
+Not tested automatically (needs a player): void rescue, PvP, fall damage, hunger, spawn eggs and the per-plot cap.
 
 ---
 

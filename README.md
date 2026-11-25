@@ -4,7 +4,7 @@
   # 🛒 CN-Market
   ### The Ultimate Minecraft Market Solution
   
-  [![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/Subu19/CN-Market)
+  [![Version](https://img.shields.io/badge/version-2.1.0-blue.svg)](https://github.com/Subu19/CN-Market)
   [![Platform](https://img.shields.io/badge/platform-Spigot%20%7C%20Paper-green.svg)](https://papermc.io/)
   [![Java](https://img.shields.io/badge/java-21-orange.svg)](https://www.oracle.com/java/)
   [![License](https://img.shields.io/badge/license-MIT-red.svg)](LICENSE)
@@ -85,6 +85,8 @@ Shops: place a barrel on your plot, then right-click it to create a selling or b
 | `/market admin toggleborder plot [plotId]` | Show plot borders. |
 | `/market admin selectionmode <mode>` | Select plot corners by hand. |
 | `/market admin bypass` | Toggle bypassing plot protection. |
+| `/market admin environment` | Show the market world environment settings. Console allowed. |
+| `/market admin clearmobs <hostile\|animals\|all>` | Remove unowned mobs from the market world. Console allowed. |
 | `/market admin reset confirm` | Delete the market world and **all** plot and shop data. Console allowed. |
 
 ---
@@ -110,7 +112,7 @@ Player permissions are granted to everyone by default; negate them in your permi
 `config.yml` is commented. The main keys:
 
 - `market-world.max-plots-per-player`, `max-height`, `spawn-radius` (unclaimable plots around 0,0).
-- `market-world.rules`: optional `no-pvp`, `no-monsters`, `no-hunger`, `no-fall-damage` for the market world, all off by default. Leave them off if WorldGuard or another plugin already handles this.
+- `market-world.environment`: how the market world behaves (see below).
 - `market-world.allowed-interact-blocks`: blocks anyone may use anywhere (ender chests, crafting tables).
 - `player-shop-blacklist`: items players cannot sell.
 - `admin-shops` and `currency-exchange`: the dynamic pricing limits.
@@ -120,15 +122,40 @@ Data lives in `plugins/Market/market.db` (SQLite). Prices are in `price.yml` (ba
 
 ---
 
+## 🌤️ Market world environment
+
+The market world is a shopping hub, so by default it is calm. Every line is a switch in `market-world.environment`; set it to the vanilla value to hand that part back to the game or another plugin (such as WorldGuard). `/market admin environment` shows what is in effect.
+
+| Key | Default | Effect |
+| :--- | :--- | :--- |
+| `mob-spawning` | `false` | Mobs never spawn on their own, animals included: no monsters, phantoms, patrols, wandering traders, raids. Players can still use spawn eggs and buckets on their plot, breed animals and build golems. |
+| `hostile-mobs` | `false` | No hostile mobs by any player route: eggs, spawners, building a wither. Hostile mobs already in the world are removed as their chunks load (named ones are kept). |
+| `pvp` | `false` | No player-versus-player damage of any kind. |
+| `explosions` | `off` | `off`: TNT, creepers, end crystals and respawn anchors do nothing. `contained`: explosions only damage blocks in their own plot. |
+| `fire-spread` | `false` | Fire never spreads or burns blocks away and lava lights nothing. Fire a player lights on their own plot stays. |
+| `weather` | `clear` | `clear` or `cycle`. |
+| `time` | `cycle` | `cycle` or `day` (always noon). |
+| `hunger` | `false` | Food does not drop. |
+| `fall-damage` | `false` | Flight is allowed in the market; landings do not hurt. |
+| `void-rescue` | `true` | Falling into the void returns the player to the market spawn. |
+| `max-mobs-per-plot` | `0` | Breeding, eggs and buckets stop once a plot holds this many mobs. `0` = no cap. |
+
+Where the world has its own setting (game rules, the PvP flag, weather) the plugin sets it, and sets it back if you turn the option off again. `/market admin clearmobs <hostile|animals|all>` removes mobs already in the world; it never touches named, tamed, leashed or ridden mobs, or villagers.
+
+---
+
 ## 🛡️ Protection
 
 Inside the market world only plot owners, members and admins can change a plot. Explosions, fire, pistons, fluids, growth, dispensers, projectiles, vehicles and entities cannot cross a plot border. Pathways and the spawn area are protected for everyone except admins. The full list is in [`docs/PROTECTION_CHECKLIST.md`](docs/PROTECTION_CHECKLIST.md).
 
 ---
 
-## 🔄 Upgrading from 1.x
+## 🔄 Upgrading
 
-Replace the jar and restart. Existing `market.db`, `config.yml` and prices load unchanged. Note that player permissions now default to everyone, and the unused `market.admin.*` child permissions are gone: grant `market.admin` instead.
+Replace the jar and restart. Existing `market.db`, `config.yml` and prices load unchanged; new config keys are added with their defaults.
+
+- **From 1.x:** player permissions now default to everyone, and the unused `market.admin.*` child permissions are gone: grant `market.admin` instead.
+- **To 2.1:** the market world environment is on by default (no mobs, PvP, explosions, fire spread, hunger or fall damage; clear weather). If WorldGuard flags handled this before, they can go. 2.0.0's `market-world.rules` section is no longer read.
 
 ---
 

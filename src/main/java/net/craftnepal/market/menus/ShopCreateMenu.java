@@ -4,10 +4,10 @@ import me.kodysimpson.simpapi.menu.Menu;
 import me.kodysimpson.simpapi.menu.PlayerMenuUtility;
 import net.craftnepal.market.Entities.ChestShop;
 import net.craftnepal.market.Market;
-import net.craftnepal.market.files.RegionData;
 import net.craftnepal.market.managers.DynamicPriceManager;
 import net.craftnepal.market.utils.DisplayUtils;
 import net.craftnepal.market.utils.LocationUtils;
+import net.craftnepal.market.utils.SendMessage;
 import net.craftnepal.market.utils.ShopUtils;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
@@ -113,11 +113,11 @@ public class ShopCreateMenu extends Menu {
                         : realMeta.getEnchants().entrySet()) {
                     String enchantName = entry.getKey().getKey().getKey().toUpperCase();
                     int enchantLevel = entry.getValue();
-                    int enchantPrice = net.craftnepal.market.files.PriceData.getEnchantmentPrice(enchantName, enchantLevel);
+                    double enchantPrice = net.craftnepal.market.files.PriceData.getEnchantmentPrice(enchantName, enchantLevel);
                     String displayName = net.craftnepal.market.utils.ShopUtils.formatKey(enchantName)
                             + " " + toRoman(enchantLevel);
                     lore.add(ChatColor.DARK_GRAY + "  + " + displayName + ": "
-                            + ChatColor.GRAY + String.format("%.2f", (double) enchantPrice));
+                            + ChatColor.GRAY + String.format("%.2f", enchantPrice));
                 }
             }
 
@@ -202,6 +202,13 @@ public class ShopCreateMenu extends Menu {
     }
 
     private void createShop() {
+        // An item missing from price.yml has no fair price; a shop at 0 would give it away.
+        if (currentPrice <= 0) {
+            playerMenuUtility.getOwner().closeInventory();
+            SendMessage.sendPlayerMessage(playerMenuUtility.getOwner(),
+                    "&cThis item has no market price yet. Ask an admin to add it to price.yml.");
+            return;
+        }
         UUID uuid = playerMenuUtility.getOwner().getUniqueId();
         String shopId = UUID.randomUUID().toString();
 
@@ -210,7 +217,9 @@ public class ShopCreateMenu extends Menu {
         // Count stock initially to cache it correctly in SQLite
         int initialStock = ShopUtils.getPhysicalBarrelStock(chestShop);
         
-        // Save to SQLite database
+        // The shops table references plots: a grid plot (e.g. the spawn plot for admin shops)
+        // must have a row before its first shop is saved.
+        net.craftnepal.market.utils.PlotUtils.registerAutomaticPlot(plotId);
         net.craftnepal.market.managers.DatabaseManager.saveShop(chestShop, plotId, initialStock);
 
         playerMenuUtility.getOwner().closeInventory();

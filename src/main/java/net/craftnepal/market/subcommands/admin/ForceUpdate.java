@@ -28,13 +28,13 @@ public class ForceUpdate extends SubCommand {
     @Override
     public void perform(CommandSender sender, String[] args) {
         if (!sender.hasPermission("market.admin")) {
-            SendMessage.sendPlayerMessage((Player) sender, "§cYou don't have permission.");
+            SendMessage.sendPlayerMessage(sender, "§cYou don't have permission.");
             return;
         }
 
-        SendMessage.sendPlayerMessage((Player) sender, "§aForcing dynamic price update...");
+        SendMessage.sendPlayerMessage(sender, "§aForcing dynamic price update...");
         DynamicPriceManager.triggerDailyUpdate();
-        SendMessage.sendPlayerMessage((Player) sender, "§aUpdate complete.");
+        SendMessage.sendPlayerMessage(sender, "§aUpdate complete.");
     }
 
     @Override

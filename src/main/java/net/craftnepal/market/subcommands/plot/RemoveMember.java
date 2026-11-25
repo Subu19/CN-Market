@@ -1,7 +1,6 @@
 package net.craftnepal.market.subcommands.plot;
 
 import me.kodysimpson.simpapi.command.SubCommand;
-import net.craftnepal.market.files.RegionData;
 import net.craftnepal.market.utils.PlotUtils;
 import net.craftnepal.market.utils.SendMessage;
 import org.bukkit.Bukkit;
@@ -27,7 +26,7 @@ public class RemoveMember extends SubCommand {
 
     @Override
     public String getSyntax() {
-        return "/market removemember <player>";
+        return "/market plot removemember <player>";
     }
 
     @Override
@@ -41,14 +40,14 @@ public class RemoveMember extends SubCommand {
         }
 
         if (args.length < 2) {
-            SendMessage.sendPlayerMessage(player, "§cUsage: /market removemember <player>");
+            SendMessage.sendPlayerMessage(player, "§cUsage: /market plot removemember <player>");
             return;
         }
 
         String targetName = args[1];
-        OfflinePlayer target = Bukkit.getOfflinePlayer(targetName);
+        OfflinePlayer target = net.craftnepal.market.utils.PlayerUtils.findKnownPlayer(targetName);
 
-        if (!target.hasPlayedBefore() && !target.isOnline()) {
+        if (target == null) {
             SendMessage.sendPlayerMessage(player, "§cPlayer not found.");
             return;
         }
@@ -87,10 +86,7 @@ public class RemoveMember extends SubCommand {
                 List<String> memberNames = new ArrayList<>();
                 List<String> members = net.craftnepal.market.managers.DatabaseManager.getPlotMembers(plotId);
                 for (String uuidStr : members) {
-                    OfflinePlayer p = Bukkit.getOfflinePlayer(UUID.fromString(uuidStr));
-                    if (p.getName() != null) {
-                        memberNames.add(p.getName());
-                    }
+                    memberNames.add(net.craftnepal.market.utils.PlayerUtils.getName(UUID.fromString(uuidStr)));
                 }
                 return memberNames;
             }

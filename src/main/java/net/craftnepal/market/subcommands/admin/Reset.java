@@ -2,8 +2,6 @@ package net.craftnepal.market.subcommands.admin;
 
 import me.kodysimpson.simpapi.command.SubCommand;
 import net.craftnepal.market.Market;
-import net.craftnepal.market.files.LocationData;
-import net.craftnepal.market.files.RegionData;
 import net.craftnepal.market.utils.DisplayUtils;
 import net.craftnepal.market.utils.SendMessage;
 import org.bukkit.Bukkit;
@@ -27,14 +25,12 @@ public class Reset extends SubCommand {
 
     @Override
     public String getSyntax() {
-        return "/amarket reset confirm";
+        return "/market admin reset confirm";
     }
 
     @Override
     public void perform(CommandSender sender, String[] args) {
-        if (!(sender instanceof Player))
-            return;
-        Player player = (Player) sender;
+                CommandSender player = sender; // console allowed
 
         if (!player.hasPermission("market.admin")) {
             SendMessage.sendPlayerMessage(player,
@@ -45,7 +41,7 @@ public class Reset extends SubCommand {
         if (args.length < 2 || !args[1].equalsIgnoreCase("confirm")) {
             SendMessage.sendPlayerMessage(player,
                     "§c§lWARNING: This will delete the market world and ALL plot/shop data!");
-            SendMessage.sendPlayerMessage(player, "§cTo proceed, type: §f/amarket reset confirm");
+            SendMessage.sendPlayerMessage(player, "§cTo proceed, type: §f/market admin reset confirm");
             return;
         }
 
@@ -131,6 +127,7 @@ public class Reset extends SubCommand {
             // 5. Update config
             Market.getMainConfig().set("market-world.name", null);
             Market.getPlugin().saveConfig();
+            Market.applyConfigChanges();
 
             SendMessage.sendPlayerMessage(player, "§a§lMarket system reset successfully!");
             SendMessage.sendPlayerMessage(player, "§eUse §f/market admin setup §eto start over.");

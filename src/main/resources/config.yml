@@ -1,6 +1,5 @@
 # Market chat prefix — supports & color codes
 prefix: "&2&l[&a&lMarket&2&l] &a"
-join-message: "&eHello there! %player%"
 
 
 # Allow players to fly within the market world
@@ -12,10 +11,24 @@ allow-flight: true
 # in the market world, as it stops rendering displays that are far away.
 display-view-range: 0.25
 
-# Note: Player protection (damage, hunger, mob spawning) is now handled by WorldGuard and Paper.
-
 market-world:
-  # Maximum height players can build in their plots
+  # Set by /market admin setup; shown here for reference. Do not change them on a live market:
+  # plot positions are computed from plot-size and pathway-width.
+  # name: "market"
+  # plot-size: 16
+  # pathway-width: 3
+
+  # Maximum Y players can build at in their plots
+  max-height: 255
+
+  # Optional rules for the market world, all off by default. Turn them on if no other plugin
+  # (WorldGuard, Essentials...) already handles these.
+  rules:
+    no-pvp: false
+    no-monsters: false     # stops hostile mobs spawning naturally; spawn eggs still work
+    no-hunger: false
+    no-fall-damage: false
+
   # Optional: WorldEdit schematic for pathways (relative to plugin folder)
   # If provided, the generator will skip material-based pathway generation
   # and paste this schematic instead.
@@ -29,6 +42,15 @@ market-world:
   # Maximum number of plots a player can claim.
   # You can also use permissions: market.plots.limit.<number> to override this.
   max-plots-per-player: 1
+
+  # The protected spawn area: the plots within spawn-radius plots of 0,0 cannot be claimed or
+  # built on. It is always centred on 0,0, even after /market admin setspawn moves the point
+  # where players arrive.
+  spawn-radius: 1
+
+  # Players who die in the market world respawn at the market spawn, unless they have a bed or
+  # respawn anchor. Set to false to use the server's normal respawn point.
+  respawn-at-market-spawn: true
 
   # Blocks that anyone can interact with anywhere in the market world
   # (e.g. Ender Chests, Crafting Tables)
@@ -61,7 +83,7 @@ currency-exchange:
   # The material name of the currency item (case-insensitive)
   currency-item: "DIAMOND"
   
-  # Pricing model to use: CPI_PEG (Consumer Price Index) or TRANSACTION_FLOW (default)
+  # Pricing model to use. Only CPI_PEG (Consumer Price Index) is implemented.
   pricing-model: "CPI_PEG"
   
   # Min and max multipliers of the base price for the currency item.

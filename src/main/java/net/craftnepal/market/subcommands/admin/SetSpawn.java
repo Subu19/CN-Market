@@ -1,7 +1,6 @@
 package net.craftnepal.market.subcommands.admin;
 
 import me.kodysimpson.simpapi.command.SubCommand;
-import net.craftnepal.market.files.RegionData;
 import org.bukkit.Location;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -34,6 +33,11 @@ public class SetSpawn extends SubCommand {
         if (commandSender instanceof Player) {
             Player p = (Player) commandSender;
             Location location = p.getLocation();
+            // Saving elsewhere would also overwrite that other world's spawn point.
+            if (!net.craftnepal.market.utils.MarketUtils.isInMarketWorld(location.getWorld())) {
+                net.craftnepal.market.utils.SendMessage.sendPlayerMessage(p, "&cStand in the market world to set its spawn.");
+                return;
+            }
             
             // Save to SQLite database
             net.craftnepal.market.managers.DatabaseManager.setMarketSpawn(location);

@@ -2,8 +2,8 @@ package net.craftnepal.market.subcommands.admin;
 
 import me.kodysimpson.simpapi.command.SubCommand;
 import net.craftnepal.market.Market;
-import net.craftnepal.market.files.RegionData;
 import net.craftnepal.market.utils.PlotUtils;
+import net.craftnepal.market.utils.SendMessage;
 import net.craftnepal.market.utils.RegionUtils;
 import org.bukkit.Color;
 import org.bukkit.Location;
@@ -32,7 +32,7 @@ public class ToggleBorder extends SubCommand {
 
     @Override
     public String getSyntax() {
-        return "/amarket toggleborder <region> [plot number]";
+        return "/market admin toggleborder plot [plotId]";
     }
 
     @Override
@@ -40,6 +40,10 @@ public class ToggleBorder extends SubCommand {
         if(commandSender instanceof Player){
             Player player = (Player) commandSender;
 
+            if (strings.length < 2) {
+                SendMessage.sendPlayerMessage(player, "&cUsage: " + getSyntax());
+                return;
+            }
             if(Objects.equals(strings[1], "plot" )){
                 String plotId = null;
                 if(strings.length == 3){
@@ -61,7 +65,7 @@ public class ToggleBorder extends SubCommand {
                     player.sendMessage("No plot found at your location. Please specify a plot ID.");
                 }
             }else{
-                player.sendMessage("Invalid usage. /amarket toggleborder plot [plotId]");
+                player.sendMessage("Invalid usage. /market admin toggleborder plot [plotId]");
             }
 
         }

@@ -32,6 +32,11 @@ public class DynamicPriceManager {
 
     private static final long UPDATE_INTERVAL_MS = 24L * 60L * 60L * 1000L; // 24 hours
 
+    // Both files are kept in memory and written on a timer, not on every buy or sell.
+    private static boolean pricesDirty;
+    private static boolean metricsDirty;
+    private static long lastUpdate;
+
     public static void setup() {
         dynamicPricesFile = new File(Market.getPlugin().getDataFolder(), "dynamic_prices.yml");
         if (!dynamicPricesFile.exists()) {
@@ -52,19 +57,65 @@ public class DynamicPriceManager {
             }
         }
         metricsConfig = YamlConfiguration.loadConfiguration(metricsFile);
+        lastUpdate = metricsConfig.getLong("last_update", 0L);
 
-        // Schedule the periodic check every 5 minutes (6000 ticks)
-        Bukkit.getScheduler().runTaskTimerAsynchronously(Market.getPlugin(), () -> {
-            long lastUpdate = metricsConfig.getLong("last_update", 0L);
+        // Every 5 minutes (6000 ticks): run the daily update when due, then write changed files.
+        Bukkit.getScheduler().runTaskTimer(Market.getPlugin(), () -> {
             if (System.currentTimeMillis() - lastUpdate >= UPDATE_INTERVAL_MS) {
-                // Time to update!
-                Bukkit.getScheduler().runTask(Market.getPlugin(), DynamicPriceManager::triggerDailyUpdate);
+                triggerDailyUpdate();
             }
+            flush(false);
         }, 6000L, 6000L);
     }
 
+    /**
+     * Writes changed files. The YAML text is built here on the server thread; with
+     * {@code async} the disk write happens on a background thread. Call with false on disable.
+     */
+    public static void flush(boolean async) {
+        if (pricesDirty) {
+            pricesDirty = false;
+            write(dynamicPricesFile, dynamicPricesConfig.saveToString(), async);
+        }
+        if (metricsDirty) {
+            metricsDirty = false;
+            write(metricsFile, metricsConfig.saveToString(), async);
+        }
+    }
+
+    // Snapshot numbers per file, so an older async write that runs late never replaces a newer one.
+    private static final java.util.Map<File, Long> latestSnapshot = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.Map<File, Long> writtenSnapshot = new java.util.HashMap<>(); // guarded by class lock
+
+    private static void write(File file, String yaml, boolean async) {
+        long snapshot = latestSnapshot.merge(file, 1L, Long::sum);
+        if (async) {
+            Bukkit.getScheduler().runTaskAsynchronously(Market.getPlugin(), () -> writeNow(file, yaml, snapshot));
+        } else {
+            writeNow(file, yaml, snapshot);
+        }
+    }
+
+    /** Write to a temp file and move it over the old one, so a crash never leaves half a file. */
+    private static synchronized void writeNow(File file, String yaml, long snapshot) {
+        if (writtenSnapshot.getOrDefault(file, 0L) > snapshot) return;
+        writtenSnapshot.put(file, snapshot);
+        try {
+            java.nio.file.Path tmp = file.toPath().resolveSibling(file.getName() + ".tmp");
+            java.nio.file.Files.writeString(tmp, yaml);
+            try {
+                java.nio.file.Files.move(tmp, file.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                        java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+            } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                java.nio.file.Files.move(tmp, file.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException e) {
+            Bukkit.getLogger().severe("[Market] Could not save " + file.getName() + ": " + e.getMessage());
+        }
+    }
+
     public static double getDynamicPrice(String itemKey) {
-        Integer basePrice = PriceData.getPrice(itemKey);
+        Double basePrice = PriceData.getPrice(itemKey);
         if (basePrice == null || basePrice <= 0) return 0;
 
         if (dynamicPricesConfig.contains(itemKey + ".price")) {
@@ -72,7 +123,7 @@ public class DynamicPriceManager {
             // this entry was last seeded. We store the base that was used to seed
             // the dynamic price as a ".base" field. If it differs from the current
             // PriceData value, the admin edited price.yml — reset the dynamic price.
-            int storedBase = dynamicPricesConfig.getInt(itemKey + ".base", -1);
+            double storedBase = dynamicPricesConfig.getDouble(itemKey + ".base", -1);
             if (storedBase == -1) {
                 // Migration: Existing config has .price but no .base. 
                 // Set .base to current basePrice to track future changes, but do NOT reset the economy.
@@ -190,9 +241,11 @@ public class DynamicPriceManager {
         Map<String, Integer> totalStockMap = new HashMap<>();
         Map<String, ChestShop> allShops = ShopUtils.getAllShops();
         java.util.Set<String> adminShopKeys = new java.util.HashSet<>();
+        shopsByKey = new HashMap<>();
 
         for (ChestShop shop : allShops.values()) {
             String key = ShopUtils.getItemKey(shop);
+            shopsByKey.computeIfAbsent(key.toLowerCase(java.util.Locale.ROOT), k -> new ArrayList<>()).add(shop);
             if (shop.isAdmin()) {
                 adminShopKeys.add(key);
                 continue; // Admin shops have infinite supply, ignore for market balance
@@ -205,6 +258,7 @@ public class DynamicPriceManager {
         
         // We will process every material that has either base price or stock or purchases
         boolean pricesChanged = false;
+        java.util.Set<String> changedToday = new java.util.HashSet<>();
         
         // To compute over all active keys, we take materials + any recorded stock/purchases
         java.util.Set<String> allKeys = new java.util.HashSet<>(totalStockMap.keySet());
@@ -214,7 +268,7 @@ public class DynamicPriceManager {
         }
         
         for (String itemKey : allKeys) {
-            Integer basePrice = PriceData.getPrice(itemKey);
+            Double basePrice = PriceData.getPrice(itemKey);
             if (basePrice == null || basePrice <= 0) continue;
 
             double currentPrice = getDynamicPrice(itemKey);
@@ -274,6 +328,7 @@ public class DynamicPriceManager {
                     dynamicPricesConfig.set(itemKey + ".price", newPrice);
                     dynamicPricesConfig.set(itemKey + ".trend", trend);
                     pricesChanged = true;
+                    changedToday.add(itemKey);
 
                     Bukkit.getLogger().info("[Market] Admin item " + itemKey + " price changed by " + String.format("%.1f%%", trend * 100) + " (New: " + newPrice + ")");
                     
@@ -319,6 +374,7 @@ public class DynamicPriceManager {
                         dynamicPricesConfig.set(itemKey + ".price", newPrice);
                         dynamicPricesConfig.set(itemKey + ".trend", trend);
                         pricesChanged = true;
+                        changedToday.add(itemKey);
                         
                         Bukkit.getLogger().info("[Market] " + itemKey + " price changed by " + String.format("%.1f%%", trend * 100) + " (New: " + newPrice + ")");
                         
@@ -326,6 +382,14 @@ public class DynamicPriceManager {
                         autoScaleShops(itemKey, actualMultiplier);
                     }
                 }
+            }
+        }
+
+        // A trend shows the last change; an item whose price did not move today shows none.
+        for (String key : dynamicPricesConfig.getKeys(false)) {
+            if (!changedToday.contains(key) && dynamicPricesConfig.getDouble(key + ".trend", 0.0) != 0.0) {
+                dynamicPricesConfig.set(key + ".trend", 0.0);
+                pricesChanged = true;
             }
         }
 
@@ -339,35 +403,36 @@ public class DynamicPriceManager {
         metricsConfig.set("purchased_today", null);
         metricsConfig.set("admin_purchased_today", null);
         metricsConfig.set("admin_sold_today", null);
-        metricsConfig.set("last_update", System.currentTimeMillis());
+        lastUpdate = System.currentTimeMillis();
+        metricsConfig.set("last_update", lastUpdate);
         saveMetrics();
+        flush(true);
     }
 
+    /** Shops grouped by lower-case item key, built once per daily update. */
+    private static Map<String, List<ChestShop>> shopsByKey = new HashMap<>();
+
+    /**
+     * Moves player selling shops with the market price, kept inside the same 0.85x-1.5x band of the
+     * new fair price that shop creation allows. Admin shops are priced live and buying shops set
+     * their own offer, so neither is touched.
+     */
     private static void autoScaleShops(String itemKey, double multiplier) {
-        for (ChestShop shop : DatabaseManager.getAllShops()) {
-            if (ShopUtils.getItemKey(shop).equalsIgnoreCase(itemKey)) {
-                double oldPrice = shop.getPrice();
-                double newShopPrice = oldPrice * multiplier;
-                shop.setPrice(newShopPrice);
-                DatabaseManager.updateShopPrice(shop.getId(), newShopPrice);
-            }
+        for (ChestShop shop : shopsByKey.getOrDefault(itemKey.toLowerCase(java.util.Locale.ROOT), List.of())) {
+            if (shop.isAdmin() || shop.isBuyingShop()) continue;
+            double fair = getDynamicPrice(shop.getItem());
+            double price = shop.getPrice() * multiplier;
+            if (fair > 0) price = Math.max(fair * 0.85, Math.min(fair * 1.50, price));
+            DatabaseManager.updateShopPrice(shop.getId(), price);
         }
     }
 
     private static void saveDynamicPrices() {
-        try {
-            dynamicPricesConfig.save(dynamicPricesFile);
-        } catch (IOException e) {
-            Bukkit.getLogger().severe("Could not save dynamic_prices.yml");
-        }
+        pricesDirty = true;
     }
 
     private static void saveMetrics() {
-        try {
-            metricsConfig.save(metricsFile);
-        } catch (IOException e) {
-            Bukkit.getLogger().severe("Could not save market_metrics.yml");
-        }
+        metricsDirty = true;
     }
 
     private static double calculateCPIPrice(String itemKey, double basePrice) {
@@ -386,7 +451,7 @@ public class DynamicPriceManager {
         Map<String, ChestShop> allShops = ShopUtils.getAllShops();
 
         for (String basketItem : basketItems) {
-            Integer itemBase = PriceData.getPrice(basketItem);
+            Double itemBase = PriceData.getPrice(basketItem);
             if (itemBase == null || itemBase <= 0) continue;
 
             baselineIndex += itemBase;
@@ -453,6 +518,9 @@ public class DynamicPriceManager {
         }
         if (metricsFile != null) {
             metricsConfig = YamlConfiguration.loadConfiguration(metricsFile);
+            lastUpdate = metricsConfig.getLong("last_update", 0L);
         }
+        pricesDirty = false;
+        metricsDirty = false;
     }
 }

@@ -3,7 +3,6 @@ package net.craftnepal.market.subcommands.admin;
 import me.kodysimpson.simpapi.colors.ColorTranslator;
 import me.kodysimpson.simpapi.command.SubCommand;
 import net.craftnepal.market.Market;
-import net.craftnepal.market.files.RegionData;
 import net.craftnepal.market.utils.SendMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
@@ -34,7 +33,7 @@ public class ListPlots extends SubCommand {
 
     @Override
     public String getSyntax() {
-        return "/amarket listplots";
+        return "/market admin listplots";
     }
 
     @Override

@@ -7,6 +7,7 @@ import me.kodysimpson.simpapi.menu.MenuManager;
 import me.kodysimpson.simpapi.menu.PlayerMenuUtility;
 import net.craftnepal.market.Entities.ChestShop;
 import net.craftnepal.market.utils.ShopUtils;
+import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -21,6 +22,10 @@ public class AllItemsMenu extends Menu {
     private String searchQuery = null;
     private Map<String, Integer> itemStocks = new HashMap<>();
     private Map<String, ChestShop> representativeShops = new HashMap<>();
+    /** Items sold by an admin shop, which has unlimited stock. */
+    private final java.util.Set<String> adminKeys = new java.util.HashSet<>();
+    /** Menu slot → item key, so clicks never depend on item names. */
+    private final Map<Integer, String> slotKeys = new HashMap<>();
 
     public AllItemsMenu(PlayerMenuUtility playerMenuUtility) {
         super(playerMenuUtility);
@@ -55,9 +60,17 @@ public class AllItemsMenu extends Menu {
         // Calculate global stock for each item dynamically
         itemStocks.clear();
         representativeShops.clear();
-        Map<String, ChestShop> allShops = ShopUtils.getAllShops();
-        for (ChestShop shop : allShops.values()) {
+        adminKeys.clear();
+        slotKeys.clear();
+        for (ChestShop shop : ShopUtils.getAllShops().values()) {
+            if (shop.isBuyingShop()) continue; // buys from players; nothing to buy here
             String key = ShopUtils.getItemKey(shop);
+            if (shop.isAdmin()) {
+                adminKeys.add(key);
+                itemStocks.putIfAbsent(key, 0);
+                representativeShops.putIfAbsent(key, shop);
+                continue;
+            }
             int stock = ShopUtils.getShopStock(shop);
             if (stock > 0) {
                 itemStocks.put(key, itemStocks.getOrDefault(key, 0) + stock);
@@ -101,7 +114,8 @@ public class AllItemsMenu extends Menu {
             String trendStr = net.craftnepal.market.managers.DynamicPriceManager.getTrendString(itemKey);
             
             List<String> lore = new ArrayList<>();
-            lore.add(ChatColor.GRAY + "Global Stock: " + ChatColor.GREEN + count);
+            lore.add(ChatColor.GRAY + "Global Stock: " + ChatColor.GREEN + count
+                    + (adminKeys.contains(key) ? ChatColor.LIGHT_PURPLE + " + admin shop (unlimited)" : ""));
             if (dynamicPrice > 0) {
                 lore.add(ChatColor.GRAY + "Market Price: " + ChatColor.GOLD + net.craftnepal.market.utils.EconomyUtils.format(dynamicPrice) + " " + trendStr);
             }
@@ -110,7 +124,10 @@ public class AllItemsMenu extends Menu {
 
             meta.setLore(lore);
             itemStack.setItemMeta(meta);
-            inventory.addItem(itemStack);
+            int slot = inventory.firstEmpty();
+            if (slot < 0) break;
+            inventory.setItem(slot, itemStack);
+            slotKeys.put(slot, key);
         }
 
         // Navigation
@@ -132,45 +149,38 @@ public class AllItemsMenu extends Menu {
         inventory.setItem(53, makeItem(Material.BARRIER, ChatColor.RED + "Back to Main Menu"));
     }
 
+    private boolean isArrow(int slot) {
+        ItemStack item = inventory.getItem(slot);
+        return item != null && item.getType() == Material.ARROW;
+    }
+
     @Override
     public void handleMenu(InventoryClickEvent event) {
-        ItemStack clickedItem = event.getCurrentItem();
-        if (clickedItem == null || !clickedItem.hasItemMeta()) return;
+        // Matched by slot in this menu, never by an item's name.
+        int slot = event.getRawSlot();
+        if (slot >= getSlots()) return;
+        String matchedKey = slotKeys.get(slot);
 
-        String displayName = ChatColor.stripColor(clickedItem.getItemMeta().getDisplayName());
-
-        if (displayName.equals("Previous Page")) {
+        if (slot == 48 && isArrow(48)) {
             currentPage--;
             setMenuItems();
-        } else if (displayName.equals("Next Page")) {
+        } else if (slot == 50 && isArrow(50)) {
             currentPage++;
             setMenuItems();
-        } else if (displayName.equals("Back to Main Menu")) {
+        } else if (slot == 53) {
             try {
                 MenuManager.openMenu(ShopMainMenu.class, playerMenuUtility.getOwner());
             } catch (MenuManagerException | MenuManagerNotSetupException e) {
-                e.printStackTrace();
+                Bukkit.getLogger().warning("[Market] Could not open main menu: " + e.getMessage());
             }
-        } else if (!clickedItem.getType().equals(Material.BLUE_STAINED_GLASS_PANE) &&
-                event.getSlot() != 49) {
-            
-            // Get the display name to match back to our keys (a bit hacky but works with SimpAPI)
-            String name = ChatColor.stripColor(clickedItem.getItemMeta().getDisplayName());
-            String matchedKey = null;
-            for (String key : representativeShops.keySet()) {
-                if (ShopUtils.getShopDisplayName(representativeShops.get(key)).equals(name)) {
-                    matchedKey = key;
-                    break;
-                }
-            }
-
+        } else {
             if (matchedKey != null) {
                 try {
                     PlotsSellingItemMenu nextMenu = new PlotsSellingItemMenu(playerMenuUtility);
                     nextMenu.setTargetProduct(matchedKey);
                     nextMenu.open();
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    net.craftnepal.market.Market.getPlugin().getLogger().log(java.util.logging.Level.WARNING, "AllItemsMenu failed", e);
                 }
             }
         }

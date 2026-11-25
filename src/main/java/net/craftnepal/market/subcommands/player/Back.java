@@ -2,11 +2,9 @@ package net.craftnepal.market.subcommands.player;
 
 import me.kodysimpson.simpapi.command.SubCommand;
 import net.craftnepal.market.Listeners.Movement;
-import net.craftnepal.market.files.LocationData;
 import net.craftnepal.market.utils.PlayerUtils;
 import net.craftnepal.market.utils.RegionUtils;
 import net.craftnepal.market.utils.SendMessage;
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -44,11 +42,10 @@ public class Back extends SubCommand {
             }
             //Check if the player is inside market
             if(net.craftnepal.market.utils.MarketUtils.isInMarketArea(player.getLocation())){
-                Bukkit.getLogger().info("player is in market");
                 Location lastLocation = net.craftnepal.market.utils.PlayerUtils.getLastLocation(player);
                 if(lastLocation != null){
                     player.teleport(lastLocation);
-                    Movement.getPlayersInMarket().remove(player.getUniqueId());
+                    Movement.forget(player.getUniqueId());
                     //toggle fly
                     Movement.checkAndToggle(player,false);
 

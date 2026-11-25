@@ -55,7 +55,7 @@ jobs:
           cache: 'maven'
 
       - name: Build with Maven
-        run: mvn clean package -DskipTests
+        run: mvn -B clean package
 
       # ── Name the artifact ─────────────────────────────────────────────────
       - name: Prepare release artifact

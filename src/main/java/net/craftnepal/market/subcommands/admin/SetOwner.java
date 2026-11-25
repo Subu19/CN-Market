@@ -1,7 +1,6 @@
 package net.craftnepal.market.subcommands.admin;
 
 import me.kodysimpson.simpapi.command.SubCommand;
-import net.craftnepal.market.files.RegionData;
 import net.craftnepal.market.utils.PlotUtils;
 import net.craftnepal.market.utils.SendMessage;
 import org.bukkit.Bukkit;
@@ -31,8 +30,7 @@ public class SetOwner extends SubCommand {
 
     @Override
     public void perform(CommandSender sender, String[] args) {
-        if (!(sender instanceof Player)) return;
-        Player player = (Player) sender;
+                CommandSender player = sender; // console allowed
 
         if (!player.hasPermission("market.admin")) {
             SendMessage.sendPlayerMessage(player, "&cYou do not have permission to use this command.");
@@ -52,8 +50,8 @@ public class SetOwner extends SubCommand {
             return;
         }
 
-        OfflinePlayer target = Bukkit.getOfflinePlayer(targetName);
-        if (!target.hasPlayedBefore() && !target.isOnline()) {
+        OfflinePlayer target = net.craftnepal.market.utils.PlayerUtils.findKnownPlayer(targetName);
+        if (target == null) {
             SendMessage.sendPlayerMessage(player, "§cPlayer not found.");
             return;
         }

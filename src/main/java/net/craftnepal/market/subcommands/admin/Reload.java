@@ -39,7 +39,7 @@ public class Reload extends SubCommand {
     @Override
     public void perform(CommandSender sender, String[] args) {
         if (sender instanceof Player && !sender.hasPermission("market.admin")) {
-            SendMessage.sendPlayerMessage((Player) sender, "§cYou don't have permission to use this command.");
+            SendMessage.sendPlayerMessage(sender, "§cYou don't have permission to use this command.");
             return;
         }
 
@@ -64,7 +64,7 @@ public class Reload extends SubCommand {
 
         String msg = "§aMarket reloaded successfully! (config, price, region, location, dynamic prices, schematics, displays)";
         if (sender instanceof Player) {
-            SendMessage.sendPlayerMessage((Player) sender, msg);
+            SendMessage.sendPlayerMessage(sender, msg);
         } else {
             Bukkit.getLogger().info(msg);
         }

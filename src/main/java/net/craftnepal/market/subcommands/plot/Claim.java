@@ -1,7 +1,6 @@
 package net.craftnepal.market.subcommands.plot;
 
 import me.kodysimpson.simpapi.command.SubCommand;
-import net.craftnepal.market.files.RegionData;
 import net.craftnepal.market.utils.PlotUtils;
 import net.craftnepal.market.utils.RegionUtils;
 import net.craftnepal.market.utils.SendMessage;
@@ -32,7 +31,7 @@ public class Claim extends SubCommand {
 
     @Override
     public String getSyntax() {
-        return "/market claim";
+        return "/market plot claim";
     }
 
     @Override

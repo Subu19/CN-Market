@@ -29,13 +29,32 @@ public class TeleportUtils {
                 Bukkit.getPluginManager().getPlugin("Market"),
                 () -> {
                     teleportTasks.remove(player.getUniqueId());
-                    player.teleport(targetLocation);
-                    if (onSuccess != null) onSuccess.run();
+                    if (!player.isOnline()) return;
+                    // Another plugin may cancel the teleport; then nothing else should happen.
+                    if (player.teleport(targetLocation)) {
+                        if (onSuccess != null) onSuccess.run();
+                    } else {
+                        SendMessage.sendPlayerMessage(player, "&cTeleport was blocked.");
+                    }
                 },
                 delayTicks
         );
 
         teleportTasks.put(player.getUniqueId(), taskId);
+    }
+
+    /**
+     * The usual market teleport: wait, teleport, and if the player came from outside the market,
+     * remember where so {@code /market leave} can take them back.
+     */
+    public static void teleportFromOrigin(Player player, Location targetLocation, Runnable onSuccess) {
+        Location origin = player.getLocation();
+        scheduleTeleport(player, targetLocation, () -> {
+            if (!MarketUtils.isInMarketArea(origin)) {
+                PlayerUtils.saveLastLocation(player, origin);
+            }
+            if (onSuccess != null) onSuccess.run();
+        });
     }
 
     /**
@@ -53,13 +72,14 @@ public class TeleportUtils {
      * Check and cancel teleport if the player moves.
      */
     public static void handleMovement(PlayerMoveEvent event) {
+        // Runs for every move of every player: cheapest checks first, no Block lookups.
+        if (teleportTasks.isEmpty()) return;
         Player player = event.getPlayer();
-
-        if (!event.getFrom().getBlock().equals(event.getTo().getBlock())) {
-            if (teleportTasks.containsKey(player.getUniqueId())) {
-                cancelTeleport(player);
-                SendMessage.sendPlayerMessage(player, "&cTeleport canceled due to movement.");
-            }
-        }
+        if (!teleportTasks.containsKey(player.getUniqueId())) return;
+        Location from = event.getFrom(), to = event.getTo();
+        if (to == null || (from.getBlockX() == to.getBlockX() && from.getBlockY() == to.getBlockY()
+                && from.getBlockZ() == to.getBlockZ())) return;
+        cancelTeleport(player);
+        SendMessage.sendPlayerMessage(player, "&cTeleport canceled due to movement.");
     }
 }

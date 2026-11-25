@@ -23,10 +23,6 @@ public class EconomyUtils {
         return econ != null;
     }
 
-    public static Economy getEconomy() {
-        return econ;
-    }
-
     public static boolean hasBalance(UUID playerUUID, double amount) {
         if (econ == null) return false;
         OfflinePlayer player = Bukkit.getOfflinePlayer(playerUUID);

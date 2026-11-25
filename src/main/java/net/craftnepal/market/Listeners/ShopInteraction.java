@@ -20,6 +20,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.UUID;
@@ -47,6 +48,9 @@ public class ShopInteraction implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onChestInteraction(PlayerInteractEvent event) {
         if (event.getAction() != Action.LEFT_CLICK_BLOCK && event.getAction() != Action.RIGHT_CLICK_BLOCK)
+            return;
+        // The off hand fires a second event when the main hand's was cancelled; handle one click once.
+        if (event.getHand() != EquipmentSlot.HAND)
             return;
 
         Block block = event.getClickedBlock();
@@ -101,9 +105,9 @@ public class ShopInteraction implements Listener {
                 if (isOwner || isBypass) {
                     // Owner/Admin right-click → open the actual barrel inventory to restock.
                     // Do NOT cancel – Minecraft will open the barrel normally.
+                    // Not un-cancelled: if another plugin blocked it, that decision stands.
                     SendMessage.sendPlayerMessage(player, "&7Restocking your shop…");
-                    event.setCancelled(false); // Ensure it's not cancelled so they can open it
-                    return; // Let the event proceed normally.
+                    return;
                 } else {
                     // Customer right-click → open buyer menu.
                     event.setCancelled(true);
@@ -128,7 +132,6 @@ public class ShopInteraction implements Listener {
             if (PlotUtils.canPlayerInteract(player, block.getLocation())) {
                 // Let owner/member/admin open the barrel inventory normally.
                 SendMessage.sendPlayerMessage(player, "&7This barrel is not a shop. Left-click with an item to create one.");
-                event.setCancelled(false); // Ensure it's not cancelled for the owner
             } else {
                 // Deny for everyone else
                 event.setCancelled(true);
@@ -172,7 +175,7 @@ public class ShopInteraction implements Listener {
                 Bukkit.getLogger().severe("[Market] MenuManagerNotSetupException for " + player.getName());
             } catch (Exception e) {
                 SendMessage.sendPlayerMessage(player, "&cUnexpected error opening menu.");
-                e.printStackTrace();
+                net.craftnepal.market.Market.getPlugin().getLogger().log(java.util.logging.Level.WARNING, "ShopInteraction failed", e);
             }
         } else {
             SendMessage.sendPlayerMessage(player, "&cYou do not own this plot and cannot create shops here.");
@@ -183,7 +186,7 @@ public class ShopInteraction implements Listener {
      * Crouch + break = remove shop barrel (owner or admin only).
      * Normal breaks (non-sneaking) on shop barrels are blocked with guidance.
      */
-    @EventHandler(priority = EventPriority.LOWEST)
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onChestBreak(BlockBreakEvent event) {
         Block block = event.getBlock();
         if (block.getType() != Material.BARREL) return;
@@ -211,10 +214,18 @@ public class ShopInteraction implements Listener {
             return;
         }
 
-        // Sneak + break → remove shop data, then let the block break normally.
-        String plotId = PlotUtils.getPlotIdByLocation(block.getLocation());
-        ShopUtils.removeShop(plotId, shop.getId());
-        SendMessage.sendPlayerMessage(player, "&aShop removed. The barrel has been dropped.");
+        // Sneak + break: allowed here; the shop is removed in onChestBroken once no plugin cancels.
+    }
+
+    /** Runs after every plugin has had its say, so a cancelled break never deletes the shop. */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onChestBroken(BlockBreakEvent event) {
+        Block block = event.getBlock();
+        if (block.getType() != Material.BARREL) return;
+        ChestShop shop = ShopUtils.getShopAt(block.getLocation());
+        if (shop == null) return;
+        ShopUtils.removeShop(shop.getPlotId(), shop.getId());
+        SendMessage.sendPlayerMessage(event.getPlayer(), "&aShop removed. The barrel has been dropped.");
     }
 
     // ── Helper ────────────────────────────────────────────────────────────────────
@@ -239,7 +250,7 @@ public class ShopInteraction implements Listener {
             org.bukkit.Bukkit.getLogger().severe("[Market] MenuManagerNotSetupException for " + player.getName());
         } catch (Exception e) {
             SendMessage.sendPlayerMessage(player, "&cUnexpected error opening menu.");
-            e.printStackTrace();
+            net.craftnepal.market.Market.getPlugin().getLogger().log(java.util.logging.Level.WARNING, "ShopInteraction failed", e);
         }
     }
 }

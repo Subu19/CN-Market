@@ -26,8 +26,8 @@ public abstract class NestedCommand extends SubCommand {
 
     @Override
     public void perform(CommandSender sender, String[] args) {
-        if (!(sender instanceof Player)) return;
-        Player player = (Player) sender;
+        // The console may run these too; subcommands that need a player check for one themselves.
+        CommandSender player = sender;
 
         // Check group-level permission
         String perm = getRequiredPermission();

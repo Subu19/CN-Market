@@ -37,7 +37,7 @@ public class HelpCommand extends SubCommand {
         SendMessage.sendPlayerMessage(player,
                 "§e/market shops §7- View a list of all active shops.");
         SendMessage.sendPlayerMessage(player,
-                "§e/market back §7- Teleport back to your previous location.");
+                "§e/market leave §7- Teleport back to where you were before the market.");
     }
 
     @Override

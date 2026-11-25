@@ -1,4 +1,4 @@
-package net.craftnepal.market.Listeners;
+package net.craftnepal.market.protection;
 
 import net.craftnepal.market.utils.PlotUtils;
 import net.craftnepal.market.utils.ShopUtils;
@@ -16,6 +16,7 @@ import org.bukkit.event.entity.EntityExplodeEvent;
 
 import java.util.List;
 
+/** Removes a shop when its barrel is destroyed by an explosion, fire or a piston inside its plot. */
 public class ShopProtectionListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)

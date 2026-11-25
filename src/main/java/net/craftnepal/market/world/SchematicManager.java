@@ -76,16 +76,11 @@ public class SchematicManager {
                         .warning("[Market] Schematic not found: " + file.getAbsolutePath());
                 return;
             }
-            com.sk89q.worldedit.extent.clipboard.io.ClipboardFormat format =
-                    com.sk89q.worldedit.extent.clipboard.io.ClipboardFormats.findByFile(file);
-            if (format == null) {
+            clipboard = WorldEditPaster.load(file);
+            if (clipboard == null) {
                 Market.getPlugin().getLogger()
                         .warning("[Market] Unknown schematic format: " + file.getName());
                 return;
-            }
-            try (com.sk89q.worldedit.extent.clipboard.io.ClipboardReader reader =
-                    format.getReader(new java.io.FileInputStream(file))) {
-                clipboard = reader.read();
             }
             Market.getPlugin().getLogger()
                     .info("[Market] Pathway schematic loaded: " + file.getName());
@@ -118,9 +113,6 @@ public class SchematicManager {
             return; // already in queue
 
         pasteQueue.add(new PendingChunk(world, chunk, plotSize, pathwayWidth, key));
-        Market.getPlugin().getLogger().info("[Market] Queued chunk " + chunk.getX() + ","
-                + chunk.getZ() + " (queue size: " + pasteQueue.size() + ")");
-
         startDrainTaskIfNeeded();
     }
 
@@ -195,7 +187,10 @@ public class SchematicManager {
         int nXEnd = (maxWorldX / totalSize) + 1;
         int nZEnd = (maxWorldZ / totalSize) + 1;
 
-        boolean pastedAny = false;
+        // Read once per chunk, not per tile.
+        int limit = Market.settings().grid().spawnRadius() - 1;
+        int y = Market.getMainConfig().getInt("market-world.pathway-y-level", 65);
+
         for (int nx = nXStart; nx <= nXEnd; nx++) {
             int pasteX = nx * totalSize;
             if (pasteX < minWorldX || pasteX > maxWorldX)
@@ -207,65 +202,18 @@ public class SchematicManager {
                     continue;
 
                 // Skip ONLY the strictly internal pathway intersections
-                int spawnRadius = Market.getMainConfig().getInt("market-world.spawn-radius", 1);
-                int limit = spawnRadius - 1;
                 if (nx >= -limit && nx <= limit && nz >= -limit && nz <= limit) {
                     continue;
                 }
 
-                int y = Market.getMainConfig().getInt("market-world.pathway-y-level", 65);
                 pasteSchematic(pending.world, pasteX, y, pasteZ);
-                pastedAny = true;
-                Market.getPlugin().getLogger().info("[Market] Pasted tile at " + pasteX + "," + pasteZ
-                        + " for chunk " + pending.chunk.getX() + "," + pending.chunk.getZ());
             }
-        }
-
-        if (!pastedAny) {
-            Market.getPlugin().getLogger().info("[Market] No pathway tiles in chunk "
-                    + pending.chunk.getX() + "," + pending.chunk.getZ());
         }
     }
 
     private void pasteSchematic(World world, int x, int y, int z) {
         try {
-            com.sk89q.worldedit.world.World weWorld =
-                    com.sk89q.worldedit.bukkit.BukkitAdapter.adapt(world);
-            com.sk89q.worldedit.extent.clipboard.Clipboard cb =
-                    (com.sk89q.worldedit.extent.clipboard.Clipboard) clipboard;
-
-            try (com.sk89q.worldedit.EditSession editSession =
-                    com.sk89q.worldedit.WorldEdit.getInstance().newEditSessionBuilder().world(weWorld).build()) {
-                
-                editSession.setFastMode(true);
-
-                // Prevent the schematic arms from overwriting ANY blocks in the 3D spawn area column
-                int plotSize = Market.getMainConfig().getInt("market-world.plot-size", 16);
-                int pathwayWidth = Market.getMainConfig().getInt("market-world.pathway-width", 3);
-                int totalSize = plotSize + pathwayWidth;
-                int halfPath = pathwayWidth / 2;
-                int spawnRadiusConfig = Market.getMainConfig().getInt("market-world.spawn-radius", 1);
-                int symmetricRadius = spawnRadiusConfig * totalSize - (pathwayWidth - halfPath);
-
-                com.sk89q.worldedit.regions.CuboidRegion spawnRegion = new com.sk89q.worldedit.regions.CuboidRegion(
-                        weWorld,
-                        com.sk89q.worldedit.math.BlockVector3.at(-symmetricRadius, -100, -symmetricRadius),
-                        com.sk89q.worldedit.math.BlockVector3.at(symmetricRadius, 400, symmetricRadius)
-                );
-
-                com.sk89q.worldedit.function.mask.Mask spawnMask = com.sk89q.worldedit.function.mask.Masks.negate(
-                        new com.sk89q.worldedit.function.mask.RegionMask(spawnRegion)
-                );
-                editSession.setMask(spawnMask);
-
-                com.sk89q.worldedit.function.operation.Operation op =
-                        new com.sk89q.worldedit.session.ClipboardHolder(cb).createPaste(editSession)
-                                .to(com.sk89q.worldedit.math.BlockVector3.at(x, y, z))
-                                .ignoreAirBlocks(true).build();
-
-                com.sk89q.worldedit.function.operation.Operations.complete(op);
-                editSession.flushSession();
-            }
+            WorldEditPaster.paste(clipboard, world, x, y, z, Market.settings().grid().spawnAreaRadius());
         } catch (Exception ex) {
             Market.getPlugin().getLogger()
                     .warning("[Market] Failed to paste at " + x + "," + z + ": " + ex.getMessage());

@@ -29,7 +29,7 @@ public class SelectionMode extends SubCommand {
 
     @Override
     public String getSyntax() {
-        return "/amarket selectionmove <mode>";
+        return "/market admin selectionmode <mode>";
     }
 
     @Override

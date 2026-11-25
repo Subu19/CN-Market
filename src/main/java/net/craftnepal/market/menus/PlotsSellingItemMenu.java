@@ -7,6 +7,7 @@ import me.kodysimpson.simpapi.menu.MenuManager;
 import me.kodysimpson.simpapi.menu.PlayerMenuUtility;
 import net.craftnepal.market.Entities.ChestShop;
 import net.craftnepal.market.Market;
+import net.craftnepal.market.managers.DatabaseManager;
 
 import net.craftnepal.market.utils.*;
 import org.bukkit.*;
@@ -33,7 +34,7 @@ public class PlotsSellingItemMenu extends Menu {
         Set<String> plotSet = new HashSet<>();
         Map<String, ChestShop> allShops = ShopUtils.getAllShops();
         for (ChestShop shop : allShops.values()) {
-            if (ShopUtils.getItemKey(shop).equals(productKey) && ShopUtils.getShopStock(shop) > 0) {
+            if (!shop.isBuyingShop() && ShopUtils.getItemKey(shop).equals(productKey) && ShopUtils.getShopStock(shop) > 0) {
                 // Find plot ID from shop
                 String plotId = shop.getPlotId();
                 if (plotId != null) {
@@ -100,6 +101,7 @@ public class PlotsSellingItemMenu extends Menu {
 
     @Override
     public void handleMenu(InventoryClickEvent event) {
+        if (event.getRawSlot() >= getSlots()) return; // the player's own inventory
         ItemStack clickedItem = event.getCurrentItem();
         if (clickedItem == null || !clickedItem.hasItemMeta()) return;
 
@@ -116,7 +118,7 @@ public class PlotsSellingItemMenu extends Menu {
                 // Just go back to the browse menu (without search query for simplicity, or we could pass it)
                 MenuManager.openMenu(AllItemsMenu.class, playerMenuUtility.getOwner());
             } catch (MenuManagerException | MenuManagerNotSetupException e) {
-                e.printStackTrace();
+                net.craftnepal.market.Market.getPlugin().getLogger().log(java.util.logging.Level.WARNING, "PlotsSellingItemMenu failed", e);
             }
         } else if (displayName.startsWith("Plot ")) {
             String plotId = displayName.replace("Plot ", "");
@@ -126,14 +128,10 @@ public class PlotsSellingItemMenu extends Menu {
             
             if (tpLoc != null) {
                 org.bukkit.entity.Player player = playerMenuUtility.getOwner();
-                org.bukkit.Location origin = player.getLocation();
                 SendMessage.sendPlayerMessage(player, "Teleporting to the shop in 5 seconds! Don't move..");
                 player.closeInventory();
-                
-                TeleportUtils.scheduleTeleport(player, tpLoc, () -> {
-                    if (!net.craftnepal.market.utils.MarketUtils.isInMarketArea(origin)) {
-                        net.craftnepal.market.utils.PlayerUtils.saveLastLocation(player, origin);
-                    }
+
+                TeleportUtils.teleportFromOrigin(player, tpLoc, () -> {
                     SendMessage.sendPlayerMessage(player, "Teleported to shop!");
                     
                     // Highlight only the shops matching the specific product
@@ -156,8 +154,7 @@ public class PlotsSellingItemMenu extends Menu {
         ItemStack plotItem;
         if (ownerUUID != null) {
             plotItem = PlayerUtils.getPlayerHead(UUID.fromString(ownerUUID));
-            OfflinePlayer owner = Bukkit.getOfflinePlayer(UUID.fromString(ownerUUID));
-            ownerName = owner.getName() != null ? owner.getName() : "Unknown";
+            ownerName = PlayerUtils.getName(UUID.fromString(ownerUUID));
         } else {
             plotItem = new ItemStack(Material.SKELETON_SKULL);
         }
@@ -168,21 +165,20 @@ public class PlotsSellingItemMenu extends Menu {
         // Find cheapest price in this plot for this specific product
         double cheapest = Double.MAX_VALUE;
         int totalStock = 0;
-        Map<String, ChestShop> allShops = ShopUtils.getAllShops();
-        for (ChestShop shop : allShops.values()) {
-            String plotOfShop = shop.getPlotId();
-            if (plotId.equals(plotOfShop) && ShopUtils.getItemKey(shop).equals(targetProductKey)) {
-                int stock = ShopUtils.getShopStock(shop);
-                if (stock > 0) {
-                    totalStock += stock;
-                    if (shop.getPrice() < cheapest) cheapest = shop.getPrice();
-                }
+        boolean unlimited = false;
+        for (ChestShop shop : DatabaseManager.getShopsByPlot(plotId)) {
+            if (shop.isBuyingShop() || !ShopUtils.getItemKey(shop).equals(targetProductKey)) continue;
+            int stock = ShopUtils.getShopStock(shop);
+            if (stock > 0) {
+                if (shop.isAdmin()) unlimited = true;
+                else totalStock += stock;
+                if (shop.getPrice() < cheapest) cheapest = shop.getPrice();
             }
         }
 
         List<String> lore = new ArrayList<>();
         lore.add(ChatColor.GRAY + "Owner: " + ChatColor.YELLOW + ownerName);
-        lore.add(ChatColor.GRAY + "In Stock: " + ChatColor.GREEN + totalStock);
+        lore.add(ChatColor.GRAY + "In Stock: " + ChatColor.GREEN + (unlimited ? "Unlimited" : String.valueOf(totalStock)));
         if (cheapest != Double.MAX_VALUE) {
             String trendStr = net.craftnepal.market.managers.DynamicPriceManager.getTrendString(targetProductKey);
             lore.add(ChatColor.GRAY + "Price: " + ChatColor.GOLD + EconomyUtils.format(cheapest) + " " + trendStr);

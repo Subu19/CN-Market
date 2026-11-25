@@ -2,7 +2,6 @@ package net.craftnepal.market.handlers;
 
 import net.craftnepal.market.Market;
 import net.craftnepal.market.Listeners.Movement;
-import net.craftnepal.market.files.RegionData;
 import net.craftnepal.market.utils.*;
 import org.bukkit.Location;
 import org.bukkit.Sound;
@@ -36,18 +35,11 @@ public class MarketCommandHandler {
             return;
         }
 
-        Location location = net.craftnepal.market.managers.DatabaseManager.getMarketSpawn();
-        if (location == null) {
-            location = marketWorld.getSpawnLocation();
-        }
+        Location location = MarketUtils.spawnIn(marketWorld);
 
-        Location origin = p.getLocation();
         SendMessage.sendPlayerMessage(p, "&eTeleporting to the market in 5 seconds... don't move!");
 
-        TeleportUtils.scheduleTeleport(p, location, () -> {
-            if (!MarketUtils.isInMarketArea(origin)) {
-                PlayerUtils.saveLastLocation(p, origin);
-            }
+        TeleportUtils.teleportFromOrigin(p, location, () -> {
             p.playSound(p.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1, 1);
             Movement.checkAndToggle(p, true);
         });

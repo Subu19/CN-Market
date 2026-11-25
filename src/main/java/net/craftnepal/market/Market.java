@@ -2,9 +2,11 @@ package net.craftnepal.market;
 
 import me.kodysimpson.simpapi.command.CommandManager;
 import net.craftnepal.market.Listeners.*;
-import net.craftnepal.market.files.LocationData;
+import net.craftnepal.market.protection.EntityProtectionListener;
+import net.craftnepal.market.protection.ShopProtectionListener;
+import net.craftnepal.market.protection.PlayerProtectionListener;
+import net.craftnepal.market.protection.WorldProtectionListener;
 import net.craftnepal.market.files.PriceData;
-import net.craftnepal.market.files.RegionData;
 import net.craftnepal.market.handlers.MarketCommandHandler;
 import net.craftnepal.market.managers.DynamicPriceManager;
 import net.craftnepal.market.managers.MarketWorldManager;
@@ -19,7 +21,6 @@ import net.craftnepal.market.world.SchematicManager;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
@@ -28,7 +29,8 @@ public final class Market extends JavaPlugin {
 
     private static Market plugin;
     private static FileConfiguration config;
-    private static File cfile;
+    private static volatile MarketSettings settings;
+    private World marketWorld;
     private DisplayUtils displayUtils;
 
     @Override
@@ -65,6 +67,7 @@ public final class Market extends JavaPlugin {
     @Override
     public void onDisable() {
         if (displayUtils != null) displayUtils.clearAllDisplays();
+        net.craftnepal.market.managers.DynamicPriceManager.flush(false);
         net.craftnepal.market.managers.DatabaseManager.close();
         Bukkit.getLogger().info("Market is shutting down!");
     }
@@ -75,7 +78,7 @@ public final class Market extends JavaPlugin {
         config = getConfig();
         config.options().copyDefaults(true);
         saveConfig();
-        cfile = new File(getDataFolder(), "config.yml");
+        settings = MarketSettings.from(config, getLogger());
     }
 
     private void setupDataFiles() {
@@ -83,7 +86,7 @@ public final class Market extends JavaPlugin {
         DynamicPriceManager.setup();
         
         // Initialize SQLite database and trigger any necessary automatic migration
-        net.craftnepal.market.managers.DatabaseManager.initialize(new File(getDataFolder(), "market.db"));
+        net.craftnepal.market.managers.DatabaseManager.initialize(this, new File(getDataFolder(), "market.db"));
         
         TransactionLogUtils.setup();
     }
@@ -91,16 +94,18 @@ public final class Market extends JavaPlugin {
     private void registerListeners() {
         var pm = getServer().getPluginManager();
         pm.registerEvents(new RegionSelection(), this);
-        pm.registerEvents(new MarketRegionProtection(), this);
+        pm.registerEvents(new PlayerProtectionListener(), this);
+        pm.registerEvents(new WorldProtectionListener(), this);
+        pm.registerEvents(new EntityProtectionListener(), this);
         pm.registerEvents(new Movement(this), this);
         pm.registerEvents(new ShopInteraction(), this);
         pm.registerEvents(new MarketDisplayListener(this), this);
         pm.registerEvents(new ShopStockListener(), this);
         pm.registerEvents(new MarketWorldListener(), this);
-        pm.registerEvents(new InternalCommandListener(), this);
         pm.registerEvents(new SearchListener(), this);
         pm.registerEvents(new CommandTabFilter(), this);
         pm.registerEvents(new ShopProtectionListener(), this);
+        pm.registerEvents(new net.craftnepal.market.protection.WorldRulesListener(), this);
         pm.registerEvents(new MenuCleanupListener(), this);
         pm.registerEvents(new PlayerJoinListener(), this);
     }
@@ -126,15 +131,37 @@ public final class Market extends JavaPlugin {
         MarketWorldManager.initialize(forceCreate);
     }
 
+    /** The market world, or null when it is not loaded. Cached; see {@link #onWorldChanged()}. */
     public World getMarketWorld() {
-        return Bukkit.getWorld(config.getString("market-world.name", "market"));
+        World world = marketWorld;
+        if (world == null) {
+            world = Bukkit.getWorld(settings.worldName());
+            marketWorld = world;
+        }
+        return world;
+    }
+
+    /** Drops the cached world reference; call when a world loads or unloads, or the name changes. */
+    public void onWorldChanged() {
+        marketWorld = null;
     }
 
     public static Market getPlugin() { return plugin; }
 
     public static FileConfiguration getMainConfig() { return config; }
 
+    public static MarketSettings settings() { return settings; }
+
+    /** Reloads config.yml from disk. */
     public static void reloadMainConfig() {
-        config = YamlConfiguration.loadConfiguration(cfile);
+        plugin.reloadConfig();
+        config = plugin.getConfig();
+        applyConfigChanges();
+    }
+
+    /** Rebuilds the settings snapshot after values in {@link #getMainConfig()} were changed in code. */
+    public static void applyConfigChanges() {
+        settings = MarketSettings.from(config, plugin.getLogger());
+        plugin.onWorldChanged();
     }
 }

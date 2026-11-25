@@ -127,7 +127,6 @@ public class MarketManagementMenu extends Menu {
             String plotId = shop.getPlotId();
             if (plotId != null) {
                 org.bukkit.entity.Player player = playerMenuUtility.getOwner();
-                org.bukkit.Location origin = player.getLocation();
                 org.bukkit.Location shopSpawn = net.craftnepal.market.utils.PlotUtils.getPlotSpawn(plotId);
                 org.bukkit.Location tpLoc = shopSpawn != null ? shopSpawn : net.craftnepal.market.utils.PlotUtils.getPlotCenter(plotId);
                 
@@ -135,10 +134,7 @@ public class MarketManagementMenu extends Menu {
                     net.craftnepal.market.utils.SendMessage.sendPlayerMessage(player, "Teleporting to the shop in 5 seconds! Don't move..");
                     player.closeInventory();
                     
-                    net.craftnepal.market.utils.TeleportUtils.scheduleTeleport(player, tpLoc, () -> {
-                        if (!net.craftnepal.market.utils.MarketUtils.isInMarketArea(origin)) {
-                            net.craftnepal.market.utils.PlayerUtils.saveLastLocation(player, origin);
-                        }
+                    net.craftnepal.market.utils.TeleportUtils.teleportFromOrigin(player, tpLoc, () -> {
                         net.craftnepal.market.utils.SendMessage.sendPlayerMessage(player, "Teleported to your out-of-stock shop!");
                         
                         // Highlight the shop

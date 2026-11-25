@@ -22,13 +22,12 @@ public class Setup extends SubCommand {
 
     @Override
     public String getSyntax() {
-        return "/amarket setup <worldName> <plotSize> <pathwayWidth>";
+        return "/market admin setup <worldName> <plotSize> <pathwayWidth>";
     }
 
     @Override
     public void perform(CommandSender sender, String[] args) {
-        if (!(sender instanceof Player)) return;
-        Player player = (Player) sender;
+                CommandSender player = sender; // console allowed
 
         if (!player.hasPermission("market.admin")) {
             SendMessage.sendPlayerMessage(player, "§cYou don't have permission to use this command.");
@@ -36,7 +35,7 @@ public class Setup extends SubCommand {
         }
 
         if (args.length < 4) {
-            SendMessage.sendPlayerMessage(player, "§cUsage: /amarket setup <worldName> <plotSize> <pathwayWidth>");
+            SendMessage.sendPlayerMessage(player, "§cUsage: /market admin setup <worldName> <plotSize> <pathwayWidth>");
             return;
         }
 
@@ -56,6 +55,7 @@ public class Setup extends SubCommand {
         Market.getMainConfig().set("market-world.plot-size", plotSize);
         Market.getMainConfig().set("market-world.pathway-width", pathwayWidth);
         Market.getPlugin().saveConfig();
+        Market.applyConfigChanges();
 
         SendMessage.sendPlayerMessage(player, "§aGenerating market world '" + worldName + "'... This may cause lag.");
         Market.getPlugin().initializeMarketWorld(true);

@@ -51,3 +51,6 @@ versions/
 # OS Specific
 .DS_Store
 Thumbs.db
+
+# Local code index
+.codegraph/

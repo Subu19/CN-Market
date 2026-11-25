@@ -50,7 +50,7 @@ public class TransactionLogUtils {
                     pw.println(logLine);
                 } catch (IOException e) {
                     Bukkit.getLogger().severe("Could not write to transactions.log!");
-                    e.printStackTrace();
+                    net.craftnepal.market.Market.getPlugin().getLogger().log(java.util.logging.Level.WARNING, "TransactionLogUtils failed", e);
                 }
             }
         });
@@ -68,7 +68,9 @@ public class TransactionLogUtils {
 
         // Rename the current log file to start the rotation process
         if (logFile.renameTo(rotatedFile)) {
-            // Compress the rotated log file into a zip file
+            // Compress the rotated log file into a zip file. The plain copy is deleted only after
+            // the zip was written completely; on failure it stays in logs/ as it is.
+            boolean zipped = false;
             try (java.io.FileOutputStream fos = new java.io.FileOutputStream(zipFile);
                  java.util.zip.ZipOutputStream zos = new java.util.zip.ZipOutputStream(fos);
                  java.io.FileInputStream fis = new java.io.FileInputStream(rotatedFile)) {
@@ -83,15 +85,14 @@ public class TransactionLogUtils {
                 }
                 zos.closeEntry();
                 
-                Bukkit.getLogger().info("[Market] Rotated and compressed transaction log to " + zipFile.getName());
+                zipped = true;
             } catch (IOException e) {
-                Bukkit.getLogger().severe("Failed to zip rotated transaction log!");
-                e.printStackTrace();
-            } finally {
-                // Delete the uncompressed rotated log file
-                if (rotatedFile.exists()) {
-                    rotatedFile.delete();
-                }
+                Bukkit.getLogger().severe("[Market] Could not zip " + rotatedFile.getName() + ", keeping it uncompressed: " + e.getMessage());
+                zipFile.delete();
+            }
+            if (zipped) {
+                rotatedFile.delete();
+                Bukkit.getLogger().info("[Market] Rotated and compressed transaction log to " + zipFile.getName());
             }
         }
 

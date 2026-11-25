@@ -6,6 +6,7 @@
 # <work-dir>  scratch directory; it is wiped and filled with a copy of ./mc-data
 #             (so the dev server data is never touched). Use an empty dir for a fresh server:
 #             SEED=none scripts/smoke-test.sh /tmp/x
+#             or a copy of any server folder: SEED=/path/to/backup-subset scripts/smoke-test.sh /tmp/x
 # TYPE        PAPER (default) or SPIGOT
 # VERSION     Minecraft version, default 26.1.2
 # JAR=path    test another jar instead of target/Market.jar
@@ -29,6 +30,9 @@ docker rm -f market-smoke >/dev/null 2>&1 || true
 rm -rf "$WORK" && mkdir -p "$WORK"
 if [ "${SEED:-copy}" = "copy" ]; then
   cp -a "$ROOT/mc-data/." "$WORK/"
+  rm -f "$WORK/plugins/Market.jar"
+elif [ -d "${SEED}" ]; then
+  cp -a "$SEED/." "$WORK/"        # SEED=<dir>: start from a copy of that server folder
   rm -f "$WORK/plugins/Market.jar"
 fi
 mkdir -p "$WORK/plugins"

@@ -24,8 +24,8 @@ Tick these as phases land. One phase per branch/PR.
 - [x] Phase 5: Price and metrics file I/O off the main thread
 - [x] Phase 6: Bug fixes (only the ones approved under "Decisions")
 - [x] Phase 7: Cleanup
-- [ ] Phase 8: Final verification
-- [ ] Phase 9: Public release readiness
+- [x] Phase 8: Final verification
+- [x] Phase 9: Public release readiness
 
 ## Decisions (answered by the owner on 2026-11-24)
 
@@ -589,6 +589,20 @@ Verification:
 - Fresh server with only Vault, an economy plugin and Market: a non-op player can teleport in, claim a plot, create a shop and trade, with no other plugin installed.
 - Same flow on Spigot and on Paper, oldest and newest supported version.
 - Upgrade test: drop the new jar onto a copy of the owner's live data folder; everything loads and nothing in `config.yml` is lost.
+
+---
+
+### Phase 8 and 9 results (2026-11-25)
+
+Automated, all passing:
+
+- Unit tests: 23 (PlotGrid, PlotIndex, Zones, ShopIndex). Store round-trip and price tests were not written; the production upgrade test below covers loading.
+- Lag: 13 observer clocks on a plot border, 0.7 ms per tick and TPS 20 (1.1.4: 56 ms, TPS 16.6).
+- Independent review (separate model, read-only) found that shops were read before the market world loaded, an over-eager payment rollback, and out-of-order price file writes. All fixed. Pre-existing and left: if the owner's deposit fails, the buyer is refunded and keeps the items.
+- Fresh server with Vault + EssentialsX + Market and no WorldEdit, setup from the console, price update: Paper 26.3, Paper 1.21.1, Spigot 1.21.1 (needs a Java 21 image), Spigot 26.3. This found that Market never started without WorldEdit (also in 1.1.4); WorldEdit calls now live in `WorldEditPaster`.
+- Production upgrade (copy of the live backup, Paper 26.3, 1.1.4 → 2.0.0): 131 plots and 1981 shops load; after a clean stop the database passes `integrity_check` and plot, shop, member and offline-sale counts are unchanged; config.yml keeps every value and only gains the new keys. Idle tick 0.1 ms; daily price update one 61 ms tick. `syncstock` froze the server 1.4 s and now runs 5 ms per tick (peak 118 ms, TPS 20, 27 s).
+
+Still needs a person with a client: `docs/PROTECTION_CHECKLIST.md` and the trade cases in `docs/TESTING.md`.
 
 ---
 

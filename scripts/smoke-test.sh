@@ -13,6 +13,7 @@
 # EXTRA_PLUGINS="a.jar b.jar"  copy these jars into plugins/ too (e.g. Vault on a fresh server)
 # MODRINTH="essentialsx"       let the image download these Modrinth projects
 # WAIT=360    seconds to wait for "Done" (Spigot builds itself with BuildTools on first run: raise it)
+# IMAGE_TAG=java21  image tag; old Spigot builds refuse Java newer than 23
 #
 # Leaves the container running as "market-smoke" so you can send console commands:
 #   docker exec market-smoke rcon-cli <command>
@@ -43,7 +44,7 @@ docker run -d --name market-smoke \
   -e EULA=TRUE -e TYPE="$TYPE" -e VERSION="$VERSION" -e MEMORY=2G \
   -e UID="$(id -u)" -e GID="$(id -g)" -e ENABLE_RCON=true -e RCON_PASSWORD=smoke \
   -e ONLINE_MODE=FALSE ${MODRINTH:+-e MODRINTH_PROJECTS="$MODRINTH"} \
-  -v "$WORK:/data" itzg/minecraft-server >/dev/null
+  -v "$WORK:/data" itzg/minecraft-server${IMAGE_TAG:+:$IMAGE_TAG} >/dev/null
 
 echo "waiting for server start..."
 for _ in $(seq 1 $(( ${WAIT:-360} / 2 ))); do

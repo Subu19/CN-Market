@@ -21,7 +21,7 @@ CN-Market gives your server a separate market world, laid out as a grid of plots
 **For admins**
 - One command builds the world: `/market admin setup market 32 7`.
 - Plot protection without other plugins: explosions, fire, pistons, fluids, mobs and projectiles cannot cross a plot border; pathways and spawn are protected.
-- Optional world rules: no PvP, no monsters, no hunger, no fall damage.
+- A calm market world out of the box: no mob spawning, PvP, explosions, fire spread, hunger or fall damage, clear weather, void rescue. Each one is a switch; no WorldGuard needed.
 - Admin shops with unlimited stock and daily dynamic prices, bounded by limits you set.
 - SQLite storage off the main thread. Redstone next to plot borders costs nothing measurable.
 - Every player permission is on by default; restrict with any permissions plugin.

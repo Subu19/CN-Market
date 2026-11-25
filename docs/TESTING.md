@@ -26,6 +26,18 @@ docker exec market-smoke rcon-cli "market admin setup market 16 3"
 
 Spigot builds itself with BuildTools on first start; give it `WAIT=900`.
 
+## Market world environment
+
+```
+EXTRA_PLUGINS="Vault.jar EssentialsX.jar" scripts/environment-test.sh PAPER 26.3
+EXTRA_PLUGINS="Vault.jar EssentialsX.jar" scripts/environment-test.sh SPIGOT 1.21.1
+```
+
+Checks the game rules (names differ between 1.21 and 26.x), no natural spawns after 150 s, `summon` still
+working, TNT and fire doing nothing, and `clearmobs` keeping a named mob. Run both versions after any change to
+`MarketEnvironment`: Paper's `GameRule` is an interface and Spigot 1.21's a class, so a direct call to it
+breaks one of them.
+
 ## Lag regression (redstone)
 
 With the smoke server running on the dev data:

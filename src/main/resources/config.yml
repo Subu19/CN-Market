@@ -21,13 +21,30 @@ market-world:
   # Maximum Y players can build at in their plots
   max-height: 255
 
-  # Optional rules for the market world, all off by default. Turn them on if no other plugin
-  # (WorldGuard, Essentials...) already handles these.
-  rules:
-    no-pvp: false
-    no-monsters: false     # stops hostile mobs spawning naturally; spawn eggs still work
-    no-hunger: false
-    no-fall-damage: false
+  # How the market world behaves. The defaults make it a calm shopping hub; set a value to the
+  # vanilla one (true / contained / cycle) to hand that part back to the game or another plugin.
+  # Applied on start and on /market admin reload; check with /market admin environment.
+  environment:
+    # Mobs never spawn on their own, animals included (no monsters, phantoms, patrols, traders,
+    # raids). Players can still use spawn eggs and buckets on their plot, breed and build golems.
+    mob-spawning: false
+    # No hostile mobs by any player route either: eggs, spawners, building a wither.
+    hostile-mobs: false
+    pvp: false
+    # off: TNT, creepers, end crystals and respawn anchors do nothing.
+    # contained: explosions only damage blocks in their own plot.
+    explosions: "off"
+    # false: fire never spreads or burns blocks away and lava lights nothing. Fire a player
+    # lights on their own plot stays.
+    fire-spread: false
+    weather: clear          # clear | cycle
+    time: cycle             # cycle | day (always noon)
+    hunger: false
+    fall-damage: false
+    # Falling into the void puts the player back at the market spawn.
+    void-rescue: true
+    # Breeding, eggs and buckets stop once a plot holds this many mobs. 0 = no cap.
+    max-mobs-per-plot: 0
 
   # Optional: WorldEdit schematic for pathways (relative to plugin folder)
   # If provided, the generator will skip material-based pathway generation

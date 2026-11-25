@@ -20,6 +20,8 @@ public class AdminCommand extends NestedCommand {
         registerSubCommand(new CalcPrices());
         registerSubCommand(new Reset());
         registerSubCommand(new SyncStock());
+        registerSubCommand(new ClearMobs());
+        registerSubCommand(new EnvironmentInfo());
     }
 
 

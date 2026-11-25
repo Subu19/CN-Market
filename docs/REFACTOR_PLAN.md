@@ -606,6 +606,58 @@ Still needs a person with a client: `docs/PROTECTION_CHECKLIST.md` and the trade
 
 ---
 
+## Phase 10: Market world environment (2.1.0)
+
+Asked for after 2.0.0: on CraftNepal the market world is kept calm by five WorldGuard global flags (pvp, mob-spawning, creeper-explosion, fire-spread deny; weather-lock clear). 2.0.0 only covers part of that, and its `rules` are off by default. A market world is a shopping hub, not survival land, so the plugin should ship it that way: sensible defaults on, each one switchable, no WorldGuard needed.
+
+Approach: the market world belongs to the plugin, so use the world's own settings where they exist (no work per event), with an event as a backstop. Game rule names differ between 1.21 (`doMobSpawning`) and 26.x (`spawn_mobs`), so they are looked up by name at runtime, never by constant. Settings are applied when the world loads, on reload and after setup.
+
+Config: new section `market-world.environment` replaces 2.0.0's `market-world.rules` (only 2.0.0 had it, released the same day; the old keys are ignored with one warning).
+
+### Environment, on by default
+
+| # | Key (default) | Behaviour | How |
+|---|---|---|---|
+| E1 | `mob-spawning: false` | No mob spawns on its own: no monsters, no animals, no phantoms, patrols, wandering traders, raids, slime splits, lightning conversions. Players may still use spawn eggs and buckets in their own plot, breed animals and build golems. | spawning game rules off + `CreatureSpawnEvent` allow-list (SPAWNER_EGG, DISPENSE_EGG, BUCKET, BREEDING, BUILD_SNOWMAN/IRONGOLEM/COPPERGOLEM, SHOULDER_ENTITY, COMMAND, CUSTOM); `RaidTriggerEvent` cancelled |
+| E2 | `hostile-mobs: false` | No hostile mob by any player route either: no zombie from an egg, no wither built, no mob spawner or trial spawner. Commands and plugins still can. | `Enemy` check in the same handler |
+| E3 | `pvp: false` | Players cannot hurt each other by any means (melee, arrows, potions, TNT). | `World.setPVP(false)` (exists in 1.21 and 26.3); the 2.0.0 handler stays as backstop |
+| E4 | `explosions: off` | `off`: TNT, creepers, crystals, beds, anchors do nothing in the market world (no blocks, no damage, no item frames). `contained`: 2.0.0 behaviour, damage stays in its own plot. `vanilla`: protection only. | cancel `ExplosionPrimeEvent`/`EntityExplodeEvent`/`BlockExplodeEvent` |
+| E5 | `fire-spread: false` | Fire never spreads, never burns blocks away, lava never lights anything. Fire a player lights on their own plot stays as decoration. | `BlockSpreadEvent` (fire), `BlockBurnEvent`, `BlockIgniteEvent` SPREAD/LAVA |
+| E6 | `weather: clear` | Always clear: no rain on stalls, no lightning, no snow piling up. `cycle` for vanilla. | weather game rule off + clear on load + cancel `WeatherChangeEvent`/`ThunderChangeEvent` |
+| E7 | `hunger: false` | Food does not drop while shopping. | `FoodLevelChangeEvent` (2.0.0 rule) |
+| E8 | `fall-damage: false` | Flight is allowed in the market; landing after toggling it off should not hurt. | 2.0.0 rule |
+| E9 | `void-rescue: true` | Falling into the void puts the player back at the market spawn instead of killing them and dropping their goods. | `EntityDamageEvent` cause VOID → teleport |
+
+Optional, off by default:
+
+| # | Key (default) | Behaviour |
+|---|---|---|
+| E10 | `time: cycle` | `day` locks the market at noon (daylight game rule off, time set once). |
+| E11 | `max-mobs-per-plot: 24` | Breeding, eggs and buckets refused once a plot holds this many living mobs. Stops a plot from becoming an animal farm that lags the market. 0 = no cap. Counted only when such a spawn happens, from the plot's chunks. |
+
+### Clean-up and admin
+
+- C1 Existing worlds already hold mobs spawned under 1.x. When a market chunk loads, remove hostile mobs that are not named or persistent (when E2 is on).
+- C2 `/market admin clearmobs <hostile|animals|all>`: one-off clean-up. Never removes named, tamed, leashed or ridden mobs, villagers with trades in progress, or anything not a mob.
+- C3 `/market admin environment`: prints the effective settings for the market world, so an admin can see what is on without reading the config.
+
+### Not doing (reasons)
+
+- Blocking ender pearls and chorus fruit into other plots: plots are public storefronts; walking in is the point.
+- Keeping mobs inside their plot: fencing is the owner's job, and with E1/E11 few mobs exist.
+- Keep-inventory: with E1 to E9 there is almost no way to die in the market.
+- `messages.yml` translation: unchanged from Phase 9.
+
+### Tests
+
+- Unit: spawn-reason allow-list and the setting parser (pure functions).
+- Docker, fresh world on Paper 26.3 and Spigot 1.21.1 (game rule names differ): after 3 minutes no natural mobs exist; `summon` (COMMAND) still works; a lit TNT leaves the blocks; fire placed next to planks does not spread; `weather rain` reverts to clear; game rules read back as set.
+- Production copy: the five WorldGuard flags are matched with WorldGuard removed from the copy.
+
+Version 2.1.0. README, config comments and listing updated; the README's "leave these off if WorldGuard..." note goes.
+
+---
+
 ## Appendix A: feature inventory (the contract)
 
 ### Commands

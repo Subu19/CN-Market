@@ -105,7 +105,7 @@ public final class Market extends JavaPlugin {
         pm.registerEvents(new SearchListener(), this);
         pm.registerEvents(new CommandTabFilter(), this);
         pm.registerEvents(new ShopProtectionListener(), this);
-        pm.registerEvents(new net.craftnepal.market.protection.WorldRulesListener(), this);
+        pm.registerEvents(new net.craftnepal.market.protection.EnvironmentListener(), this);
         pm.registerEvents(new MenuCleanupListener(), this);
         pm.registerEvents(new PlayerJoinListener(), this);
     }
@@ -144,6 +144,8 @@ public final class Market extends JavaPlugin {
     /** Drops the cached world reference; call when a world loads or unloads, or the name changes. */
     public void onWorldChanged() {
         marketWorld = null;
+        World world = getMarketWorld();
+        if (world != null && settings != null) settings.environment().apply(world);
     }
 
     public static Market getPlugin() { return plugin; }

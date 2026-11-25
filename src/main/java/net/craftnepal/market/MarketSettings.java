@@ -26,7 +26,7 @@ public final class MarketSettings {
     private final boolean allowFlight;
     private final float displayViewRange;
     private final String prefix;
-    private final boolean noPvp, noMonsters, noHunger, noFallDamage;
+    private final net.craftnepal.market.world.MarketEnvironment environment;
 
     private MarketSettings(FileConfiguration c, Logger log) {
         worldConfigured = c.contains("market-world.name");
@@ -48,10 +48,12 @@ public final class MarketSettings {
         displayViewRange = (float) c.getDouble("display-view-range", 1.0);
         String p = c.getString("prefix");
         prefix = p == null ? "" : p;
-        noPvp = c.getBoolean("market-world.rules.no-pvp", false);
-        noMonsters = c.getBoolean("market-world.rules.no-monsters", false);
-        noHunger = c.getBoolean("market-world.rules.no-hunger", false);
-        noFallDamage = c.getBoolean("market-world.rules.no-fall-damage", false);
+        environment = net.craftnepal.market.world.MarketEnvironment.from(
+                c.getConfigurationSection("market-world.environment"), log);
+        if (c.isConfigurationSection("market-world.rules")) {
+            log.warning("market-world.rules is from 2.0.0 and no longer read; use market-world.environment"
+                    + " (on by default: no mobs, PvP, explosions, fire spread, hunger, fall damage).");
+        }
     }
 
     public static MarketSettings from(FileConfiguration config, Logger log) {
@@ -78,8 +80,5 @@ public final class MarketSettings {
     public boolean allowFlight() { return allowFlight; }
     public float displayViewRange() { return displayViewRange; }
     public String prefix() { return prefix; }
-    public boolean noPvp() { return noPvp; }
-    public boolean noMonsters() { return noMonsters; }
-    public boolean noHunger() { return noHunger; }
-    public boolean noFallDamage() { return noFallDamage; }
+    public net.craftnepal.market.world.MarketEnvironment environment() { return environment; }
 }

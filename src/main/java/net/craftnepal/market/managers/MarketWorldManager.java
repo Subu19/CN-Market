@@ -21,6 +21,7 @@ public class MarketWorldManager {
     public static void initialize(boolean forceCreate) {
         World marketWorld = loadWorld(forceCreate);
         if (marketWorld != null) {
+            Market.settings().environment().apply(marketWorld);
             Location spawn = net.craftnepal.market.utils.MarketUtils.spawnIn(marketWorld);
             marketWorld.setSpawnLocation(spawn.getBlockX(), spawn.getBlockY(), spawn.getBlockZ());
         }
